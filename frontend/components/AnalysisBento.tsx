@@ -14,6 +14,43 @@ const C = (t?: number | null, invert = false) => {
   return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
 };
 
+function formatMarkdown(text?: string | null) {
+  if (!text) return null;
+  const paragraphs = text.split("\n").filter((p) => p.trim() !== "");
+  return paragraphs.map((para, pIdx) => {
+    const parts = para.split(/\*\*([^*]+)\*\*/g);
+    return (
+      <p key={pIdx} className="leading-relaxed">
+        {parts.map((part, index) => {
+          if (index % 2 === 1) {
+            return (
+              <strong key={index} className="font-extrabold text-white">
+                {part}
+              </strong>
+            );
+          }
+          return part;
+        })}
+      </p>
+    );
+  });
+}
+
+function formatMarkdownInline(text?: string | null) {
+  if (!text) return null;
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  return parts.map((part, index) => {
+    if (index % 2 === 1) {
+      return (
+        <strong key={index} className="font-extrabold text-white">
+          {part}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 /* ── Reusable bento block (dark glass, clickable to expand) ── */
 function Block({ label, icon, color, span = "", onClick, children }: {
   label: string; icon: ReactNode; color: string; span?: string; onClick?: () => void; children: ReactNode;
@@ -128,26 +165,28 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         </Block>
 
         {/* SUMMARY */}
-        <Block label="Summary" icon={<Sparkle className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2"
-          onClick={report?.summary ? () => open("Summary", <p className="text-sm leading-relaxed text-ink">{report.summary}</p>) : undefined}>
-          <p className="line-clamp-4 text-xs leading-relaxed text-white/70">{report?.summary || "No summary generated."}</p>
+        <Block label="Summary" icon={<Sparkle className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
+          onClick={report?.summary ? () => open("Summary", <div className="text-sm leading-relaxed text-ink space-y-3">{formatMarkdown(report.summary)}</div>) : undefined}>
+          <p className="line-clamp-[12] text-xs leading-relaxed text-white/70 whitespace-pre-line">
+            {formatMarkdownInline(report?.summary) || "No summary generated."}
+          </p>
         </Block>
 
         {/* CLAIMS */}
-        <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2"
+        <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
           onClick={() => open("Fact-check claims", <ClaimsPanel claims={claims} showVerification={isBusiness} onReview={onReview} />)}>
-          <div className="mb-2 flex gap-2">
+          <div className="mb-3 flex gap-2">
             <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} verified</span>
             <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
             <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/50">{claims.length} total</span>
           </div>
-          <div className="space-y-1">
-            {claims.slice(0, 3).map((c, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-[11px]">
+          <div className="space-y-2 flex-1 overflow-hidden">
+            {claims.slice(0, 7).map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-[11px] border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
                 {c.verdict === "supported"
-                  ? <Check className="h-3 w-3 shrink-0 text-good" />
-                  : <span className="shrink-0" style={{ color: C(c.verdict === "contradicted" ? 0 : 50) }}><AlertTriangle className="h-3 w-3" /></span>}
-                <span className="truncate text-white/60">{c.claim_text}</span>
+                  ? <Check className="h-3.5 w-3.5 shrink-0 text-good" />
+                  : <span className="shrink-0" style={{ color: C(c.verdict === "contradicted" ? 0 : 50) }}><AlertTriangle className="h-3.5 w-3.5" /></span>}
+                <span className="truncate text-white/70 flex-1">{c.claim_text}</span>
               </div>
             ))}
             {!claims.length && <span className="text-[11px] text-white/30">No claims extracted.</span>}
@@ -276,25 +315,202 @@ function PerceptionFull({ agent }: { agent: any }) {
 }
 
 function ScoresModal({ report, isBusiness }: { report: any; isBusiness: boolean }) {
-  const items: [string, number | null, boolean][] = [
-    ["Trust", report?.trust_score, false],
-    ["Risk", report?.risk_score, true],
-    ["Compliance", report?.compliance_score, false],
-    ["Sentiment", report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null, false],
-    ["Bias", report?.bias_score, true],
-    ["Authenticity", report?.authenticity_score, false],
-  ];
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {items.map(([l, v, inv]) => {
-        const n = v == null ? null : Math.round(v);
-        return (
-          <div key={l} className="rounded-xl border border-line bg-surface p-3 text-center">
-            <div className="font-heavy text-3xl" style={{ color: C(n, inv) }}>{n ?? "—"}</div>
-            <div className="mt-1 text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">{l}</div>
+  const agents = report?.agent_results || {};
+  const [activeScore, setActiveScore] = useState<string>("Trust");
+
+  const items = [
+    {
+      label: "Trust",
+      value: report?.trust_score,
+      invert: false,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            The Trust Score represents the structural reliability of the statements made in the video.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            <div className="font-semibold text-ink">Scoring Formula:</div>
+            <p className="text-ink-light">
+              We extract claims and score them: Supported (1.0), Unverified (0.5), Misleading (0.15), and Contradicted (0.0). The base average is penalized by the bias index (up to -30%) and multiplied by the media authenticity score.
+            </p>
+            {agents.fact_check?.reasoning && (
+              <div className="mt-2 pt-2 border-t border-line">
+                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
+                <p className="mt-1 text-ink-light italic">"{agents.fact_check.reasoning}"</p>
+              </div>
+            )}
           </div>
-        );
-      })}
+        </div>
+      )
+    },
+    {
+      label: "Risk",
+      value: report?.risk_score,
+      invert: true,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            The Risk Score calculates the likelihood of guidelines violations, reputational damage, or community backlash.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            <div className="font-semibold text-ink">Calculation Method:</div>
+            <p className="text-ink-light">
+              Aggregates Creator Risk signals, framing bias severity, audience sensitivity checks, the percentage of segments flagged as risky by the content agent, and the compliance penalty.
+            </p>
+            {agents.creator_risk?.reasoning && (
+              <div className="mt-2 pt-2 border-t border-line">
+                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
+                <p className="mt-1 text-ink-light italic">"{agents.creator_risk.reasoning}"</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      label: "Compliance",
+      value: report?.compliance_score,
+      invert: false,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            Grades compliance against commercial rules, sponsored disclosure mandates (#ad), and health/financial claim restrictions.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            {agents.compliance?.issues?.length > 0 ? (
+              <div className="space-y-2">
+                <div className="font-semibold text-bad">Flagged Issues ({agents.compliance.issues.length}):</div>
+                <div className="divide-y divide-line max-h-48 overflow-y-auto pr-1">
+                  {agents.compliance.issues.map((iss: any, idx: number) => (
+                    <div key={idx} className="py-2 first:pt-0 last:pb-0 text-[11px] text-ink-light">
+                      <div className="flex items-center gap-1.5 font-bold text-ink">
+                        <span className="h-1.5 w-1.5 rounded-full bg-bad animate-pulse" />
+                        <span>{iss.issue_type?.replace("_", " ") || "violation"}</span>
+                        <span className="ml-auto text-[9px] bg-bad/10 px-1.5 py-0.5 rounded font-extrabold text-bad uppercase">{iss.severity}</span>
+                      </div>
+                      <p className="mt-0.5">{iss.description}</p>
+                      {iss.rule_citation && <p className="text-[9px] text-ink-faint mt-0.5">Citation: {iss.rule_citation}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-good font-semibold flex items-center gap-1.5">
+                <Check className="h-4 w-4" /> All checked advertising guidelines and disclosures are fully aligned.
+              </p>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      label: "Sentiment",
+      value: report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null,
+      invert: false,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            Sentiment measures the overall emotional tone and excitement index of the speaker.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            <div className="font-semibold text-ink">Analysis:</div>
+            <p className="text-ink-light">
+              Monitors emotional intensity throughout the video transcript. Objective, informative reports aim for neutral tone scores, while high emotional peaks are typical of promotional content or sensationalism.
+            </p>
+            {agents.sentiment?.reasoning && (
+              <div className="mt-2 pt-2 border-t border-line">
+                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
+                <p className="mt-1 text-ink-light italic">"{agents.sentiment.reasoning}"</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      label: "Bias",
+      value: report?.bias_score,
+      invert: true,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            Measures political bias, comparative product bias, emotional framing, and exaggeration.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            <div className="font-semibold text-ink">Analysis details:</div>
+            <p className="text-ink-light">
+              Looks for hyperbole, one-sided arguments, and loaded terms to gauge narrative balance.
+            </p>
+            {agents.bias?.reasoning && (
+              <div className="mt-2 pt-2 border-t border-line">
+                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
+                <p className="mt-1 text-ink-light italic">"{agents.bias.reasoning}"</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      label: "Authenticity",
+      value: report?.authenticity_score,
+      invert: false,
+      reasoning: (
+        <div className="space-y-3">
+          <p className="text-xs text-ink-light leading-relaxed">
+            Authenticity rates the media file's structural integrity, scanning for deepfakes, synthetic speech, or celebrity cloning.
+          </p>
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+            <div className="font-semibold text-ink">Scan details:</div>
+            <p className="text-ink-light">
+              Scans audio/video layers for splicing anomalies, synthetic voice modulations, and known celebrity face matches.
+            </p>
+            {agents.media_integrity?.deepfake?.notes && (
+              <div className="mt-2 pt-2 border-t border-line">
+                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Detector Notes:</span>
+                <p className="mt-1 text-ink-light italic font-mono">{agents.media_integrity.deepfake.notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  const activeItem = items.find((i) => i.label === activeScore) || items[0];
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-3">
+        {items.map((item) => {
+          const n = item.value == null ? null : Math.round(item.value);
+          const active = item.label === activeScore;
+          return (
+            <button
+              key={item.label}
+              onClick={() => setActiveScore(item.label)}
+              className={`rounded-xl border p-3 text-center transition-all duration-200 ${
+                active
+                  ? "border-accent bg-accent/5 shadow-md scale-[1.02]"
+                  : "border-line bg-surface hover:bg-hover hover:border-ink/20"
+              }`}
+            >
+              <div className="font-heavy text-3xl" style={{ color: C(n, item.invert) }}>
+                {n ?? "—"}
+              </div>
+              <div className="mt-1 text-[9px] font-extrabold uppercase tracking-widest text-ink">{item.label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="rounded-xl border border-line bg-paper p-4 shadow-sm text-left">
+        <h4 className="font-heavy text-xs uppercase tracking-wider text-ink mb-2.5 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {activeItem.label} Score Details
+        </h4>
+        {activeItem.reasoning}
+      </div>
     </div>
   );
 }
