@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getRights, listProducts, submitUrl, uploadVideo } from "@/lib/api";
+import { getRights, listProducts, submitUrl, uploadVideo, getRole } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
 import { ArrowRight, Link2, Upload, Sparkle } from "@/components/icons";
 
@@ -18,6 +18,12 @@ export default function AnalyzePage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const role = getRole();
+    if (!role) {
+      router.push("/login");
+      return;
+    }
+
     getRights().then((r) => {
       setRights(r);
       if (!r.formats?.includes("url")) setTab("upload");
