@@ -1,0 +1,50 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.17
+
+# Settings & validation
+pydantic==2.10.3
+pydantic-settings==2.6.1
+email-validator==2.2.0
+
+# Database
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3
+pgvector==0.3.6
+alembic==1.14.0
+
+# Auth
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+python-jose[cryptography]==3.3.0
+google-auth==2.36.0
+
+# Async jobs
+celery==5.4.0
+redis==5.2.1
+
+# AI / LLM (OpenAI-compatible)
+openai==1.57.4
+tiktoken==0.8.0
+
+# Embeddings: default is OpenRouter/OpenAI (via the openai client above).
+# For the OPTIONAL local fallback (EMBEDDINGS_PROVIDER=local) install:
+#   pip install sentence-transformers
+# It is omitted here to keep the image small (it pulls in torch).
+
+# Media ingestion & transcription
+# Unpinned floor: YouTube breaks old yt-dlp releases frequently, so always pull a
+# recent build. Bump this if extraction starts failing.
+yt-dlp>=2025.6.0
+
+# Document parsing (RAG ingestion)
+pypdf==5.1.0
+python-docx==1.1.2
+
+# Evidence retrieval
+httpx==0.28.1
+tavily-python==0.5.0
+
+# Reports
+reportlab==4.2.5

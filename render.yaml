@@ -1,0 +1,48 @@
+# Render Blueprint — deploys the TruthLayer backend on the free tier.
+# Database: use a free Supabase/Neon Postgres (set DATABASE_URL below) since
+# Render's free Postgres expires after 30 days. Redis is optional.
+#
+# 1. Push this repo to GitHub.
+# 2. Render → New → Blueprint → select this repo.
+# 3. Fill the env vars marked sync:false in the dashboard.
+# 4. Deploy the frontend separately on Vercel (see frontend/README.md).
+
+services:
+  - type: web
+    name: truthlayer-backend
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: USE_CELERY
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: llama-3.3-70b-versatile
+      - key: WHISPER_API_KEY
+        sync: false
+      - key: WHISPER_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: WHISPER_MODEL
+        value: whisper-large-v3
+      - key: EMBEDDINGS_PROVIDER
+        value: local
+      - key: EMBEDDINGS_DIM
+        value: "384"
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: BACKEND_CORS_ORIGINS
+        sync: false

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker --version)",
+      "Bash(echo \"docker: $\\(docker --version || echo 'NOT INSTALLED'\\)\")",
+      "Bash(docker compose *)",
+      "Bash(echo \"docker compose: $\\(docker compose version)",
+      "Bash(open -a Docker)",
+      "Bash(echo \"compose-up exit=$?\")"
+    ]
+  }
+}
