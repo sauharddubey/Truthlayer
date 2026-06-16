@@ -96,6 +96,10 @@ export function DynamicNav() {
       title: "Knowledge Base & Verification",
       content: "In Business Workspaces, you can upload PDFs/DOCX/TXT specification sheets and policies. The platform automatically retrieves context via semantic vector RAG search to auto-verify claims in ingested videos.",
     },
+    {
+      title: "Install App & Share Directly",
+      content: "Install TruthLayer as a web app on your phone to share videos directly from native apps:\n\n• Why: Bypasses manual copy-pasting. Audits are started directly from your system's share sheet.\n• iOS (Safari): Tap the 'Share' button, scroll down, and tap 'Add to Home Screen'.\n• Android (Chrome): Tap the browser menu and select 'Install App' or 'Add to Home Screen'.\n\nOnce installed, TruthLayer will appear inside your phone's native Share Sheet menu!",
+    },
   ];
 
   return (
