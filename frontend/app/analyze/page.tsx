@@ -23,6 +23,14 @@ export default function AnalyzePage() {
       if (!r.formats?.includes("url")) setTab("upload");
       if (r.has_products) listProducts().then(setProducts).catch(() => {});
     }).catch((e) => setError(e.message));
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const sharedUrl = params.get("url") || params.get("text");
+      if (sharedUrl) {
+        setUrl(sharedUrl);
+      }
+    }
   }, []);
 
   const formats: string[] = rights?.formats || ["url"];
