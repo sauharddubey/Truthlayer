@@ -41,12 +41,18 @@ class UserOut(BaseModel):
     role: UserRole
     organization_id: Optional[str]
     has_api_key: bool = False
+    llm_model: Optional[str] = None
+    embeddings_model: Optional[str] = None
+    transcription_model: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
 
 class SettingsRequest(BaseModel):
     openrouter_api_key: Optional[str] = None
+    llm_model: Optional[str] = None
+    embeddings_model: Optional[str] = None
+    transcription_model: Optional[str] = None
 
 
 # ── Products ─────────────────────────────────────────────────────────────────

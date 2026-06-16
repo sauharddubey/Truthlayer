@@ -62,6 +62,9 @@ def init_db() -> None:
     # Additive, idempotent migrations (create_all does not ALTER existing tables).
     _additive_migrations = [
         "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS llm_model VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS embeddings_model VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS transcription_model VARCHAR",
         """
         CREATE TABLE IF NOT EXISTS usage_records (
             id VARCHAR PRIMARY KEY,

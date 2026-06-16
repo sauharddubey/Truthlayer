@@ -101,6 +101,9 @@ def me(user: User = Depends(get_current_user)):
         role=user.role,
         organization_id=user.organization_id,
         has_api_key=bool(user.openrouter_api_key),
+        llm_model=user.llm_model,
+        embeddings_model=user.embeddings_model,
+        transcription_model=user.transcription_model,
     )
 
 
@@ -114,13 +117,27 @@ def my_rights(user: User = Depends(get_current_user)):
 
 @router.put("/settings", response_model=UserOut)
 def update_settings(payload: SettingsRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Set the user's own OpenRouter key (blank reverts to the platform default)."""
-    user.openrouter_api_key = (payload.openrouter_api_key or "").strip() or None
+    """Set the user's own OpenRouter key and model configuration."""
+    if payload.openrouter_api_key is not None:
+        user.openrouter_api_key = payload.openrouter_api_key.strip() or None
+    if payload.llm_model is not None:
+        user.llm_model = payload.llm_model.strip() or None
+    if payload.embeddings_model is not None:
+        user.embeddings_model = payload.embeddings_model.strip() or None
+    if payload.transcription_model is not None:
+        user.transcription_model = payload.transcription_model.strip() or None
     db.commit()
     db.refresh(user)
     return UserOut(
-        id=user.id, email=user.email, full_name=user.full_name, role=user.role,
-        organization_id=user.organization_id, has_api_key=bool(user.openrouter_api_key),
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        organization_id=user.organization_id,
+        has_api_key=bool(user.openrouter_api_key),
+        llm_model=user.llm_model,
+        embeddings_model=user.embeddings_model,
+        transcription_model=user.transcription_model,
     )
 
 

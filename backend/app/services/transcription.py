@@ -25,7 +25,7 @@ from typing import List, Optional
 from openai import OpenAI
 
 from app.config import settings
-from app.llm import _extract_json, effective_chat_key
+from app.llm import _extract_json, effective_chat_key, effective_transcription_model
 
 logger = logging.getLogger("truthlayer.transcription")
 
@@ -89,7 +89,7 @@ def _transcribe_openrouter(audio_path: str, duration: Optional[float]) -> Option
         },
     )
     resp = client.chat.completions.create(
-        model=settings.TRANSCRIPTION_MODEL,
+        model=effective_transcription_model(),
         temperature=0,
         messages=[
             {

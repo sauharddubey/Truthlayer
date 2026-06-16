@@ -3,7 +3,29 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { getMe, updateSettings, getUsage } from "@/lib/api";
-import { Check, Sparkle, FileSearch, AudioLines, Network } from "@/components/icons";
+import { Check, Sparkle, FileSearch, AudioLines, Network, Layers, ChevronDown } from "@/components/icons";
+
+const DEFAULT_LLM_MODELS = [
+  { id: "openai/gpt-oss-120b:free", name: "GPT-OSS-120B (Free Default)" },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini" },
+  { id: "openai/gpt-4o", name: "GPT-4o" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
+  { id: "meta-llama/llama-3.1-8b-instruct:free", name: "Llama 3.1 8B Instruct (Free)" },
+];
+
+const DEFAULT_EMBEDDING_MODELS = [
+  { id: "openai/text-embedding-3-small", name: "Text Embedding 3 Small (Default)" },
+  { id: "openai/text-embedding-3-large", name: "Text Embedding 3 Large" },
+];
+
+/** Per-token USD pricing pulled from OpenRouter. */
+type ModelPricing = { prompt: number; completion: number; audio: number };
+type ModelOption = { id: string; name: string; pricing?: ModelPricing };
+
+const DEFAULT_TRANSCRIPTION_MODELS: ModelOption[] = [
+  { id: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite (Default)" },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+];
 
 /* ── Tiny SVG bar chart ───────────────────────────────────────────────────── */
 function MiniBarChart({ data }: { data: Array<{ day: string; total_tokens: number; cost_usd: number }> }) {
@@ -69,6 +91,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 /* ── Main page ────────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
+  const [user, setUser]       = useState<any>(null);
   const [hasKey, setHasKey]   = useState(false);
   const [value, setValue]     = useState("");
   const [saved, setSaved]     = useState(false);
@@ -77,19 +100,105 @@ export default function SettingsPage() {
   const [usage, setUsage]     = useState<Awaited<ReturnType<typeof getUsage>> | null>(null);
   const [usageErr, setUsageErr] = useState("");
 
+  // Model selection states
+  const [llmVal, setLlmVal] = useState("");
+  const [embedVal, setEmbedVal] = useState("");
+  const [transcriptionVal, setTranscriptionVal] = useState("");
+  const [savingModels, setSavingModels] = useState(false);
+  const [savedModels, setSavedModels] = useState(false);
+  const [modelsError, setModelsError] = useState("");
+
+  // Model lists
+  const [llmModels, setLlmModels] = useState<{ id: string; name: string }[]>(DEFAULT_LLM_MODELS);
+  const [embedModels, setEmbedModels] = useState<{ id: string; name: string }[]>(DEFAULT_EMBEDDING_MODELS);
+  const [transcriptionModels, setTranscriptionModels] = useState<ModelOption[]>(DEFAULT_TRANSCRIPTION_MODELS);
+
   useEffect(() => {
-    getMe().then((u) => setHasKey(!!u.has_api_key)).catch(() => {});
+    getMe()
+      .then((u) => {
+        setUser(u);
+        setHasKey(!!u.has_api_key);
+        setLlmVal(u.llm_model || "");
+        setEmbedVal(u.embeddings_model || "");
+        setTranscriptionVal(u.transcription_model || "");
+      })
+      .catch(() => {});
+
     getUsage().then(setUsage).catch((e) => setUsageErr(e.message));
+
+    // Fetch OpenRouter models dynamically
+    fetch("https://openrouter.ai/api/v1/models")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.data)) {
+          const all: any[] = data.data;
+
+          const llms = all
+            .filter((m) => !m.id.includes("embed"))
+            .map((m) => ({ id: m.id, name: m.name || m.id }));
+
+          const embeds = all
+            .filter((m) => m.id.includes("embed"))
+            .map((m) => ({ id: m.id, name: m.name || m.id }));
+
+          // Only models that accept audio as an input modality can transcribe.
+          // (matches https://openrouter.ai/models?input_modalities=audio)
+          const transcriptions: ModelOption[] = all
+            .filter((m) => m.architecture?.input_modalities?.includes("audio"))
+            .map((m) => ({
+              id: m.id,
+              name: m.name || m.id,
+              pricing: m.pricing
+                ? {
+                    prompt: parseFloat(m.pricing.prompt) || 0,
+                    completion: parseFloat(m.pricing.completion) || 0,
+                    audio: parseFloat(m.pricing.audio) || 0,
+                  }
+                : undefined,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          const mergeModels = (defaults: typeof DEFAULT_LLM_MODELS, fetched: typeof DEFAULT_LLM_MODELS) => {
+            const seen = new Set(defaults.map((d) => d.id));
+            const merged = [...defaults];
+            for (const item of fetched) {
+              if (!seen.has(item.id)) {
+                seen.add(item.id);
+                merged.push(item);
+              }
+            }
+            return merged;
+          };
+
+          setLlmModels(mergeModels(DEFAULT_LLM_MODELS, llms));
+          setEmbedModels(mergeModels(DEFAULT_EMBEDDING_MODELS, embeds));
+          if (transcriptions.length) setTranscriptionModels(transcriptions);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch OpenRouter models:", err));
   }, []);
 
   async function save() {
     setLoading(true); setError(""); setSaved(false);
     try {
-      const u = await updateSettings(value);
+      const u = await updateSettings({ openrouter_api_key: value });
       setHasKey(!!u.has_api_key);
       setValue("");
       setSaved(true);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
+  }
+
+  async function saveModelsConfig() {
+    setSavingModels(true); setModelsError(""); setSavedModels(false);
+    try {
+      const u = await updateSettings({
+        llm_model: llmVal || "",
+        embeddings_model: embedVal || "",
+        transcription_model: transcriptionVal || "",
+      });
+      setUser(u);
+      setSavedModels(true);
+    } catch (e: any) { setModelsError(e.message); } finally { setSavingModels(false); }
   }
 
   const fmtTokens = (n: number) =>
@@ -100,6 +209,16 @@ export default function SettingsPage() {
     usd === 0 ? "$0.00" :
     usd < 0.001 ? `$${(usd * 1000).toFixed(3)}m` :
     `$${usd.toFixed(4)}`;
+
+  // OpenRouter pricing is per-token USD; show it per 1M tokens for readability.
+  const fmtPerM = (perToken: number) => {
+    const perM = perToken * 1_000_000;
+    if (perM === 0) return "Free";
+    return perM < 1 ? `$${perM.toFixed(3)}` : `$${perM.toFixed(2)}`;
+  };
+
+  const selectedTranscription = transcriptionModels.find((m) => m.id === transcriptionVal);
+  const tPricing = selectedTranscription?.pricing;
 
   return (
     <AppShell title="Settings">
@@ -275,6 +394,161 @@ export default function SettingsPage() {
                   Remove key
                 </button>
               )}
+            </div>
+          </div>
+        </section>
+
+        <div className="h-px bg-line" />
+
+        {/* ── Model Stack Configuration ───────────────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
+              <Layers className="h-3.5 w-3.5 text-accent" />
+            </div>
+            <h2 className="text-sm font-bold text-ink uppercase tracking-widest">Model Stack Configuration</h2>
+          </div>
+
+          <div className="card space-y-5">
+            <p className="text-sm text-ink-light leading-relaxed">
+              Customize the specific OpenRouter AI models used for your video intelligence runs. 
+              Leave selection blank to use default platform routing.
+            </p>
+
+            {/* Chat LLM / Reasoning Select */}
+            <div>
+              <label className="label flex items-center gap-1.5 mb-1.5">
+                <Sparkle className="h-3.5 w-3.5 text-accent" />
+                Chat LLM (Reasoning &amp; Agents)
+              </label>
+              <div className="relative">
+                <select
+                  className="input pr-10 appearance-none font-mono"
+                  value={llmVal}
+                  onChange={(e) => setLlmVal(e.target.value)}
+                >
+                  <option value="">Platform Default (GPT-OSS-120B / GPT-4o Mini)</option>
+                  {llmModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.id})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-faint">
+                  <ChevronDown className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="mt-1.5 text-xs text-ink-faint">
+                Runs fact-checking, compliance, narrative, bias, and sentiment agents.
+              </p>
+            </div>
+
+            {/* Transcription Select */}
+            <div>
+              <label className="label flex items-center gap-1.5 mb-1.5">
+                <AudioLines className="h-3.5 w-3.5 text-good" />
+                Audio Transcription (Speech-to-Text)
+              </label>
+              <div className="relative">
+                <select
+                  className="input pr-10 appearance-none font-mono"
+                  value={transcriptionVal}
+                  onChange={(e) => setTranscriptionVal(e.target.value)}
+                >
+                  <option value="">Platform Default (Gemini 2.5 Flash Lite)</option>
+                  {transcriptionModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.id})
+                      {m.pricing ? ` — in ${fmtPerM(m.pricing.prompt)} / out ${fmtPerM(m.pricing.completion)} per 1M` : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-faint">
+                  <ChevronDown className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="mt-1.5 text-xs text-ink-faint">
+                Only models that accept audio input on OpenRouter are listed (e.g. Gemini, GPT-Audio, Voxtral).
+              </p>
+
+              {/* Selected-model cost breakdown */}
+              {selectedTranscription && (
+                <div className="mt-3 rounded-xl border border-line bg-paper p-3.5">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">Estimated cost · per 1M tokens</div>
+                    <span className="text-[9px] font-semibold text-ink-faint font-mono truncate max-w-[45%]">{selectedTranscription.id}</span>
+                  </div>
+                  {tPricing ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-lg border border-line bg-surface px-2.5 py-2">
+                          <div className="text-[8px] font-extrabold uppercase tracking-widest text-ink-faint">Text in</div>
+                          <div className="font-heavy text-sm text-ink">{fmtPerM(tPricing.prompt)}</div>
+                        </div>
+                        <div className="rounded-lg border border-line bg-surface px-2.5 py-2">
+                          <div className="text-[8px] font-extrabold uppercase tracking-widest text-ink-faint">Audio in</div>
+                          <div className="font-heavy text-sm text-ink">{fmtPerM(tPricing.audio)}</div>
+                        </div>
+                        <div className="rounded-lg border border-line bg-surface px-2.5 py-2">
+                          <div className="text-[8px] font-extrabold uppercase tracking-widest text-ink-faint">Text out</div>
+                          <div className="font-heavy text-sm text-ink">{fmtPerM(tPricing.completion)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2.5">
+                        <span className="text-[10px] font-semibold text-ink-light">Combined (audio in + text out)</span>
+                        <span className="font-bold text-sm" style={{ color: tPricing.audio + tPricing.completion > 0 ? "#cb912f" : "#0f7b6c" }}>
+                          {fmtPerM(tPricing.audio + tPricing.completion)} <span className="text-[10px] font-normal text-ink-faint">/ 1M tok</span>
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-ink-faint">Live pricing unavailable for this model.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Vector Embeddings Select (Only for BUSINESS tier users who have product RAG features) */}
+            {user?.role === "business" && (
+              <div>
+                <label className="label flex items-center gap-1.5 mb-1.5">
+                  <Network className="h-3.5 w-3.5 text-warn" />
+                  Vector Embeddings (RAG Retrieval)
+                </label>
+                <div className="relative">
+                  <select
+                    className="input pr-10 appearance-none font-mono"
+                    value={embedVal}
+                    onChange={(e) => setEmbedVal(e.target.value)}
+                  >
+                    <option value="">Platform Default (Text Embedding 3 Small)</option>
+                    {embedModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.id})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-ink-faint">
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="mt-1.5 text-xs text-ink-faint">
+                  Used for parsing and searching your brand knowledge base (marketing guidelines, product details).
+                </p>
+              </div>
+            )}
+
+            {savedModels && (
+              <div className="rounded-lg border border-good/20 bg-good/10 px-3 py-2 text-sm text-good flex items-center gap-1.5">
+                <Check className="h-4 w-4" /> Saved successfully.
+              </div>
+            )}
+            {modelsError && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad">{modelsError}</div>}
+
+            <div className="flex gap-2.5 pt-1">
+              <button className="btn-accent" onClick={saveModelsConfig} disabled={savingModels}>
+                {savingModels ? "Saving…" : "Save model stack"}
+              </button>
             </div>
           </div>
         </section>

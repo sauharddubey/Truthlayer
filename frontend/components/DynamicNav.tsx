@@ -40,7 +40,9 @@ export function DynamicNav() {
 
   useEffect(() => {
     setRole(getRole());
-    
+  }, [pathname]);
+
+  useEffect(() => {
     // Check local storage / media query for dark theme
     const active = localStorage.getItem("theme") === "dark" ||
       (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);

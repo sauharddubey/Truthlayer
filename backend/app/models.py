@@ -96,6 +96,12 @@ class User(Base):
     )
     # Per-user OpenRouter key (falls back to the platform default if empty).
     openrouter_api_key: Mapped[Optional[str]] = mapped_column(String)
+    
+    # Per-user custom model selections
+    llm_model: Mapped[Optional[str]] = mapped_column(String)
+    embeddings_model: Mapped[Optional[str]] = mapped_column(String)
+    transcription_model: Mapped[Optional[str]] = mapped_column(String)
+    
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

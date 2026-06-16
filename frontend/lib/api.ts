@@ -108,11 +108,16 @@ export function getMe() {
   return request<any>("/auth/me");
 }
 
-export function updateSettings(openrouter_api_key: string) {
+export function updateSettings(payload: {
+  openrouter_api_key?: string;
+  llm_model?: string | null;
+  embeddings_model?: string | null;
+  transcription_model?: string | null;
+}) {
   return request<any>("/auth/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ openrouter_api_key }),
+    body: JSON.stringify(payload),
   });
 }
 

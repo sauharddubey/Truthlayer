@@ -82,7 +82,19 @@ def process_video(video_id: str) -> None:
 
             if video.submitted_by:
                 user = db.get(User, video.submitted_by)
-                set_runtime_api_key(user.openrouter_api_key if user else None)
+                if user:
+                    from app.llm import (
+                        set_runtime_api_key,
+                        set_runtime_llm_model,
+                        set_runtime_embeddings_model,
+                        set_runtime_transcription_model,
+                        set_runtime_user_id,
+                    )
+                    set_runtime_api_key(user.openrouter_api_key)
+                    set_runtime_llm_model(user.llm_model)
+                    set_runtime_embeddings_model(user.embeddings_model)
+                    set_runtime_transcription_model(user.transcription_model)
+                    set_runtime_user_id(user.id)
 
             # 0. Make re-processing idempotent: clear any prior artifacts so a
             #    re-run doesn't violate the one-report-per-video constraint.

@@ -31,6 +31,15 @@ _runtime_api_key: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar
 _runtime_user_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "runtime_user_id", default=None
 )
+_runtime_llm_model: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "runtime_llm_model", default=None
+)
+_runtime_embeddings_model: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "runtime_embeddings_model", default=None
+)
+_runtime_transcription_model: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "runtime_transcription_model", default=None
+)
 
 
 def set_runtime_api_key(key: Optional[str]) -> None:
@@ -41,6 +50,18 @@ def set_runtime_user_id(user_id: Optional[str]) -> None:
     _runtime_user_id.set(user_id or None)
 
 
+def set_runtime_llm_model(model: Optional[str]) -> None:
+    _runtime_llm_model.set(model or None)
+
+
+def set_runtime_embeddings_model(model: Optional[str]) -> None:
+    _runtime_embeddings_model.set(model or None)
+
+
+def set_runtime_transcription_model(model: Optional[str]) -> None:
+    _runtime_transcription_model.set(model or None)
+
+
 def effective_chat_key() -> str:
     return _runtime_api_key.get() or settings.LLM_API_KEY
 
@@ -49,6 +70,18 @@ def effective_embeddings_key() -> str:
     # OpenRouter serves both; prefer the runtime key, then the embeddings key,
     # then the chat key.
     return _runtime_api_key.get() or settings.EMBEDDINGS_API_KEY or settings.LLM_API_KEY
+
+
+def effective_llm_model() -> str:
+    return _runtime_llm_model.get() or settings.LLM_MODEL
+
+
+def effective_embeddings_model() -> str:
+    return _runtime_embeddings_model.get() or settings.EMBEDDINGS_MODEL
+
+
+def effective_transcription_model() -> str:
+    return _runtime_transcription_model.get() or settings.TRANSCRIPTION_MODEL
 
 
 _DEFAULT_HEADERS = {
@@ -139,8 +172,9 @@ def chat_json(system: str, user: str, *, schema_hint: str = "") -> dict:
             f"{schema_hint}\nDo not include markdown fences or commentary."
         )
     try:
+        llm_model = effective_llm_model()
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
             messages=[
                 {"role": "system", "content": sys_prompt},
@@ -150,7 +184,7 @@ def chat_json(system: str, user: str, *, schema_hint: str = "") -> dict:
         # Record usage
         if resp.usage:
             _record_usage(
-                "chat", settings.LLM_MODEL,
+                "chat", llm_model,
                 resp.usage.prompt_tokens, resp.usage.completion_tokens,
             )
         return _extract_json(resp.choices[0].message.content or "")
@@ -164,8 +198,9 @@ def chat_text(system: str, user: str) -> str:
     if client is None:
         return ""
     try:
+        llm_model = effective_llm_model()
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
             messages=[
                 {"role": "system", "content": system},
@@ -174,7 +209,7 @@ def chat_text(system: str, user: str) -> str:
         )
         if resp.usage:
             _record_usage(
-                "chat", settings.LLM_MODEL,
+                "chat", llm_model,
                 resp.usage.prompt_tokens, resp.usage.completion_tokens,
             )
         return resp.choices[0].message.content or ""
@@ -224,11 +259,12 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
         client = _client(effective_embeddings_key(), settings.EMBEDDINGS_BASE_URL)
         if client is not None:
             try:
-                resp = client.embeddings.create(model=settings.EMBEDDINGS_MODEL, input=texts)
+                emb_model = effective_embeddings_model()
+                resp = client.embeddings.create(model=emb_model, input=texts)
                 # Record embedding usage (completion_tokens = 0 for embeddings)
                 if hasattr(resp, "usage") and resp.usage:
                     _record_usage(
-                        "embed", settings.EMBEDDINGS_MODEL,
+                        "embed", emb_model,
                         getattr(resp.usage, "prompt_tokens", len(texts) * 8), 0,
                     )
                 return [d.embedding for d in resp.data]
