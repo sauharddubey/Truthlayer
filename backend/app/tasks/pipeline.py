@@ -162,6 +162,15 @@ def process_video(video_id: str) -> None:
 
             video.processing_status = ProcessingStatus.COMPLETED
             logger.info("Pipeline completed for video %s", video_id)
+            if video.organization_id:
+                try:
+                    from redis import Redis
+                    from app.config import settings
+                    if settings.REDIS_URL:
+                        r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+                        r.delete(f"brand_synthesis:{video.organization_id}")
+                except Exception:
+                    pass
         except Exception as exc:
             logger.exception("Pipeline failed for video %s: %s", video_id, exc)
             video.processing_status = ProcessingStatus.FAILED

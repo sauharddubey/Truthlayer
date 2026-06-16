@@ -6,11 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import json
+from redis import Redis
+from app.config import settings
 from app.database import get_db
 from app.llm import chat_json
 from app.models import MonitoredKeyword, NarrativeCluster, Product, User, UserRole, Video
 from app.schemas import KeywordRequest
 from app.security import get_current_user
+
+# Setup Redis client for caching brand synthesis
+_redis_client = None
+if settings.REDIS_URL:
+    try:
+        _redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -87,18 +98,35 @@ def brand_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curr
         reverse=True,
     )
 
-    # Brand identity + strengths/weaknesses synthesis.
-    synthesis = {}
-    if product_summaries:
-        synthesis = chat_json(
-            system=(
-                "You are a brand analyst. Given per-product trust/sentiment/risk scores "
-                "for a company, summarize the brand identity in one sentence, and list "
-                "general strengths and weaknesses across the portfolio."
-            ),
-            user=str(product_summaries)[:3000],
-            schema_hint='{"brand_identity":"string","strengths":["string"],"weaknesses":["string"]}',
-        )
+    # Brand identity + strengths/weaknesses synthesis (cached in Redis to resolve dashboard delays).
+    synthesis = None
+    cache_key = f"brand_synthesis:{org_id}"
+    if _redis_client:
+        try:
+            cached_data = _redis_client.get(cache_key)
+            if cached_data:
+                synthesis = json.loads(cached_data)
+        except Exception:
+            pass
+
+    if not synthesis:
+        synthesis = {}
+        if product_summaries:
+            synthesis = chat_json(
+                system=(
+                    "You are a brand analyst. Given per-product trust/sentiment/risk scores "
+                    "for a company, summarize the brand identity in one sentence, and list "
+                    "general strengths and weaknesses across the portfolio."
+                ),
+                user=str(product_summaries)[:3000],
+                schema_hint='{"brand_identity":"string","strengths":["string"],"weaknesses":["string"]}',
+            )
+            if synthesis and _redis_client:
+                try:
+                    # Cache for 1 hour (3600 seconds) - invalidated on pipeline completions and product changes
+                    _redis_client.set(cache_key, json.dumps(synthesis), ex=3600)
+                except Exception:
+                    pass
 
     # Brand perception from monitored brand hashtags + overall sentiment.
     all_reports = db.execute(

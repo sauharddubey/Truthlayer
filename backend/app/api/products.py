@@ -57,8 +57,9 @@ def _get_product(db: Session, pid: str, user: User) -> Product:
 
 @router.post("", response_model=ProductOut)
 def create_product(payload: ProductCreate, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    org_id = _org(user)
     p = Product(
-        organization_id=_org(user),
+        organization_id=org_id,
         name=payload.name,
         description=payload.description,
         image_url=payload.image_url,
@@ -67,6 +68,17 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db), user: 
     db.add(p)
     db.commit()
     db.refresh(p)
+
+    # Invalidate cache
+    try:
+        from redis import Redis
+        from app.config import settings
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.delete(f"brand_synthesis:{org_id}")
+    except Exception:
+        pass
+
     return p
 
 
@@ -111,8 +123,20 @@ def get_product(pid: str, db: Session = Depends(get_db), user: User = Depends(bu
 @router.delete("/{pid}")
 def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     p = _get_product(db, pid, user)
+    org_id = p.organization_id
     db.delete(p)
     db.commit()
+
+    # Invalidate cache
+    try:
+        from redis import Redis
+        from app.config import settings
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.delete(f"brand_synthesis:{org_id}")
+    except Exception:
+        pass
+
     return {"deleted": pid}
 
 
