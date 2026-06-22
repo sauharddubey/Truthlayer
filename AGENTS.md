@@ -113,13 +113,15 @@ Health: `GET http://localhost:8000/health`.
 ### Environment
 - `LLM_*` → OpenRouter chat (`openai/gpt-oss-120b:free` is the free default).
 - `EMBEDDINGS_*` → OpenRouter `openai/text-embedding-3-small` (1536-dim) or local MiniLM.
-- `TRANSCRIPTION_PROVIDER=openrouter` (audio via `google/gemini-2.5-flash-lite`);
-  `whisper` (Groq) or `stub` are alternatives.
-- Per-user keys: set in the app's Settings page (`PUT /auth/settings`), stored on `User`.
+- `TRANSCRIPTION_PROVIDER=openrouter` (audio via `google/gemini-2.5-flash-lite`); `stub` is the alternative.
+- **No Whisper API Key**: Whisper key/provider is fully removed. All transcription runs through OpenRouter audio multimodal models or falls back to the stub.
+- Per-user keys: OpenRouter, Tavily, and media-integrity keys are set in the app's Settings page (`PUT /auth/settings`) and stored on `User` encrypted.
 
 ---
 
 ## ⚠️ Gotchas (we hit these — don't repeat)
+- **Encryption Key Sharing**: When working on the same shared Supabase database, all developers MUST share the exact same `ENCRYPTION_KEY` in their local `.env`. If keys differ, decrypting stored user API keys will fail with a cryptography `InvalidToken` error.
+- **Multi-env split**: The frontend reads `frontend/.env.local` for local development. Never put server secrets (like `ENCRYPTION_KEY`) in frontend files since `NEXT_PUBLIC_` variables are bundled client-side and visible to users.
 - **Never run `npm run build` while the dev server is running.** `next build`
   overwrites the shared `.next/` dir and the running dev server starts serving
   unstyled HTML. To verify, use `npx tsc --noEmit` + the preview, not a full build.

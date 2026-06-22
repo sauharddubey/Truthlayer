@@ -1,8 +1,8 @@
 """Provider-agnostic LLM + embeddings access layer (OpenRouter by default).
 
-Supports a per-user API key: a request/pipeline sets a runtime key via a
-contextvar, and all chat/embeddings/transcription calls use it. If unset, the
-platform default (``settings.LLM_API_KEY``) is used.
+Per-user API keys only: a request/pipeline sets the user's runtime key via a
+contextvar, and all chat/embeddings/transcription calls use it. There is no
+environment-variable fallback — every key is supplied by the user in Settings.
 
 Every successful API call records a UsageRecord row so users can see their
 token and cost consumption in the settings dashboard.
@@ -40,10 +40,25 @@ _runtime_embeddings_model: contextvars.ContextVar[Optional[str]] = contextvars.C
 _runtime_transcription_model: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "runtime_transcription_model", default=None
 )
+# Other per-user service keys (set per request/pipeline from the user's profile).
+_runtime_tavily_key: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "runtime_tavily_key", default=None
+)
+_runtime_media_integrity_key: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "runtime_media_integrity_key", default=None
+)
 
 
 def set_runtime_api_key(key: Optional[str]) -> None:
     _runtime_api_key.set(key or None)
+
+
+def set_runtime_tavily_key(key: Optional[str]) -> None:
+    _runtime_tavily_key.set(key or None)
+
+
+def set_runtime_media_integrity_key(key: Optional[str]) -> None:
+    _runtime_media_integrity_key.set(key or None)
 
 
 def set_runtime_user_id(user_id: Optional[str]) -> None:
@@ -63,13 +78,23 @@ def set_runtime_transcription_model(model: Optional[str]) -> None:
 
 
 def effective_chat_key() -> str:
-    return _runtime_api_key.get() or settings.LLM_API_KEY
+    key = _runtime_api_key.get()
+    if not key:
+        raise RuntimeError("No OpenRouter API key set for this request")
+    return key
 
 
 def effective_embeddings_key() -> str:
-    # OpenRouter serves both; prefer the runtime key, then the embeddings key,
-    # then the chat key.
-    return _runtime_api_key.get() or settings.EMBEDDINGS_API_KEY or settings.LLM_API_KEY
+    # OpenRouter serves embeddings with the same per-user OpenRouter key.
+    return effective_chat_key()
+
+
+def effective_tavily_key() -> Optional[str]:
+    return _runtime_tavily_key.get()
+
+
+def effective_media_integrity_key() -> Optional[str]:
+    return _runtime_media_integrity_key.get()
 
 
 def effective_llm_model() -> str:

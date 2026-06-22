@@ -165,8 +165,12 @@ async def upload_document(
 
 @router.get("/{pid}/documents", response_model=list[DocumentOut])
 def list_documents(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    _get_product(db, pid, user)  # enforce org ownership before listing
     return db.execute(
-        select(BusinessDocument).where(BusinessDocument.product_id == pid)
+        select(BusinessDocument).where(
+            BusinessDocument.product_id == pid,
+            BusinessDocument.organization_id == _org(user),
+        )
     ).scalars().all()
 
 
@@ -190,7 +194,13 @@ def add_keyword(pid: str, payload: KeywordRequest, db: Session = Depends(get_db)
 
 @router.get("/{pid}/keywords")
 def list_keywords(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    rows = db.execute(select(MonitoredKeyword).where(MonitoredKeyword.product_id == pid)).scalars().all()
+    _get_product(db, pid, user)  # enforce org ownership before listing
+    rows = db.execute(
+        select(MonitoredKeyword).where(
+            MonitoredKeyword.product_id == pid,
+            MonitoredKeyword.organization_id == _org(user),
+        )
+    ).scalars().all()
     return [{"id": k.id, "keyword": k.keyword, "keyword_type": k.keyword_type} for k in rows]
 
 
@@ -277,6 +287,16 @@ def contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends
     ).all()
     if len(rows) < 2:
         return {"contradictions": []}
+
+    # Use the requesting user's own key — never the platform key.
+    from app.crypto import decrypt_secret
+    from app.llm import set_runtime_api_key, set_runtime_user_id
+
+    user_key = decrypt_secret(user.openrouter_api_key)
+    if not user_key:
+        return {"contradictions": []}
+    set_runtime_api_key(user_key)
+    set_runtime_user_id(user.id)
 
     listing = "\n".join(
         f"[{i}] (video {r[1][:8]} – {r[2] or ''}) {r[0]}" for i, r in enumerate(rows[:60])

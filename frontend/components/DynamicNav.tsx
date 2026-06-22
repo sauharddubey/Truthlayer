@@ -170,7 +170,7 @@ export function DynamicNav() {
               
               <button
                 title="Sign out"
-                onClick={() => { clearAuth(); router.push("/"); }}
+                onClick={async () => { await clearAuth(); router.push("/"); }}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-bad/20 hover:text-bad"
               >
                 <LogOut className="h-4 w-4" />

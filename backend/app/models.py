@@ -88,15 +88,20 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    # Auth is delegated to Supabase, so credentials live there — kept nullable
+    # only for legacy rows.
+    hashed_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.VERIFIER)
     organization_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("organizations.id"), nullable=True
     )
-    # Per-user OpenRouter key (falls back to the platform default if empty).
-    openrouter_api_key: Mapped[Optional[str]] = mapped_column(String)
-    
+    # Per-user external-service API keys. ALL encrypted at rest (Fernet) and
+    # supplied by the user in Settings — never read from environment variables.
+    openrouter_api_key: Mapped[Optional[str]] = mapped_column(String)        # LLM + embeddings + transcription (OpenRouter)
+    tavily_api_key: Mapped[Optional[str]] = mapped_column(String)            # fact-check web search (optional)
+    media_integrity_api_key: Mapped[Optional[str]] = mapped_column(String)   # external deepfake service (optional)
+
     # Per-user custom model selections
     llm_model: Mapped[Optional[str]] = mapped_column(String)
     embeddings_model: Mapped[Optional[str]] = mapped_column(String)
@@ -293,6 +298,7 @@ class AnalysisReport(Base):
 
     summary: Mapped[Optional[str]] = mapped_column(Text)
     agent_results: Mapped[dict] = mapped_column(JSON, default=dict)
+    score_reasonings: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     video: Mapped[Video] = relationship(back_populates="report")

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 import json
 from redis import Redis
 from app.config import settings
+from app.crypto import sign_media_url
 from app.database import get_db
 from app.llm import chat_json
 from app.models import MonitoredKeyword, NarrativeCluster, Product, User, UserRole, Video
@@ -84,7 +85,7 @@ def brand_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curr
         product_summaries.append({
             "id": p.id,
             "name": p.name,
-            "image_url": p.image_url,
+            "image_url": sign_media_url(p.image_url),
             "video_count": len(vids),
             "trust_score": avg("trust_score"),
             "sentiment_score": avg("sentiment_score"),
@@ -111,7 +112,14 @@ def brand_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curr
 
     if not synthesis:
         synthesis = {}
-        if product_summaries:
+        from app.crypto import decrypt_secret
+        from app.llm import set_runtime_api_key, set_runtime_user_id
+
+        user_key = decrypt_secret(user.openrouter_api_key)
+        if product_summaries and user_key:
+            # Use the requesting user's own key — never the platform key.
+            set_runtime_api_key(user_key)
+            set_runtime_user_id(user.id)
             synthesis = chat_json(
                 system=(
                     "You are a brand analyst. Given per-product trust/sentiment/risk scores "

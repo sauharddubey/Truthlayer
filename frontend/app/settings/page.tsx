@@ -89,11 +89,51 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
+/* ── Small labelled key input (optional service keys) ───────────────────────── */
+function KeyField({
+  label, badge, hint, placeholder, value, onChange, onRemove, canRemove, loading,
+}: {
+  label: string; badge: boolean; hint: string; placeholder: string;
+  value: string; onChange: (v: string) => void; onRemove: () => void;
+  canRemove: boolean; loading: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <label className="label">{label}</label>
+        <span className={`text-[10px] font-extrabold uppercase tracking-widest ${badge ? "text-good" : "text-ink-faint"}`}>
+          {badge ? "Set" : "Not set"}
+        </span>
+      </div>
+      <input
+        className="input font-mono"
+        type="password"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="mt-1 flex items-center justify-between">
+        <p className="text-xs text-ink-faint">{hint}</p>
+        {canRemove && (
+          <button className="text-xs text-bad hover:underline" onClick={onRemove} disabled={loading}>
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ────────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
   const [user, setUser]       = useState<any>(null);
   const [hasKey, setHasKey]   = useState(false);
   const [value, setValue]     = useState("");
+  // Optional per-user service keys.
+  const [hasTavily, setHasTavily] = useState(false);
+  const [hasMedia, setHasMedia] = useState(false);
+  const [tavilyVal, setTavilyVal] = useState("");
+  const [mediaVal, setMediaVal] = useState("");
   const [saved, setSaved]     = useState(false);
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
@@ -118,6 +158,8 @@ export default function SettingsPage() {
       .then((u) => {
         setUser(u);
         setHasKey(!!u.has_api_key);
+        setHasTavily(!!u.has_tavily_key);
+        setHasMedia(!!u.has_media_integrity_key);
         setLlmVal(u.llm_model || "");
         setEmbedVal(u.embeddings_model || "");
         setTranscriptionVal(u.transcription_model || "");
@@ -178,12 +220,33 @@ export default function SettingsPage() {
       .catch((err) => console.error("Failed to fetch OpenRouter models:", err));
   }, []);
 
+  function applyKeyFlags(u: any) {
+    setHasKey(!!u.has_api_key);
+    setHasTavily(!!u.has_tavily_key);
+    setHasMedia(!!u.has_media_integrity_key);
+  }
+
+  // Save only the key fields the user actually typed into (empty inputs are
+  // ignored, so saving never wipes a key you didn't touch). Use Remove to clear.
   async function save() {
     setLoading(true); setError(""); setSaved(false);
     try {
-      const u = await updateSettings({ openrouter_api_key: value });
-      setHasKey(!!u.has_api_key);
-      setValue("");
+      const payload: Record<string, string> = {};
+      if (value.trim()) payload.openrouter_api_key = value.trim();
+      if (tavilyVal.trim()) payload.tavily_api_key = tavilyVal.trim();
+      if (mediaVal.trim()) payload.media_integrity_api_key = mediaVal.trim();
+      const u = await updateSettings(payload);
+      applyKeyFlags(u);
+      setValue(""); setTavilyVal(""); setMediaVal("");
+      setSaved(true);
+    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
+  }
+
+  async function removeKey(field: "openrouter_api_key" | "tavily_api_key" | "media_integrity_api_key") {
+    setLoading(true); setError(""); setSaved(false);
+    try {
+      const u = await updateSettings({ [field]: "" } as any);
+      applyKeyFlags(u);
       setSaved(true);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }
@@ -348,15 +411,15 @@ export default function SettingsPage() {
           <div className="card space-y-5">
             <div className="flex items-start justify-between gap-4">
               <p className="text-sm text-ink-light leading-relaxed">
-                All AI runs through OpenRouter. Add your own key to use your own credits and remove the platform usage limit.
-                Leave blank to use the platform&apos;s shared key.
+                <strong>Required.</strong> All AI runs through your own OpenRouter key — it&apos;s
+                stored encrypted and used only for your analyses. Until it&apos;s set, analysis is disabled.
               </p>
               <span
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-widest transition-colors ${
-                  hasKey ? "border-good/25 bg-good/10 text-good" : "border-line bg-surface text-ink-faint"
+                  hasKey ? "border-good/25 bg-good/10 text-good" : "border-bad/25 bg-bad/10 text-bad"
                 }`}
               >
-                {hasKey ? <><Check className="h-3 w-3" /> Personal key</> : "Platform key"}
+                {hasKey ? <><Check className="h-3 w-3" /> Connected</> : "Not set"}
               </span>
             </div>
 
@@ -373,9 +436,26 @@ export default function SettingsPage() {
                 Get a key at{" "}
                 <a className="text-accent hover:underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
                   openrouter.ai/keys
-                </a>.{" "}
-                Save empty to revert to the platform default.
+                </a>.
               </p>
+            </div>
+
+            {/* ── Optional service keys ── */}
+            <div className="space-y-4 border-t border-line pt-4">
+              <p className="text-xs font-extrabold uppercase tracking-widest text-ink-faint">
+                Optional service keys
+              </p>
+
+              <KeyField
+                label="Tavily key" badge={hasTavily} hint="Web-search evidence for fact-checking."
+                placeholder="tvly-…" value={tavilyVal} onChange={setTavilyVal}
+                onRemove={() => removeKey("tavily_api_key")} canRemove={hasTavily} loading={loading}
+              />
+              <KeyField
+                label="Media-integrity key" badge={hasMedia} hint="Only if an external deepfake service is configured."
+                placeholder="key…" value={mediaVal} onChange={setMediaVal}
+                onRemove={() => removeKey("media_integrity_api_key")} canRemove={hasMedia} loading={loading}
+              />
             </div>
 
             {error && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>}
@@ -387,11 +467,11 @@ export default function SettingsPage() {
 
             <div className="flex gap-2.5 pt-1">
               <button className="btn-accent" onClick={save} disabled={loading}>
-                {loading ? "Saving…" : "Save key"}
+                {loading ? "Saving…" : "Save keys"}
               </button>
               {hasKey && (
-                <button className="btn-ghost" onClick={() => { setValue(""); save(); }} disabled={loading}>
-                  Remove key
+                <button className="btn-ghost" onClick={() => removeKey("openrouter_api_key")} disabled={loading}>
+                  Remove OpenRouter key
                 </button>
               )}
             </div>

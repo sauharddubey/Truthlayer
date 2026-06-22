@@ -5,8 +5,6 @@ Produces a full, segmented transcript with per-segment timestamps. Backends
 
 * ``openrouter`` — an audio-input chat model returns timestamped JSON segments
   using the LLM key (one key for all AI; audio needs a small credit balance).
-* ``whisper``    — OpenAI-compatible ``/audio/transcriptions`` (Groq = free) which
-  natively returns segment timestamps + confidence.
 * ``stub``       — deterministic placeholder.
 
 Any failure degrades to a duration-proportional fallback so the pipeline always
@@ -56,8 +54,6 @@ def transcribe(
 
     if provider == "openrouter":
         result = _transcribe_openrouter(audio_path, duration)
-    elif provider == "whisper":
-        result = _transcribe_whisper(audio_path)
     else:
         raise ValueError(f"Unknown transcription provider: {provider}")
 
@@ -142,33 +138,7 @@ def _transcribe_openrouter(audio_path: str, duration: Optional[float]) -> Option
     return _segment_plain_text(content, duration)
 
 
-# ── Whisper /audio/transcriptions backend ────────────────────────────────────
 
-
-def _transcribe_whisper(audio_path: str) -> Optional[TranscriptionResult]:
-    if not settings.WHISPER_API_KEY:
-        return None
-    client = OpenAI(api_key=settings.WHISPER_API_KEY, base_url=settings.WHISPER_BASE_URL)
-    with open(audio_path, "rb") as f:
-        resp = client.audio.transcriptions.create(
-            model=settings.WHISPER_MODEL,
-            file=f,
-            response_format="verbose_json",
-            timestamp_granularities=["segment"],
-        )
-    data = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
-    segments = [
-        {
-            "start": s.get("start"),
-            "end": s.get("end"),
-            "text": (s.get("text") or "").strip(),
-            "confidence": _seg_confidence(s),
-        }
-        for s in data.get("segments", [])
-    ]
-    return TranscriptionResult(
-        text=data.get("text", "").strip(), language=data.get("language"), segments=segments
-    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

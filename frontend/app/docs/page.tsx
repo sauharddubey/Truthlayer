@@ -241,7 +241,7 @@ export default function DocsPage() {
    [yt-dlp Ingestion Service] ──────► Extract audio track (save locally in media volume)
              │
              ▼
-   [Audio Speech transcription] ────► OpenRouter Audio Multimodal or Groq Whisper (time-granulated segments)
+   [Audio Speech transcription] ────► OpenRouter Audio Multimodal (time-granulated segments)
              │
              ▼
    [Structuring Service] ──────────► LLM JSON mapping into thematic blocks & claims

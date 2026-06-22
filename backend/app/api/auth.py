@@ -1,99 +1,25 @@
-"""Authentication & registration (FR-AUTH-001..004)."""
+"""Profile & settings for Supabase-authenticated users (FR-AUTH-001..004).
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+Sign-up / sign-in (email+password and Google) happen client-side via Supabase.
+The backend verifies the Supabase JWT (see ``app.security``) and exposes the
+local profile. ``/auth/bootstrap`` lets the frontend apply the role / org chosen
+at sign-up onto the JIT-provisioned profile.
+"""
+
+from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import secrets
-
+from app.crypto import encrypt_secret
 from app.database import get_db
-from app.models import Organization, User
-from app.schemas import GoogleLoginRequest, RegisterRequest, SettingsRequest, Token, UserOut
-from app.security import create_access_token, get_current_user, hash_password, verify_password
-from app.services.google_oauth import GoogleAuthError, verify_google_credential
+from app.models import Organization, User, UserRole
+from app.schemas import BootstrapRequest, SettingsRequest, UserOut
+from app.security import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _org_for_role(db, role, org_name, email):
-    """Business users always get an organization; others don't need one."""
-    from app.models import UserRole
-
-    if role == UserRole.BUSINESS:
-        org = Organization(name=org_name or f"{email.split('@')[0]}'s workspace")
-        db.add(org)
-        db.flush()
-        return org.id
-    if org_name:
-        org = Organization(name=org_name)
-        db.add(org)
-        db.flush()
-        return org.id
-    return None
-
-
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    org_id = _org_for_role(db, payload.role, payload.organization_name, payload.email)
-
-    user = User(
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        full_name=payload.full_name,
-        role=payload.role,
-        organization_id=org_id,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    token = create_access_token(user.id, user.role.value, user.organization_id)
-    return Token(access_token=token, role=user.role, organization_id=user.organization_id)
-
-
-@router.post("/login", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.execute(select(User).where(User.email == form.username)).scalar_one_or_none()
-    if not user or not verify_password(form.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    token = create_access_token(user.id, user.role.value, user.organization_id)
-    return Token(access_token=token, role=user.role, organization_id=user.organization_id)
-
-
-@router.post("/google", response_model=Token)
-def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
-    """Verify a Google ID token, upsert the user, and issue a TruthLayer JWT."""
-    try:
-        profile = verify_google_credential(payload.credential)
-    except GoogleAuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
-
-    user = db.execute(select(User).where(User.email == profile["email"])).scalar_one_or_none()
-    if user is None:
-        org_id = _org_for_role(db, payload.role, payload.organization_name, profile["email"])
-        # Google-authenticated users have no local password; store a random hash.
-        user = User(
-            email=profile["email"],
-            hashed_password=hash_password(secrets.token_urlsafe(32)),
-            full_name=profile.get("name"),
-            role=payload.role,
-            organization_id=org_id,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    token = create_access_token(user.id, user.role.value, user.organization_id)
-    return Token(access_token=token, role=user.role, organization_id=user.organization_id)
-
-
-@router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
+def _user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
         email=user.email,
@@ -101,10 +27,45 @@ def me(user: User = Depends(get_current_user)):
         role=user.role,
         organization_id=user.organization_id,
         has_api_key=bool(user.openrouter_api_key),
+        has_tavily_key=bool(user.tavily_api_key),
+        has_media_integrity_key=bool(user.media_integrity_api_key),
         llm_model=user.llm_model,
         embeddings_model=user.embeddings_model,
         transcription_model=user.transcription_model,
     )
+
+
+@router.post("/bootstrap", response_model=UserOut)
+def bootstrap(
+    payload: BootstrapRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Apply the workspace role / org chosen at sign-up to the current profile.
+
+    Called by the frontend right after a Supabase sign-up (and harmlessly after
+    sign-in). The profile itself is created on first authenticated request.
+    """
+    if payload.full_name and not user.full_name:
+        user.full_name = payload.full_name
+    if payload.role is not None:
+        user.role = payload.role
+        # Business accounts need an organization; create one if missing.
+        if payload.role == UserRole.BUSINESS and not user.organization_id:
+            org = Organization(
+                name=payload.organization_name or f"{user.email.split('@')[0]}'s workspace"
+            )
+            db.add(org)
+            db.flush()
+            user.organization_id = org.id
+    db.commit()
+    db.refresh(user)
+    return _user_out(user)
+
+
+@router.get("/me", response_model=UserOut)
+def me(user: User = Depends(get_current_user)):
+    return _user_out(user)
 
 
 @router.get("/rights")
@@ -117,9 +78,17 @@ def my_rights(user: User = Depends(get_current_user)):
 
 @router.put("/settings", response_model=UserOut)
 def update_settings(payload: SettingsRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Set the user's own OpenRouter key and model configuration."""
+    """Set the user's own service API keys (encrypted) and model configuration.
+
+    Every key is encrypted at rest and only decrypted at point-of-use; keys are
+    never read from environment variables.
+    """
     if payload.openrouter_api_key is not None:
-        user.openrouter_api_key = payload.openrouter_api_key.strip() or None
+        user.openrouter_api_key = encrypt_secret(payload.openrouter_api_key.strip() or None)
+    if payload.tavily_api_key is not None:
+        user.tavily_api_key = encrypt_secret(payload.tavily_api_key.strip() or None)
+    if payload.media_integrity_api_key is not None:
+        user.media_integrity_api_key = encrypt_secret(payload.media_integrity_api_key.strip() or None)
     if payload.llm_model is not None:
         user.llm_model = payload.llm_model.strip() or None
     if payload.embeddings_model is not None:
@@ -128,17 +97,7 @@ def update_settings(payload: SettingsRequest, db: Session = Depends(get_db), use
         user.transcription_model = payload.transcription_model.strip() or None
     db.commit()
     db.refresh(user)
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        role=user.role,
-        organization_id=user.organization_id,
-        has_api_key=bool(user.openrouter_api_key),
-        llm_model=user.llm_model,
-        embeddings_model=user.embeddings_model,
-        transcription_model=user.transcription_model,
-    )
+    return _user_out(user)
 
 
 @router.get("/usage")

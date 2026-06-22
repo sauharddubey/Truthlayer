@@ -32,12 +32,6 @@ services:
         value: https://api.groq.com/openai/v1
       - key: LLM_MODEL
         value: llama-3.3-70b-versatile
-      - key: WHISPER_API_KEY
-        sync: false
-      - key: WHISPER_BASE_URL
-        value: https://api.groq.com/openai/v1
-      - key: WHISPER_MODEL
-        value: whisper-large-v3
       - key: EMBEDDINGS_PROVIDER
         value: local
       - key: EMBEDDINGS_DIM

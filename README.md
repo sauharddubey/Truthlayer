@@ -25,7 +25,7 @@ Video Upload / URL  →  Ingestion  →  Audio Extraction  →  Transcription
 | Async jobs  | Celery + Redis (with in-process `BackgroundTasks` fallback)       |
 | Database    | PostgreSQL + `pgvector`                                           |
 | AI / LLM    | OpenAI-compatible Chat + Embeddings API (Groq / OpenAI / Gemini)  |
-| Transcription | Whisper via OpenAI-compatible audio API (Groq `whisper-large-v3`) |
+| Transcription | OpenRouter audio model or stub fallback                           |
 | Ingestion   | `yt-dlp` (YouTube / TikTok / Instagram public URLs)               |
 
 The system is **provider-agnostic**: every AI call goes through an OpenAI-compatible
@@ -40,7 +40,7 @@ endpoint, OpenAI, or a local Ollama) by changing environment variables only.
 | Redis      | [Upstash](https://upstash.com) (serverless Redis) — optional |
 | Backend    | [Render](https://render.com) / [Railway](https://railway.app) / [Fly.io](https://fly.io) |
 | Frontend   | [Vercel](https://vercel.com)          |
-| LLM + STT  | [Groq](https://console.groq.com) (free Whisper + Llama) |
+| LLM + STT  | [OpenRouter](https://openrouter.ai) (Free models / OpenRouter audio models) |
 
 > Heavy GPU models (DeepFace/InsightFace face recognition, FaceForensics++/XceptionNet
 > deepfake detection) are **not** free-tier friendly. TruthLayer ships these as

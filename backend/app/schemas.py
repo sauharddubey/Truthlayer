@@ -5,33 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, field_serializer
 
 from app.models import UserRole
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8)
-    full_name: Optional[str] = None
-    role: UserRole = UserRole.VERIFIER
-    organization_name: Optional[str] = None  # required-ish for business
-
-
-class GoogleLoginRequest(BaseModel):
-    credential: str
-    role: UserRole = UserRole.VERIFIER
-    organization_name: Optional[str] = None
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    role: UserRole
-    organization_id: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -40,7 +19,9 @@ class UserOut(BaseModel):
     full_name: Optional[str]
     role: UserRole
     organization_id: Optional[str]
-    has_api_key: bool = False
+    has_api_key: bool = False             # OpenRouter (required)
+    has_tavily_key: bool = False
+    has_media_integrity_key: bool = False
     llm_model: Optional[str] = None
     embeddings_model: Optional[str] = None
     transcription_model: Optional[str] = None
@@ -48,8 +29,18 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BootstrapRequest(BaseModel):
+    """Applied to the profile right after a Supabase sign-up."""
+
+    role: Optional[UserRole] = None
+    organization_name: Optional[str] = None
+    full_name: Optional[str] = None
+
+
 class SettingsRequest(BaseModel):
     openrouter_api_key: Optional[str] = None
+    tavily_api_key: Optional[str] = None
+    media_integrity_api_key: Optional[str] = None
     llm_model: Optional[str] = None
     embeddings_model: Optional[str] = None
     transcription_model: Optional[str] = None
@@ -74,6 +65,13 @@ class ProductOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("image_url")
+    def _sign_image(self, value: Optional[str]) -> Optional[str]:
+        # Hand out a short-lived signed URL for uploaded media; pass external URLs through.
+        from app.crypto import sign_media_url
+
+        return sign_media_url(value)
 
 
 # ── Videos / analysis ────────────────────────────────────────────────────────
@@ -135,6 +133,7 @@ class ReportOut(BaseModel):
     overall_confidence: Optional[float]
     summary: Optional[str]
     agent_results: dict = {}
+    score_reasonings: dict = {}
 
     model_config = {"from_attributes": True}
 

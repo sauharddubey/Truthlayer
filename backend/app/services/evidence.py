@@ -8,22 +8,24 @@ to an empty list when unconfigured so the fact-check agent still runs.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
-from typing import List, Optional
+from typing import List
 
 from app.config import settings
 
 logger = logging.getLogger("truthlayer.evidence")
 
 
-@lru_cache
 def _client():
-    if not settings.TAVILY_API_KEY:
+    # Per-user Tavily key (set at request/pipeline time). No env fallback.
+    from app.llm import effective_tavily_key
+
+    key = effective_tavily_key()
+    if not key:
         return None
     try:
         from tavily import TavilyClient
 
-        return TavilyClient(api_key=settings.TAVILY_API_KEY)
+        return TavilyClient(api_key=key)
     except Exception as exc:  # pragma: no cover
         logger.warning("Tavily init failed: %s", exc)
         return None

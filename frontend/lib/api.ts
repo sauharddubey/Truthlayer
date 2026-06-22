@@ -1,36 +1,32 @@
 "use client";
 
+import { supabase } from "@/lib/supabase";
+
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-const TOKEN_KEY = "truthlayer_token";
 const ROLE_KEY = "truthlayer_role";
-const ORG_KEY = "truthlayer_org";
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
+const PENDING_KEY = "truthlayer_pending_signup";
 
 export function getRole(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ROLE_KEY);
 }
 
-export function setAuth(token: string, role: string, org: string | null) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(ROLE_KEY, role);
-  if (org) localStorage.setItem(ORG_KEY, org);
-}
-
-export function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
+/** Sign out of Supabase and clear cached role. */
+export async function clearAuth() {
   localStorage.removeItem(ROLE_KEY);
-  localStorage.removeItem(ORG_KEY);
+  localStorage.removeItem(PENDING_KEY);
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    /* ignore */
+  }
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
@@ -47,37 +43,34 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res as unknown as T;
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+// ── Auth (delegated to Supabase) ────────────────────────────────────────────
 
-export async function login(email: string, password: string) {
-  const body = new URLSearchParams({ username: email, password });
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || "Login failed");
-  }
-  const data = await res.json();
-  setAuth(data.access_token, data.role, data.organization_id);
-  return data;
-}
+type SignupMeta = { role: string; full_name?: string; organization_name?: string };
 
-export async function googleLogin(
-  credential: string,
-  opts?: { role?: string; organization_name?: string }
-) {
-  const data = await request<any>("/auth/google", {
+/**
+ * Apply the role/org chosen at sign-up to the backend profile (which is
+ * JIT-created on the first authenticated request). Idempotent.
+ */
+export function bootstrapProfile(meta: Partial<SignupMeta>) {
+  return request<any>("/auth/bootstrap", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential, ...opts }),
+    body: JSON.stringify(meta),
   });
-  setAuth(data.access_token, data.role, data.organization_id);
-  return data;
 }
 
+export async function login(email: string, password: string) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  const me = await getMe(); // creates the profile on first call
+  localStorage.setItem(ROLE_KEY, me.role);
+  return { role: me.role as string };
+}
+
+/**
+ * Email/password sign-up. If the project requires email confirmation there is
+ * no session yet — we return { needsConfirmation: true } so the UI can say so.
+ */
 export async function register(payload: {
   email: string;
   password: string;
@@ -85,13 +78,57 @@ export async function register(payload: {
   role: string;
   organization_name?: string;
 }) {
-  const data = await request<any>("/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  const { data, error } = await supabase.auth.signUp({
+    email: payload.email,
+    password: payload.password,
+    options: {
+      data: {
+        full_name: payload.full_name,
+        role: payload.role,
+        organization_name: payload.organization_name,
+      },
+    },
   });
-  setAuth(data.access_token, data.role, data.organization_id);
-  return data;
+  if (error) throw new Error(error.message);
+  if (!data.session) return { needsConfirmation: true as const };
+
+  const me = await bootstrapProfile({
+    role: payload.role,
+    full_name: payload.full_name,
+    organization_name: payload.organization_name,
+  });
+  localStorage.setItem(ROLE_KEY, me.role);
+  return { role: me.role as string };
+}
+
+/**
+ * Start the Google OAuth redirect. The chosen role/org (sign-up only) are
+ * stashed so /auth/callback can apply them once we return with a session.
+ */
+export async function signInWithGoogle(meta?: Partial<SignupMeta>) {
+  if (meta && meta.role) localStorage.setItem(PENDING_KEY, JSON.stringify(meta));
+  const redirectTo = `${window.location.origin}/auth/callback`;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Called by /auth/callback after Supabase establishes the session. */
+export async function completeOAuth(): Promise<{ role: string }> {
+  let pending: Partial<SignupMeta> | null = null;
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (raw) pending = JSON.parse(raw);
+  } catch {
+    /* ignore */
+  }
+  localStorage.removeItem(PENDING_KEY);
+
+  const me = pending?.role ? await bootstrapProfile(pending) : await getMe();
+  localStorage.setItem(ROLE_KEY, me.role);
+  return { role: me.role as string };
 }
 
 export function routeForRole(role: string) {
@@ -110,6 +147,8 @@ export function getMe() {
 
 export function updateSettings(payload: {
   openrouter_api_key?: string;
+  tavily_api_key?: string;
+  media_integrity_api_key?: string;
   llm_model?: string | null;
   embeddings_model?: string | null;
   transcription_model?: string | null;

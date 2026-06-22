@@ -41,7 +41,7 @@ app/
 ├── agents/            fact_check, bias, sentiment, compliance, creator_risk,
 │                      media_integrity, narrative, orchestrator
 ├── rag/store.py       document parse/chunk/embed + tenant-scoped retrieval
-├── services/          ingestion (yt-dlp), transcription (whisper), structuring,
+├── services/          ingestion (yt-dlp), transcription (OpenRouter audio), structuring,
 │                      evidence (tavily), reports (pdf)
 └── tasks/             pipeline + celery app
 ```

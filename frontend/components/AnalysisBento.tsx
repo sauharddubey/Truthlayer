@@ -504,11 +504,21 @@ function ScoresModal({ report, isBusiness }: { report: any; isBusiness: boolean 
         })}
       </div>
 
-      <div className="rounded-xl border border-line bg-paper p-4 shadow-sm text-left">
-        <h4 className="font-heavy text-xs uppercase tracking-wider text-ink mb-2.5 flex items-center gap-1.5">
+      <div className="rounded-xl border border-line bg-paper p-4 shadow-sm text-left space-y-4">
+        <h4 className="font-heavy text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           {activeItem.label} Score Details
         </h4>
+        {report?.score_reasonings?.[activeItem.label.toLowerCase()] && (
+          <div className="rounded-lg bg-accent/[0.03] border border-accent/15 p-3.5 text-xs">
+            <div className="font-extrabold text-[9px] uppercase tracking-wider text-accent mb-1.5 flex items-center gap-1">
+              <Sparkle className="h-3 w-3 inline-block" /> AI Analysis & Reasoning
+            </div>
+            <p className="text-ink-light leading-relaxed">
+              {report.score_reasonings[activeItem.label.toLowerCase()]}
+            </p>
+          </div>
+        )}
         {activeItem.reasoning}
       </div>
     </div>

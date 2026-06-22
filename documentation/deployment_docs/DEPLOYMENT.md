@@ -9,7 +9,7 @@ This guide deploys TruthLayer entirely on free tiers.
 | Database   | Supabase **or** Neon            | Postgres + `pgvector`, generous free tier |
 | Backend    | Render / Railway / Fly.io       | Docker web service                      |
 | Frontend   | Vercel                          | Next.js, zero-config                    |
-| LLM + STT  | Groq                            | Free `llama-3.3-70b` + `whisper-large-v3` |
+| LLM + STT  | OpenRouter                      | OpenAI-compatible API key              |
 | Evidence   | Tavily (optional)               | Free web-search for fact-checking       |
 | Redis      | Upstash (optional)              | Only if you enable Celery               |
 
@@ -32,18 +32,10 @@ This guide deploys TruthLayer entirely on free tiers.
 > Neon works identically — copy its connection string and prefix with
 > `postgresql+psycopg://`.
 
-## 2. LLM + transcription keys (Groq)
+## 2. LLM + transcription keys (OpenRouter)
 
-1. Create a key at [console.groq.com](https://console.groq.com).
-2. Set:
-   ```
-   LLM_API_KEY=<groq key>
-   LLM_BASE_URL=https://api.groq.com/openai/v1
-   LLM_MODEL=llama-3.3-70b-versatile
-   WHISPER_API_KEY=<groq key>
-   WHISPER_BASE_URL=https://api.groq.com/openai/v1
-   WHISPER_MODEL=whisper-large-v3
-   ```
+1. Create a key at [openrouter.ai](https://openrouter.ai).
+2. Set `LLM_API_KEY` or configure OpenRouter variables as needed. All transcription defaults to using the OpenRouter audio models (e.g. Gemini 2.5 Flash Lite).
 
 Embeddings default to a **local** MiniLM model (`EMBEDDINGS_PROVIDER=local`,
 `EMBEDDINGS_DIM=384`) so you need no embeddings key. To use OpenAI embeddings
@@ -54,7 +46,7 @@ instead, set `EMBEDDINGS_PROVIDER=openai`, the key/base, and `EMBEDDINGS_DIM=153
 
 1. Push this repo to GitHub.
 2. Render → **New → Blueprint** → pick the repo (uses [`render.yaml`](../render.yaml)).
-3. Fill the `sync:false` env vars: `DATABASE_URL`, `LLM_API_KEY`, `WHISPER_API_KEY`,
+3. Fill the `sync:false` env vars: `DATABASE_URL`, `LLM_API_KEY`,
    `TAVILY_API_KEY` (optional), and `BACKEND_CORS_ORIGINS` (your Vercel URL).
 4. Deploy. Health check: `GET /health`.
 

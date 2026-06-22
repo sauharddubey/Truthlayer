@@ -17,6 +17,8 @@ from app.tasks.pipeline import dispatch
 
 router = APIRouter(tags=["videos"])
 
+_ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"}
+
 _ROLE_MODE = {
     UserRole.BUSINESS: AnalysisMode.BUSINESS,
     UserRole.CREATOR: AnalysisMode.CREATOR,
@@ -40,6 +42,15 @@ def _check_format(user: User, fmt: str):
         )
 
 
+def _require_api_key(user: User):
+    """Analysis requires the user's own OpenRouter key (FR-AUTH). No key, no work."""
+    if not (user.openrouter_api_key and user.openrouter_api_key.strip()):
+        raise HTTPException(
+            status_code=403,
+            detail="Add your OpenRouter API key in Settings before running any analysis.",
+        )
+
+
 @router.post("/videos/url", response_model=VideoOut)
 def submit_url(
     payload: VideoUrlRequest,
@@ -49,6 +60,7 @@ def submit_url(
 ):
     from app.services.ingestion import detect_platform
 
+    _require_api_key(user)
     _check_format(user, "url")
 
     # Dedup by source_url within tenant scope (FR-ING-007).
@@ -87,10 +99,21 @@ def upload_video(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    _require_api_key(user)
     _check_format(user, "upload")
 
+    # Only accept known video containers — never trust the client to hand us an
+    # arbitrary extension (defends against content-spoofing / served-back files).
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
+    if ext not in _ALLOWED_VIDEO_EXTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Allowed: {sorted(_ALLOWED_VIDEO_EXTS)}",
+        )
+    if file.content_type and not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="File must be a video")
+
     os.makedirs(settings.MEDIA_STORAGE_DIR, exist_ok=True)
-    ext = os.path.splitext(file.filename or "")[1] or ".mp4"
     dest = os.path.join(settings.MEDIA_STORAGE_DIR, f"{uuid.uuid4()}{ext}")
 
     size = 0
@@ -133,6 +156,7 @@ def start_analysis(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    _require_api_key(user)
     video = _get_scoped(db, payload.video_id, user)
     video.processing_status = ProcessingStatus.PENDING
     video.error = None

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { googleLogin, login, routeForRole } from "@/lib/api";
-import { GoogleButton } from "@/components/GoogleButton";
+import { login, routeForRole } from "@/lib/api";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Layers, ArrowRight, ShieldCheck, Check, Eye } from "@/components/icons";
 
 export default function LoginPage() {
@@ -21,12 +21,6 @@ export default function LoginPage() {
       const data = await login(email, password);
       router.push(routeForRole(data.role));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
-  }
-
-  async function onGoogle(credential: string) {
-    setError("");
-    try { const d = await googleLogin(credential); router.push(routeForRole(d.role)); }
-    catch (err: any) { setError(err.message); }
   }
 
   return (
@@ -82,7 +76,7 @@ export default function LoginPage() {
           </div>
 
           <div className="card space-y-5">
-            <GoogleButton onCredential={onGoogle} text="signin_with" />
+            <GoogleAuthButton label="Sign in with Google" />
 
             <div className="flex items-center gap-3 text-xs text-ink-faint">
               <span className="h-px flex-1 bg-line" /> or continue with email <span className="h-px flex-1 bg-line" />

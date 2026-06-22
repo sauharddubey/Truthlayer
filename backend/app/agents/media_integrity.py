@@ -33,9 +33,12 @@ def run(ctx: AgentContext) -> dict:
 
 def _call_external(ctx: AgentContext) -> dict | None:
     try:
+        from app.llm import effective_media_integrity_key
+
         headers = {}
-        if settings.MEDIA_INTEGRITY_API_KEY:
-            headers["Authorization"] = f"Bearer {settings.MEDIA_INTEGRITY_API_KEY}"
+        mi_key = effective_media_integrity_key()  # per-user key; no env fallback
+        if mi_key:
+            headers["Authorization"] = f"Bearer {mi_key}"
         resp = httpx.post(
             settings.MEDIA_INTEGRITY_URL.rstrip("/") + "/analyze",
             json={"video_id": ctx.video_id, "metadata": ctx.metadata},

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { googleLogin, register, routeForRole } from "@/lib/api";
-import { GoogleButton } from "@/components/GoogleButton";
+import { register, routeForRole } from "@/lib/api";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Layers, ArrowRight, Box, Eye, Scale, Check } from "@/components/icons";
 
 const ROLES = [
@@ -41,29 +41,30 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "verifier", organization_name: "" });
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const isBusiness = form.role === "business";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); setLoading(true);
+    setError(""); setNotice(""); setLoading(true);
     try {
       const payload: any = { ...form };
       if (!isBusiness) delete payload.organization_name;
       const data = await register(payload);
+      if ("needsConfirmation" in data) {
+        setNotice("Check your inbox to confirm your email, then sign in.");
+        return;
+      }
       router.push(routeForRole(data.role));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   }
 
-  async function onGoogle(credential: string) {
-    setError("");
-    try {
-      const opts: any = { role: form.role };
-      if (isBusiness && form.organization_name) opts.organization_name = form.organization_name;
-      const d = await googleLogin(credential, opts);
-      router.push(routeForRole(d.role));
-    } catch (err: any) { setError(err.message); }
-  }
+  const googleMeta = {
+    role: form.role,
+    full_name: form.full_name || undefined,
+    organization_name: isBusiness ? form.organization_name || undefined : undefined,
+  };
 
   const activeRole = ROLES.find((r) => r.value === form.role)!;
 
@@ -167,7 +168,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <GoogleButton onCredential={onGoogle} text="signup_with" />
+            <GoogleAuthButton label="Sign up with Google" meta={googleMeta} />
 
             <div className="flex items-center gap-3 text-xs text-ink-faint">
               <span className="h-px flex-1 bg-line" /> or continue with email <span className="h-px flex-1 bg-line" />
@@ -190,6 +191,7 @@ export default function RegisterPage() {
                   value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
               </div>
               {error && <p className="text-sm text-bad">{error}</p>}
+              {notice && <p className="text-sm text-good">{notice}</p>}
               <button className="btn-accent w-full py-2.5 text-sm" disabled={loading}>
                 {loading ? "Creating…" : `Create ${activeRole.label} account`} <ArrowRight className="h-3.5 w-3.5" />
               </button>

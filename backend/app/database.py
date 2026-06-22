@@ -80,6 +80,12 @@ def init_db() -> None:
         """,
         "CREATE INDEX IF NOT EXISTS ix_usage_records_user_id ON usage_records(user_id)",
         "CREATE INDEX IF NOT EXISTS ix_usage_records_created_at ON usage_records(created_at)",
+        "ALTER TABLE analysis_reports ADD COLUMN IF NOT EXISTS score_reasonings JSON DEFAULT '{}'",
+        # Supabase owns credentials now; existing deployments may still have NOT NULL.
+        "ALTER TABLE users ALTER COLUMN hashed_password DROP NOT NULL",
+        # Per-user external-service API keys (encrypted at rest).
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS tavily_api_key VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS media_integrity_api_key VARCHAR",
     ]
     with engine.connect() as conn:
         for stmt in _additive_migrations:

@@ -26,9 +26,9 @@ external service must be connected for full fidelity.
 ## 5.3 Audio Processing / ASR
 | Req | Status | Location |
 |-----|--------|----------|
-| FR-SP-001 Whisper/WhisperX | ✅ | `services/transcription.py` |
+| FR-SP-001 OpenRouter Audio | ✅ | `services/transcription.py` |
 | FR-SP-002 timestamps + confidence | ✅ | segment timestamps + confidence |
-| FR-SP-003 multi-language/accents/noise | ✅ (Whisper) | model-level |
+| FR-SP-003 multi-language/accents/noise | ✅ (OpenRouter) | model-level |
 | FR-SP-004 normalize | ✅ | transcription output normalization |
 | FR-SP-005 chunking | ✅ | `services/structuring.py`, `rag/store.py` |
 

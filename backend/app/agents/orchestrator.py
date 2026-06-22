@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextvars
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Dict, List
+from typing import Callable, Dict
 
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,7 @@ from app.agents import (
     verification,
 )
 from app.agents.base import AgentContext
-from app.llm import chat_text
+from app.llm import chat_json
 from app.models import (
     AnalysisReport,
     CelebrityDetection,
@@ -210,7 +210,16 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
     ]
     overall_conf = round(sum(c for c in confidences if c) / len(confidences), 3) if confidences else 0.5
 
-    summary = _summary(video, results, trust, overall_risk)
+    res_dict = _generate_summary_and_reasonings(
+        video=video,
+        results=results,
+        trust=trust,
+        risk=overall_risk,
+        compliance=compliance_score,
+        bias=bias_score,
+        sentiment=sentiment_score,
+        authenticity=authenticity * 100,
+    )
 
     report = AnalysisReport(
         video_id=video.id,
@@ -222,7 +231,8 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         narrative_leaning=bias_r.get("narrative_leaning") or sent.get("narrative_leaning"),
         authenticity_score=authenticity * 100,
         overall_confidence=overall_conf,
-        summary=summary,
+        summary=res_dict["summary"],
+        score_reasonings=res_dict,
         agent_results=results,
     )
     db.add(report)
@@ -253,7 +263,16 @@ def _overall_risk(risk_score, bias_score, compliance_score, perception_harm, ris
     return round(sum(parts) / len(parts), 1) if parts else 0.0
 
 
-def _summary(video: Video, results: dict, trust: float, risk: float) -> str:
+def _generate_summary_and_reasonings(
+    video: Video,
+    results: dict,
+    trust: float,
+    risk: float,
+    compliance: Optional[float],
+    bias: Optional[float],
+    sentiment: Optional[float],
+    authenticity: Optional[float],
+) -> Dict[str, str]:
     cont = results.get("content", {})
     is_product = bool(cont.get("is_about_product"))
     products = cont.get("products") or []
@@ -273,26 +292,85 @@ def _summary(video: Video, results: dict, trust: float, risk: float) -> str:
             "people's sentiments."
         )
 
-    text = chat_text(
-        system=(
-            "Write a concise 3-5 sentence plain-English summary of this video analysis "
-            "for a non-technical reader. " + focus + " Mention the trust and risk scores."
-        ),
-        user=(
-            f"Trust score: {trust}/100. Risk score: {risk}/100. Content type: {content_type}.\n"
-            f"Products: {products}\n"
-            f"Fact-check: {str(results.get('fact_check', {}))[:1100]}\n"
-            f"Perception: {str(perc)[:700]}\n"
-            f"Bias: {str(results.get('bias', {}))[:400]}"
-        ),
+    system_prompt = (
+        "You are an AI trust, compliance, and media-intelligence analyst. "
+        "Your task is to generate both a high-level summary and detailed score reasonings for this video's analysis. "
+        "Provide solid, evidence-backed reasoning/explanations for why each score was assigned, referring "
+        "to specific agent findings in the user input. "
+        "Be professional, clear, objective, and do not use emojis in your responses.\n\n"
+        "Return a JSON object conforming exactly to this schema:\n"
+        "{\n"
+        '  "summary": "A concise 3-5 sentence plain-English summary of this video analysis for a non-technical reader. ' + focus + '",\n'
+        '  "trust": "Solid reasoning for the Trust Score (' + str(trust) + '/100). Explain based on verified vs unverified/contradicted claims, bias levels, and media integrity.",\n'
+        '  "risk": "Solid reasoning for the Risk Score (' + str(risk) + '/100). Explain based on safety flags, compliance issues, perception harm, and segment risks.",\n'
+        '  "compliance": "Solid reasoning for the Compliance Score (' + str(compliance) + '/100). Explain compliance alignment, or missing disclosures / off-brand mentions.",\n'
+        '  "bias": "Solid reasoning for the Bias Score (' + str(bias) + '/100). Explain the detected bias level and narrative leaning.",\n'
+        '  "sentiment": "Solid reasoning for the Sentiment Score (' + str(sentiment) + '/100). Explain the emotional tone, sentiment polarity, and impact.",\n'
+        '  "authenticity": "Solid reasoning for the Authenticity Score (' + str(authenticity) + '/100). Explain based on deepfake probability and celebrity detection checks."\n'
+        "}"
     )
-    if text:
-        return text.strip()
-    kind = f"product video about {', '.join(products)}" if is_product else f"{content_type} video"
-    return (
-        f"Automated analysis of this {kind}. Trust score {trust}/100, risk score {risk}/100. "
-        "Configure an LLM API key for richer summaries."
+
+    user_prompt = (
+        f"Scores to explain:\n"
+        f"- Trust Score: {trust}/100\n"
+        f"- Risk Score: {risk}/100\n"
+        f"- Compliance Score: {compliance}/100\n"
+        f"- Bias Score: {bias}/100\n"
+        f"- Sentiment Score: {sentiment}/100\n"
+        f"- Authenticity Score: {authenticity}/100\n\n"
+        f"Agent Analysis Data:\n"
+        f"- Content Type: {content_type}\n"
+        f"- Products mentioned: {products}\n"
+        f"- Fact Check: {str(results.get('fact_check', {}))[:1200]}\n"
+        f"- Perception: {str(perc)[:800]}\n"
+        f"- Compliance: {str(results.get('compliance', {}))[:800]}\n"
+        f"- Creator Risk: {str(results.get('creator_risk', {}))[:800]}\n"
+        f"- Bias Check: {str(results.get('bias', {}))[:500]}\n"
+        f"- Sentiment Check: {str(results.get('sentiment', {}))[:500]}\n"
+        f"- Media Integrity: {str(results.get('media_integrity', {}))[:600]}"
     )
+
+    schema_hint = """{
+      "summary": "string",
+      "trust": "string",
+      "risk": "string",
+      "compliance": "string",
+      "bias": "string",
+      "sentiment": "string",
+      "authenticity": "string"
+    }"""
+
+    result = chat_json(
+        system=system_prompt,
+        user=user_prompt,
+        schema_hint=schema_hint,
+    )
+
+    if not result:
+        kind = f"product video about {', '.join(products)}" if is_product else f"{content_type} video"
+        summary_text = (
+            f"Automated analysis of this {kind}. Trust score {trust}/100, risk score {risk}/100. "
+            "Configure an LLM API key for richer summaries."
+        )
+        return {
+            "summary": summary_text,
+            "trust": f"Calculated as {trust}/100 based on verified claims, bias penalties, and authenticity metrics.",
+            "risk": f"Calculated as {risk}/100 from overall content safety labels, compliance issues, and sentiment harm.",
+            "compliance": f"Calculated as {compliance}/100 based on policy compliance checks against marketing guidelines." if compliance is not None else "No compliance check run.",
+            "bias": f"Calculated as {bias}/100 based on language neutrality and narrative leaning analysis." if bias is not None else "No bias check run.",
+            "sentiment": f"Calculated as {sentiment}/100 based on transcription emotional tone and polarity indicators." if sentiment is not None else "No sentiment check run.",
+            "authenticity": f"Calculated as {authenticity}/100 based on deepfake verification and celebrity endorsement analysis." if authenticity is not None else "No authenticity check run.",
+        }
+
+    return {
+        "summary": result.get("summary") or "",
+        "trust": result.get("trust") or f"Trust score of {trust}/100.",
+        "risk": result.get("risk") or f"Risk score of {risk}/100.",
+        "compliance": result.get("compliance") or (f"Compliance score of {compliance}/100." if compliance is not None else ""),
+        "bias": result.get("bias") or (f"Bias score of {bias}/100." if bias is not None else ""),
+        "sentiment": result.get("sentiment") or (f"Sentiment score of {sentiment}/100." if sentiment is not None else ""),
+        "authenticity": result.get("authenticity") or (f"Authenticity score of {authenticity}/100." if authenticity is not None else ""),
+    }
 
 
 def _as_float(v):

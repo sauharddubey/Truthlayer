@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import auth, dashboard, products, reports, videos
+from app.api import auth, dashboard, media, products, reports, videos
 from app.config import settings
 from app.database import init_db
 
@@ -18,9 +18,11 @@ app = FastAPI(
     description="AI-powered trust, compliance, and media-intelligence platform.",
 )
 
+# Fail closed: never fall back to a wildcard origin (it would reflect any origin
+# with credentials). Require an explicit allow-list via BACKEND_CORS_ORIGINS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins or ["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,13 +32,11 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup():
     init_db()
-    # Serve uploaded product images / media.
     import os
 
-    from fastapi.staticfiles import StaticFiles
-
+    # Uploaded media is served only via signed URLs (see app.api.media); the
+    # directory is never mounted statically.
     os.makedirs(settings.MEDIA_STORAGE_DIR, exist_ok=True)
-    app.mount("/media", StaticFiles(directory=settings.MEDIA_STORAGE_DIR), name="media")
 
 
 @app.get("/health", tags=["system"])
@@ -45,8 +45,7 @@ def health():
         "status": "ok",
         "version": __version__,
         "celery": settings.celery_enabled,
-        "llm_configured": bool(settings.LLM_API_KEY),
-        "whisper_configured": bool(settings.WHISPER_API_KEY),
+        # API keys are per-user (set in Settings), so there is nothing to report here.
     }
 
 
@@ -55,3 +54,4 @@ app.include_router(videos.router)
 app.include_router(products.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
+app.include_router(media.router)
