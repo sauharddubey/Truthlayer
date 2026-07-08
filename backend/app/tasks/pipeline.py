@@ -133,6 +133,12 @@ def process_video(video_id: str) -> None:
                 fallback_text=video.captions or "",
                 duration=ing.duration_seconds or video.duration_seconds,
             )
+            video.extra_metadata = {
+                **(video.extra_metadata or {}),
+                "transcription_provider": transcription.settings.TRANSCRIPTION_PROVIDER.lower(),
+                "transcription_stub": transcription.settings.TRANSCRIPTION_PROVIDER.lower() == "stub",
+            }
+            db.commit()
 
             from app.models import Transcript
 

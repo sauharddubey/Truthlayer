@@ -111,6 +111,8 @@ class ClaimOut(BaseModel):
     timestamp_start: Optional[float]
     timestamp_end: Optional[float]
     evidence: List[Any] = []
+    evidence_quality_score: Optional[float] = None
+    insufficient_evidence_reasons: List[str] = []
     verification_status: Optional[str]
     verification_note: Optional[str]
 

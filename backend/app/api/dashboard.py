@@ -34,16 +34,25 @@ def _cards_for_user(db: Session, user: User):
     out = []
     for v in vids:
         r = v.report
+        claims = list(v.claims or [])
+        supported = sum(1 for c in claims if c.verdict == "supported")
+        flagged = sum(1 for c in claims if c.verdict in {"misleading", "contradicted"})
+        breakdown = (r.score_reasonings or {}).get("scoring_breakdown", {}) if r else {}
         out.append({
             "video_id": v.id,
             "title": v.title or v.source_url,
             "platform": v.platform,
             "status": v.processing_status.value,
+            "mode": v.mode.value,
             "created_at": v.created_at.isoformat(),
             "trust_score": r.trust_score if r else None,
             "risk_score": r.risk_score if r else None,
             "sentiment_score": r.sentiment_score if r else None,
             "bias_score": r.bias_score if r else None,
+            "supported_claims": supported,
+            "flagged_claims": flagged,
+            "total_claims": len(claims),
+            "evidence_coverage_pct": breakdown.get("evidence_coverage"),
         })
     return out
 

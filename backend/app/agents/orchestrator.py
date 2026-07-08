@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextvars
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -177,6 +177,7 @@ def _persist_entities(db: Session, video: Video, results: Dict[str, dict]) -> No
 
 
 def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> AnalysisReport:
+    tier = (video.extra_metadata or {}).get("tier", "verifier")
     fact = results.get("fact_check", {})
     bias_r = results.get("bias", {})
     sent = results.get("sentiment", {})
@@ -186,14 +187,14 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
     cont = results.get("content", {})
     perc = results.get("perception", {})
 
-    # Trust score: penalize contradicted/misleading/unverified claims and high bias.
-    trust = _trust_score(fact, bias_r, mi)
-    bias_score = _as_float(bias_r.get("bias_score")) or 0.0
-    sentiment_score = _as_float(sent.get("sentiment_score")) or 0.0
+    # Verifier mode is strictly claim/evidence focused; broader dimensions are
+    # meaningful only when their agents run for the current tier.
+    bias_score = _as_float(bias_r.get("bias_score"))
+    sentiment_score = _as_float(sent.get("sentiment_score"))
     compliance_score = _as_float(comp.get("compliance_score"))
     risk_score = _as_float(risk.get("creator_risk_score"))
     perception_harm = _as_float(perc.get("sentiment_harm_score"))
-    authenticity = _as_float((mi.get("deepfake") or {}).get("authenticity_score")) or 1.0
+    authenticity = _as_float((mi.get("deepfake") or {}).get("authenticity_score"))
 
     # Risky segments also raise overall risk.
     segs = cont.get("segments") or []
@@ -201,14 +202,42 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         sum(1 for s in segs if s.get("label") == "risky") / len(segs) * 100 if segs else None
     )
 
-    # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm
-    # and the share of risky segments.
-    overall_risk = _overall_risk(risk_score, bias_score, compliance_score, perception_harm, risky_ratio)
+    if tier == "verifier":
+        trust, scoring_breakdown = _verifier_trust_score(fact)
+        overall_risk = None
+        bias_score = None
+        sentiment_score = None
+        compliance_score = None
+        authenticity_pct = None
+    else:
+        trust = _trust_score(fact, bias_r, mi)
+        authenticity_val = authenticity if authenticity is not None else 1.0
+        authenticity_pct = authenticity_val * 100
+        # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm
+        # and the share of risky segments.
+        overall_risk = _overall_risk(
+            risk_score,
+            bias_score if bias_score is not None else 0.0,
+            compliance_score,
+            perception_harm,
+            risky_ratio,
+        )
+        scoring_breakdown = {
+            "mode": tier,
+            "trust_components": {
+                "claim_verdict_weighted": trust,
+                "bias_penalty_pct": round(((bias_score or 0.0) / 100) * 30, 2),
+                "authenticity_multiplier": round(authenticity_val, 3),
+            },
+        }
 
     confidences = [
         _as_float(r.get("confidence")) for r in results.values() if r.get("confidence") is not None
     ]
     overall_conf = round(sum(c for c in confidences if c) / len(confidences), 3) if confidences else 0.5
+
+    diagnostics = _diagnostics(video, fact, results)
+    scoring_breakdown["diagnostics"] = diagnostics
 
     res_dict = _generate_summary_and_reasonings(
         video=video,
@@ -218,8 +247,12 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         compliance=compliance_score,
         bias=bias_score,
         sentiment=sentiment_score,
-        authenticity=authenticity * 100,
+        authenticity=authenticity_pct,
+        tier=tier,
     )
+    res_dict["scoring_breakdown"] = scoring_breakdown
+    res_dict["diagnostics"] = diagnostics
+    results["diagnostics"] = diagnostics
 
     report = AnalysisReport(
         video_id=video.id,
@@ -229,7 +262,7 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         bias_score=bias_score,
         sentiment_score=sentiment_score,
         narrative_leaning=bias_r.get("narrative_leaning") or sent.get("narrative_leaning"),
-        authenticity_score=authenticity * 100,
+        authenticity_score=authenticity_pct,
         overall_confidence=overall_conf,
         summary=res_dict["summary"],
         score_reasonings=res_dict,
@@ -238,6 +271,88 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
     db.add(report)
     db.flush()
     return report
+
+
+def _verifier_trust_score(fact: dict) -> tuple[Optional[float], dict]:
+    claims = fact.get("claims", []) or []
+    if not claims:
+        return None, {
+            "mode": "verifier",
+            "insufficient_claims": True,
+            "claim_counts": {"supported": 0, "unverified": 0, "misleading": 0, "contradicted": 0, "total": 0},
+            "verdict_score": None,
+            "evidence_coverage": 0.0,
+            "evidence_quality": 0.0,
+            "confidence_factor": 0.0,
+            "final_score": None,
+        }
+
+    weights = {"supported": 1.0, "unverified": 0.5, "misleading": 0.15, "contradicted": 0.0}
+    counts = {"supported": 0, "unverified": 0, "misleading": 0, "contradicted": 0}
+    weighted = 0.0
+    with_evidence = 0
+    url_backed = 0
+    conf_sum = 0.0
+    conf_n = 0
+    quality_sum = 0.0
+    quality_n = 0
+    reasons_count: dict[str, int] = {}
+    for c in claims:
+        verdict = c.get("verdict", "unverified")
+        if verdict not in counts:
+            verdict = "unverified"
+        counts[verdict] += 1
+        weighted += weights.get(verdict, 0.5)
+        ev = c.get("evidence") or []
+        if ev:
+            with_evidence += 1
+        if any((e or {}).get("url") for e in ev if isinstance(e, dict)):
+            url_backed += 1
+        cv = _as_float(c.get("confidence"))
+        if cv is not None:
+            conf_sum += cv
+            conf_n += 1
+        eq = _as_float(c.get("evidence_quality_score"))
+        if eq is not None:
+            quality_sum += eq
+            quality_n += 1
+        for reason in c.get("insufficient_evidence_reasons") or []:
+            reasons_count[reason] = reasons_count.get(reason, 0) + 1
+
+    total = len(claims)
+    verdict_score = weighted / total
+    coverage = with_evidence / total
+    quality = url_backed / total
+    conf_factor = max(0.0, min(1.0, (conf_sum / conf_n) if conf_n else 0.5))
+    avg_quality = max(0.0, min(1.0, ((quality_sum / quality_n) / 100) if quality_n else 0.0))
+    final = round(
+        max(
+            0.0,
+            min(
+                1.0,
+                verdict_score
+                * (0.55 + 0.45 * coverage)
+                * (0.7 + 0.3 * quality)
+                * (0.65 + 0.35 * avg_quality)
+                * conf_factor,
+            ),
+        )
+        * 100,
+        1,
+    )
+
+    return final, {
+        "mode": "verifier",
+        "insufficient_claims": False,
+        "claim_counts": {**counts, "total": total},
+        "verdict_score": round(verdict_score * 100, 2),
+        "evidence_coverage": round(coverage * 100, 2),
+        "evidence_quality": round(quality * 100, 2),
+        "claim_evidence_quality": round(avg_quality * 100, 2),
+        "confidence_factor": round(conf_factor * 100, 2),
+        "final_score": final,
+        "insufficient_evidence_reasons": reasons_count,
+    }
 
 
 def _trust_score(fact: dict, bias_r: dict, mi: dict) -> float:
@@ -272,6 +387,7 @@ def _generate_summary_and_reasonings(
     bias: Optional[float],
     sentiment: Optional[float],
     authenticity: Optional[float],
+    tier: str,
 ) -> Dict[str, str]:
     cont = results.get("content", {})
     is_product = bool(cont.get("is_about_product"))
@@ -340,11 +456,14 @@ def _generate_summary_and_reasonings(
       "authenticity": "string"
     }"""
 
-    result = chat_json(
-        system=system_prompt,
-        user=user_prompt,
-        schema_hint=schema_hint,
-    )
+    try:
+        result = chat_json(
+            system=system_prompt,
+            user=user_prompt,
+            schema_hint=schema_hint,
+        )
+    except Exception:
+        result = {}
 
     if not result:
         kind = f"product video about {', '.join(products)}" if is_product else f"{content_type} video"
@@ -352,7 +471,7 @@ def _generate_summary_and_reasonings(
             f"Automated analysis of this {kind}. Trust score {trust}/100, risk score {risk}/100. "
             "Configure an LLM API key for richer summaries."
         )
-        return {
+        data = {
             "summary": summary_text,
             "trust": f"Calculated as {trust}/100 based on verified claims, bias penalties, and authenticity metrics.",
             "risk": f"Calculated as {risk}/100 from overall content safety labels, compliance issues, and sentiment harm.",
@@ -361,8 +480,12 @@ def _generate_summary_and_reasonings(
             "sentiment": f"Calculated as {sentiment}/100 based on transcription emotional tone and polarity indicators." if sentiment is not None else "No sentiment check run.",
             "authenticity": f"Calculated as {authenticity}/100 based on deepfake verification and celebrity endorsement analysis." if authenticity is not None else "No authenticity check run.",
         }
+        if tier == "verifier":
+            for key in ("risk", "compliance", "bias", "sentiment", "authenticity"):
+                data[key] = ""
+        return data
 
-    return {
+    data = {
         "summary": result.get("summary") or "",
         "trust": result.get("trust") or f"Trust score of {trust}/100.",
         "risk": result.get("risk") or f"Risk score of {risk}/100.",
@@ -370,6 +493,34 @@ def _generate_summary_and_reasonings(
         "bias": result.get("bias") or (f"Bias score of {bias}/100." if bias is not None else ""),
         "sentiment": result.get("sentiment") or (f"Sentiment score of {sentiment}/100." if sentiment is not None else ""),
         "authenticity": result.get("authenticity") or (f"Authenticity score of {authenticity}/100." if authenticity is not None else ""),
+    }
+    if tier == "verifier":
+        for key in ("risk", "compliance", "bias", "sentiment", "authenticity"):
+            data[key] = ""
+    return data
+
+
+def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
+    from app.llm import effective_tavily_key
+
+    claims = fact.get("claims", []) or []
+    claim_evidence_count = sum(1 for c in claims if c.get("evidence"))
+    fact_retrieved = (fact.get("evidence") or [])
+    reason_counts: dict[str, int] = {}
+    for c in claims:
+        for reason in c.get("insufficient_evidence_reasons") or []:
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    metadata = video.extra_metadata or {}
+    return {
+        "no_claims_extracted": len(claims) == 0,
+        "claim_evidence_coverage_pct": round((claim_evidence_count / len(claims) * 100), 2) if claims else 0.0,
+        "retrieved_evidence_count": len(fact_retrieved),
+        "no_retrieved_evidence": len(fact_retrieved) == 0,
+        "tavily_configured": bool(effective_tavily_key()),
+        "transcription_provider": metadata.get("transcription_provider"),
+        "used_transcription_stub": bool(metadata.get("transcription_stub")),
+        "agent_keys": sorted(k for k in results.keys() if k != "diagnostics"),
+        "insufficient_reason_counts": reason_counts,
     }
 
 
