@@ -128,6 +128,10 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 }) {
   const agents = report?.agent_results || {};
   const content = agents.content || {};
+  const mode = video?.mode || "verifier";
+  const isVerifier = mode === "verifier";
+  const scoring = report?.score_reasonings?.scoring_breakdown || {};
+  const diagnostics = report?.score_reasonings?.diagnostics || {};
   const [modal, setModal] = useState<{ title: string; node: ReactNode } | null>(null);
   const open = (title: string, node: ReactNode) => setModal({ title, node });
 
@@ -148,19 +152,22 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* TRUST HERO */}
         <Block label="Trust" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c" span="col-span-2 row-span-2"
-          onClick={() => open("Scores", <ScoresModal report={report} isBusiness={isBusiness} />)}>
+          onClick={() => open("Scores", <ScoresModal report={report} isBusiness={isBusiness} mode={mode} />)}>
           <div className="flex flex-1 items-center gap-5">
             <Ring value={report?.trust_score ?? 0} color={C(report?.trust_score)} label="trust" />
             <div className="flex-1 space-y-2">
-              <MiniBar label="Risk" value={report?.risk_score} invert />
-              {isBusiness && <MiniBar label="Compliance" value={report?.compliance_score} />}
-              <MiniBar label="Sentiment" value={sentimentPct} />
-              <MiniBar label="Authenticity" value={report?.authenticity_score} />
+              {!isVerifier && <MiniBar label="Risk" value={report?.risk_score} invert />}
+              {!isVerifier && isBusiness && <MiniBar label="Compliance" value={report?.compliance_score} />}
+              {!isVerifier && <MiniBar label="Sentiment" value={sentimentPct} />}
+              {!isVerifier && <MiniBar label="Authenticity" value={report?.authenticity_score} />}
+              {isVerifier && <MiniBar label="Evidence coverage" value={scoring?.evidence_coverage} />}
+              {isVerifier && <MiniBar label="Confidence factor" value={scoring?.confidence_factor} />}
             </div>
           </div>
           <div className="mt-2 text-[10px] font-medium text-white/40">
             {content.is_about_product ? "Product video" : (content.content_type || "video")}
             {report?.overall_confidence != null && ` · ${Math.round(report.overall_confidence * 100)}% confidence`}
+            {isVerifier && diagnostics?.no_claims_extracted && " · insufficient claims"}
           </div>
         </Block>
 
@@ -176,7 +183,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
           onClick={() => open("Fact-check claims", <ClaimsPanel claims={claims} showVerification={isBusiness} onReview={onReview} />)}>
           <div className="mb-3 flex gap-2">
-            <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} verified</span>
+            <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} supported</span>
             <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
             <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/50">{claims.length} total</span>
           </div>
@@ -314,11 +321,14 @@ function PerceptionFull({ agent }: { agent: any }) {
   );
 }
 
-function ScoresModal({ report, isBusiness }: { report: any; isBusiness: boolean }) {
+function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: boolean; mode: string }) {
   const agents = report?.agent_results || {};
+  const isVerifier = mode === "verifier";
+  const scoring = report?.score_reasonings?.scoring_breakdown || {};
+  const diagnostics = report?.score_reasonings?.diagnostics || {};
   const [activeScore, setActiveScore] = useState<string>("Trust");
 
-  const items = [
+  const baseItems = [
     {
       label: "Trust",
       value: report?.trust_score,
@@ -476,6 +486,36 @@ function ScoresModal({ report, isBusiness }: { report: any; isBusiness: boolean 
       )
     }
   ];
+  const verifierItems = [
+    {
+      label: "Trust",
+      value: report?.trust_score,
+      invert: false,
+      reasoning: (
+        <div className="space-y-3">
+          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-1.5">
+            <div className="font-semibold text-ink">Verifier Scoring Breakdown</div>
+            <p className="text-ink-light">Verdict score: {scoring?.verdict_score ?? "n/a"} / 100</p>
+            <p className="text-ink-light">Evidence coverage: {scoring?.evidence_coverage ?? "n/a"}%</p>
+            <p className="text-ink-light">Evidence quality: {scoring?.evidence_quality ?? "n/a"}%</p>
+            <p className="text-ink-light">Confidence factor: {scoring?.confidence_factor ?? "n/a"}%</p>
+            {scoring?.claim_counts && (
+              <p className="text-ink-light">
+                Claims — supported: {scoring.claim_counts.supported ?? 0}, unverified: {scoring.claim_counts.unverified ?? 0}, misleading: {scoring.claim_counts.misleading ?? 0}, contradicted: {scoring.claim_counts.contradicted ?? 0}
+              </p>
+            )}
+          </div>
+          {diagnostics?.no_retrieved_evidence && (
+            <p className="text-xs text-warn">No retrieved external evidence for this run.</p>
+          )}
+          {diagnostics?.used_transcription_stub && (
+            <p className="text-xs text-warn">Transcription used stub provider; trust should be treated as low confidence.</p>
+          )}
+        </div>
+      ),
+    },
+  ];
+  const items = isVerifier ? verifierItems : baseItems;
 
   const activeItem = items.find((i) => i.label === activeScore) || items[0];
 

@@ -5,7 +5,12 @@ import { ArrowRight, FileSearch } from "@/components/icons";
 
 type Video = {
   video_id: string; title?: string; platform?: string; status?: string;
+  mode?: string;
   trust_score?: number | null; risk_score?: number | null; sentiment_score?: number | null; bias_score?: number | null;
+  supported_claims?: number;
+  flagged_claims?: number;
+  total_claims?: number;
+  evidence_coverage_pct?: number | null;
 };
 
 const C = (t?: number | null, invert = false) => {
@@ -51,7 +56,11 @@ function statusTone(s?: string) {
   return { c: "#cb912f", t: "Analyzing" };
 }
 
-export function VideoBoard({ videos, emptyHref = "/analyze" }: { videos: Video[]; emptyHref?: string }) {
+export function VideoBoard({
+  videos,
+  emptyHref = "/analyze",
+  variant = "default",
+}: { videos: Video[]; emptyHref?: string; variant?: "default" | "verifier" }) {
   if (!videos.length) {
     return (
       <div className="glass-board flex h-[44vh] flex-col items-center justify-center text-center">
@@ -85,11 +94,26 @@ export function VideoBoard({ videos, emptyHref = "/analyze" }: { videos: Video[]
 
             <div className="relative z-10 flex flex-1 items-center gap-4">
               <Ring value={v.trust_score} size={featured ? 84 : 52} />
-              {featured ? (
+              {featured && variant !== "verifier" ? (
                 <div className="flex-1 space-y-1.5">
                   <Bar label="Risk" value={v.risk_score} invert />
                   <Bar label="Sentiment" value={v.sentiment_score != null ? (v.sentiment_score + 1) * 50 : null} />
                   <Bar label="Bias" value={v.bias_score} invert />
+                </div>
+              ) : featured ? (
+                <div className="flex-1 space-y-1.5 text-[10px] font-semibold text-white/70">
+                  <div className="flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-white/40">Claims</span>
+                    <span>{v.supported_claims ?? 0}/{v.total_claims ?? 0} supported</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-white/40">Flagged</span>
+                    <span>{v.flagged_claims ?? 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-white/40">Evidence</span>
+                    <span>{v.evidence_coverage_pct != null ? `${Math.round(v.evidence_coverage_pct)}%` : "n/a"}</span>
+                  </div>
                 </div>
               ) : (
                 <div className="min-w-0 flex-1">

@@ -48,8 +48,18 @@ export function ClaimsPanel({
             <div className="mt-1 text-xs text-ink-faint">
               {c.claim_type}
               {c.confidence != null && ` · ${Math.round(c.confidence * 100)}% conf`}
+              {c.evidence_quality_score != null && ` · evidence ${Math.round(c.evidence_quality_score)}%`}
               {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
             </div>
+            {c.insufficient_evidence_reasons?.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {c.insufficient_evidence_reasons.slice(0, 3).map((reason: string) => (
+                  <span key={reason} className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-ink-faint">
+                    {reason.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            )}
             {c.verification_note && showVerification && (
               <p className="mt-1 text-xs text-ink-light">{c.verification_note}</p>
             )}

@@ -84,6 +84,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   );
 
   const { video, report, claims } = data;
+  const diagnostics = report?.score_reasonings?.diagnostics || {};
   const status = video.processing_status;
   const agents = report?.agent_results || {};
   const content = agents.content || {};
@@ -240,6 +241,21 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
       </div>
 
       {error && <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</div>}
+      {diagnostics?.used_transcription_stub && (
+        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
+          This analysis used stub transcription data. Scores may be less reliable.
+        </div>
+      )}
+      {diagnostics?.no_claims_extracted && (
+        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
+          No factual claims were extracted. Trust score is shown as insufficient evidence.
+        </div>
+      )}
+      {diagnostics?.no_retrieved_evidence && !diagnostics?.no_claims_extracted && (
+        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
+          No external evidence was retrieved for this run. Verdict confidence may be lower.
+        </div>
+      )}
 
       <AnalysisBento
         video={video} report={report} claims={claims}

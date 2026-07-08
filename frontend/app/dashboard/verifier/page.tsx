@@ -23,7 +23,7 @@ export default function VerifierDashboard() {
         </Link>
       </div>
       {error && <p className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</p>}
-      <VideoBoard videos={videos} />
+      <VideoBoard videos={videos} variant="verifier" />
     </AppShell>
   );
 }
