@@ -9,12 +9,14 @@ selected by analysis mode.
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, Optional
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.agents import (
     bias,
     compliance,
@@ -38,6 +40,7 @@ from app.models import (
 )
 from app.rag.store import retrieve
 from app.rights import agents_for_tier
+from app.services.trust_scoring import compute_tier_trust_score, summarize_skipped_claims
 
 logger = logging.getLogger("truthlayer.orchestrator")
 
@@ -67,6 +70,9 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
         mode=video.mode.value,
         tier=tier,
         metadata=meta,
+        source_url=video.source_url,
+        platform=video.platform,
+        duration_seconds=video.duration_seconds,
         product_id=video.product_id,
         product_name=product.name if product else None,
         product_description=product.description if product else None,
@@ -82,6 +88,11 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
     # 1) Content classification + segment labelling runs first.
     content_result = content.run(ctx)
     is_product = bool(content_result.get("is_about_product"))
+    ctx.metadata = {
+        **(ctx.metadata or {}),
+        "content_segments": content_result.get("segments") or [],
+        "content_type": content_result.get("content_type") or "other",
+    }
 
     # 2) Parallel agents selected by user category (tier). Each runs inside a copy
     #    of the current context so the per-user OpenRouter key propagates to the
@@ -210,7 +221,7 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         compliance_score = None
         authenticity_pct = None
     else:
-        trust = _trust_score(fact, bias_r, mi)
+        trust = compute_tier_trust_score(fact, bias_r, mi)
         authenticity_val = authenticity if authenticity is not None else 1.0
         authenticity_pct = authenticity_val * 100
         # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm
@@ -224,6 +235,7 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         )
         scoring_breakdown = {
             "mode": tier,
+            "insufficient_claims": trust is None,
             "trust_components": {
                 "claim_verdict_weighted": trust,
                 "bias_penalty_pct": round(((bias_score or 0.0) / 100) * 30, 2),
@@ -355,19 +367,6 @@ def _verifier_trust_score(fact: dict) -> tuple[Optional[float], dict]:
     }
 
 
-def _trust_score(fact: dict, bias_r: dict, mi: dict) -> float:
-    claims = fact.get("claims", []) or []
-    if claims:
-        weights = {"supported": 1.0, "unverified": 0.5, "misleading": 0.15, "contradicted": 0.0}
-        base = sum(weights.get(c.get("verdict", "unverified"), 0.5) for c in claims) / len(claims)
-    else:
-        base = 0.6
-    bias_penalty = (_as_float(bias_r.get("bias_score")) or 0.0) / 100 * 0.3
-    authenticity = _as_float((mi.get("deepfake") or {}).get("authenticity_score")) or 1.0
-    score = (base - bias_penalty) * authenticity
-    return round(max(0.0, min(1.0, score)) * 100, 1)
-
-
 def _overall_risk(risk_score, bias_score, compliance_score, perception_harm, risky_ratio) -> float:
     parts = []
     for v in (risk_score, bias_score, perception_harm, risky_ratio):
@@ -376,6 +375,33 @@ def _overall_risk(risk_score, bias_score, compliance_score, perception_harm, ris
     if compliance_score is not None:
         parts.append(100 - compliance_score)
     return round(sum(parts) / len(parts), 1) if parts else 0.0
+
+
+def _media_integrity_prompt_summary(media_integrity: dict) -> str:
+    if not media_integrity:
+        return "No media integrity analysis available."
+    deepfake = media_integrity.get("deepfake") or {}
+    signals = media_integrity.get("signals") or {}
+    evidence = deepfake.get("manipulation_evidence") or media_integrity.get("evidence") or []
+    top_timestamps = [
+        e.get("timestamp_sec")
+        for e in evidence[:5]
+        if e.get("timestamp_sec") is not None
+    ]
+    summary = {
+        "method": media_integrity.get("method"),
+        "provider": media_integrity.get("provider"),
+        "dominant_signal": media_integrity.get("dominant_signal"),
+        "authenticity_score": deepfake.get("authenticity_score"),
+        "probability_score": deepfake.get("probability_score"),
+        "signals_max": {
+            name: (signals.get(name) or {}).get("max")
+            for name in ("ai_generated", "deepfake", "ai_generated_audio")
+        },
+        "top_timestamps_sec": top_timestamps,
+        "suspicious_moments": len(evidence),
+    }
+    return json.dumps(summary, ensure_ascii=True)
 
 
 def _generate_summary_and_reasonings(
@@ -417,7 +443,7 @@ def _generate_summary_and_reasonings(
         "Return a JSON object conforming exactly to this schema:\n"
         "{\n"
         '  "summary": "A concise 3-5 sentence plain-English summary of this video analysis for a non-technical reader. ' + focus + '",\n'
-        '  "trust": "Solid reasoning for the Trust Score (' + str(trust) + '/100). Explain based on verified vs unverified/contradicted claims, bias levels, and media integrity.",\n'
+        '  "trust": "Solid reasoning for the Trust Score (' + (f"{trust}/100" if trust is not None else "insufficient evidence") + '). Explain based on verified vs unverified/contradicted claims, bias levels, and media integrity.",\n'
         '  "risk": "Solid reasoning for the Risk Score (' + str(risk) + '/100). Explain based on safety flags, compliance issues, perception harm, and segment risks.",\n'
         '  "compliance": "Solid reasoning for the Compliance Score (' + str(compliance) + '/100). Explain compliance alignment, or missing disclosures / off-brand mentions.",\n'
         '  "bias": "Solid reasoning for the Bias Score (' + str(bias) + '/100). Explain the detected bias level and narrative leaning.",\n'
@@ -428,7 +454,7 @@ def _generate_summary_and_reasonings(
 
     user_prompt = (
         f"Scores to explain:\n"
-        f"- Trust Score: {trust}/100\n"
+        f"- Trust Score: {trust if trust is not None else 'insufficient evidence (no checkable claims)'}\n"
         f"- Risk Score: {risk}/100\n"
         f"- Compliance Score: {compliance}/100\n"
         f"- Bias Score: {bias}/100\n"
@@ -443,7 +469,7 @@ def _generate_summary_and_reasonings(
         f"- Creator Risk: {str(results.get('creator_risk', {}))[:800]}\n"
         f"- Bias Check: {str(results.get('bias', {}))[:500]}\n"
         f"- Sentiment Check: {str(results.get('sentiment', {}))[:500]}\n"
-        f"- Media Integrity: {str(results.get('media_integrity', {}))[:600]}"
+        f"- Media Integrity: {_media_integrity_prompt_summary(results.get('media_integrity', {}) or {})}"
     )
 
     schema_hint = """{
@@ -501,7 +527,7 @@ def _generate_summary_and_reasonings(
 
 
 def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
-    from app.llm import effective_tavily_key
+    from app.llm import effective_media_integrity_key, effective_tavily_key
 
     claims = fact.get("claims", []) or []
     claim_evidence_count = sum(1 for c in claims if c.get("evidence"))
@@ -510,9 +536,13 @@ def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
     for c in claims:
         for reason in c.get("insufficient_evidence_reasons") or []:
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    skipped = fact.get("skipped_claims", []) or []
+    skipped_summary = summarize_skipped_claims(skipped)
     metadata = video.extra_metadata or {}
+    mi = results.get("media_integrity", {}) or {}
     return {
         "no_claims_extracted": len(claims) == 0,
+        **skipped_summary,
         "claim_evidence_coverage_pct": round((claim_evidence_count / len(claims) * 100), 2) if claims else 0.0,
         "retrieved_evidence_count": len(fact_retrieved),
         "no_retrieved_evidence": len(fact_retrieved) == 0,
@@ -521,6 +551,16 @@ def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
         "used_transcription_stub": bool(metadata.get("transcription_stub")),
         "agent_keys": sorted(k for k in results.keys() if k != "diagnostics"),
         "insufficient_reason_counts": reason_counts,
+        "media_integrity_method": mi.get("method"),
+        "media_integrity_provider": mi.get("provider"),
+        "media_integrity_stub_reason": mi.get("stub_reason"),
+        "media_integrity_used_stub": mi.get("method") == "stub",
+        "hive_configured": bool(
+            (settings.MEDIA_INTEGRITY_PROVIDER or "").strip().lower() == "hive"
+            and effective_media_integrity_key()
+        ),
+        "backend_public_url_configured": bool((settings.BACKEND_PUBLIC_URL or "").strip()),
+        "video_file_available": bool(metadata.get("video_path") or metadata.get("upload_path")),
     }
 
 

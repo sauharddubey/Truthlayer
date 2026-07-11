@@ -12,6 +12,7 @@ import re
 from typing import List
 
 from app.llm import chat_json
+from app.services.claim_eligibility import is_checkable_claim
 
 CLAIM_TYPES = [
     "promotional",
@@ -54,7 +55,14 @@ def structure_transcript(text: str, segments: List[dict]) -> List[dict]:
             "You are a transcript-structuring engine for a media-compliance platform. "
             "Break the transcript into semantic blocks. For each block extract topics, "
             "claims (with claim_type), product mentions, brand mentions and emotional "
-            "cues. Claim types: " + ", ".join(CLAIM_TYPES) + "."
+            "cues. Claim types: "
+            + ", ".join(CLAIM_TYPES)
+            + ". "
+            "A claim must be a complete, declarative, checkable proposition that could "
+            "be true or false. Do NOT extract titles, intros, list headings, noun "
+            "phrases, questions, or pure opinions as claims. Put non-claim phrases in "
+            "topic instead. Prefer rewriting fragments into full sentences using block "
+            "context when the speaker makes a factual assertion."
         ),
         user=f"Transcript segments:\n{segment_view}",
         schema_hint=_SCHEMA,
@@ -62,7 +70,7 @@ def structure_transcript(text: str, segments: List[dict]) -> List[dict]:
 
     blocks = result.get("blocks") if isinstance(result, dict) else None
     if blocks:
-        return blocks
+        return _sanitize_blocks(blocks)
     return _heuristic_blocks(text, segments)
 
 
@@ -86,7 +94,9 @@ def _heuristic_blocks(text: str, segments: List[dict]) -> List[dict]:
             ctype = "promotional"
         else:
             ctype = "factual"
-        claims.append({"claim_text": s.strip(), "claim_type": ctype})
+        item = {"claim_text": s.strip(), "claim_type": ctype}
+        if is_checkable_claim(item["claim_text"], ctype):
+            claims.append(item)
 
     return [
         {
@@ -100,3 +110,17 @@ def _heuristic_blocks(text: str, segments: List[dict]) -> List[dict]:
             "emotional_cues": [],
         }
     ]
+
+
+def _sanitize_blocks(blocks: List[dict]) -> List[dict]:
+    """Drop non-checkable claim fragments returned by the structuring LLM."""
+    cleaned = []
+    for block in blocks or []:
+        claims = []
+        for claim in block.get("claims") or []:
+            text = (claim.get("claim_text") or "").strip()
+            ctype = claim.get("claim_type", "factual")
+            if text and is_checkable_claim(text, ctype):
+                claims.append({"claim_text": text, "claim_type": ctype})
+        cleaned.append({**block, "claims": claims})
+    return cleaned

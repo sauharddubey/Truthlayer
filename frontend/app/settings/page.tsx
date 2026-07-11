@@ -452,8 +452,8 @@ export default function SettingsPage() {
                 onRemove={() => removeKey("tavily_api_key")} canRemove={hasTavily} loading={loading}
               />
               <KeyField
-                label="Media-integrity key" badge={hasMedia} hint="Only if an external deepfake service is configured."
-                placeholder="key…" value={mediaVal} onChange={setMediaVal}
+                label="Hive API token" badge={hasMedia} hint="Hive deepfake detection for business authenticity scoring. Requires MEDIA_INTEGRITY_PROVIDER=hive and a public BACKEND_PUBLIC_URL."
+                placeholder="Hive token…" value={mediaVal} onChange={setMediaVal}
                 onRemove={() => removeKey("media_integrity_api_key")} canRemove={hasMedia} loading={loading}
               />
             </div>

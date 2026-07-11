@@ -70,8 +70,12 @@ class Settings(BaseSettings):
     TRANSCRIPTION_MODEL: str = "google/gemini-2.5-flash-lite"
 
     # ── Media integrity ───────────────────────────────────────────────────
-    # Optional external deepfake service endpoint (the API key is per-user).
-    MEDIA_INTEGRITY_URL: str = ""
+    # Provider adapter: "hive" enables Hive deepfake detection (business tier).
+    # The API key is per-user in Settings; only non-secret config lives here.
+    MEDIA_INTEGRITY_PROVIDER: str = ""
+    MEDIA_INTEGRITY_URL: str = "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection"
+    # Public base URL of this API (required so Hive can fetch signed /media/... links).
+    BACKEND_PUBLIC_URL: str = ""
 
     # ── Storage ───────────────────────────────────────────────────────────
     MEDIA_STORAGE_DIR: str = "/tmp/truthlayer/media"

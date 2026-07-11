@@ -12,6 +12,11 @@ from urllib.parse import urlparse
 
 from app.agents.base import AgentContext
 from app.llm import chat_json
+from app.services.claim_eligibility import (
+    claim_eligibility_reasons,
+    filter_checkable_claims,
+    has_declarative_predicate,
+)
 from app.services.evidence import search_evidence
 
 NAME = "fact_check"
@@ -47,10 +52,18 @@ def run(ctx: AgentContext) -> dict:
                 }
             )
 
-    # Gather external evidence for the most checkable claims.
+    content_segments = (ctx.metadata or {}).get("content_segments") or []
+    content_type = (ctx.metadata or {}).get("content_type")
+    checkable_claims, skipped_claims = filter_checkable_claims(
+        candidate_claims,
+        content_segments,
+        content_type=content_type,
+    )
+
+    # Gather external evidence for the most checkable claims only.
     claim_evidence_index: dict[str, list[dict]] = {}
     retrieval_diagnostics: dict[str, dict] = {}
-    claim_candidates = _prioritize_claims(candidate_claims)
+    claim_candidates = _prioritize_claims(checkable_claims)
     for c in claim_candidates:
         text = c.get("claim_text") or ""
         if not text:
@@ -90,11 +103,15 @@ def run(ctx: AgentContext) -> dict:
             "You are a rigorous fact-checking agent. For each claim, weigh the provided "
             "evidence and classify it as supported, contradicted, misleading, or "
             "unverified. Cite the evidence you used. Be conservative: if evidence is "
-            "weak or absent, mark unverified. Always include confidence (0-1)."
+            "weak or absent, mark unverified. If claim_text is not a factual proposition "
+            "(topic phrase, title, intro fragment, or opinion), mark unverified and "
+            "explain that it is not a checkable claim. Do not treat keyword overlap or "
+            "related web titles as support for non-declarative phrases. Always include "
+            "confidence (0-1)."
         ),
         user=(
             f"Transcript:\n{ctx.transcript_text[:4000]}\n\n"
-            f"Candidate claims:\n{candidate_claims}\n\n"
+            f"Candidate claims:\n{checkable_claims}\n\n"
             f"Retrieved evidence:\n{_flatten_claim_evidence(claim_evidence_index)}"
         ),
         schema_hint=_SCHEMA,
@@ -111,11 +128,12 @@ def run(ctx: AgentContext) -> dict:
                     "evidence": claim_evidence_index.get((c.get("claim_text") or "").strip().lower(), []),
                     "reasoning": "No LLM available.",
                 }
-                for c in candidate_claims
+                for c in checkable_claims
             ],
             "confidence": 0.3,
             "evidence": _flatten_claim_evidence(claim_evidence_index),
-            "evidence_summary": _summarize_evidence(candidate_claims, claim_evidence_index, retrieval_diagnostics),
+            "evidence_summary": _summarize_evidence(checkable_claims, claim_evidence_index, retrieval_diagnostics),
+            "skipped_claims": skipped_claims,
         }
 
     claims = result.get("claims") or []
@@ -151,8 +169,8 @@ def run(ctx: AgentContext) -> dict:
 
         verdict = claim.get("verdict") or "unverified"
         evidence_quality = _evidence_quality_score(text, merged)
-        reason_codes = _reason_codes(text, merged, evidence_quality)
-        if not _passes_evidence_contract(verdict, merged, evidence_quality):
+        reason_codes = _reason_codes(text, merged, evidence_quality, claim.get("claim_type"))
+        if not _passes_evidence_contract(verdict, text, merged, evidence_quality):
             verdict = "unverified"
             confidence = min(confidence, 0.35 if merged else 0.25)
         elif not merged:
@@ -175,6 +193,7 @@ def run(ctx: AgentContext) -> dict:
     result.setdefault("confidence", 0.6)
     result["evidence"] = _flatten_claim_evidence(claim_evidence_index)
     result["evidence_summary"] = _summarize_evidence(normalized_claims, claim_evidence_index, retrieval_diagnostics)
+    result["skipped_claims"] = skipped_claims
     return result
 
 
@@ -280,19 +299,33 @@ def _evidence_quality_score(claim_text: str, evidence: list[dict]) -> float:
     return max(0.0, min(100.0, score))
 
 
-def _passes_evidence_contract(verdict: str, evidence: list[dict], evidence_quality: float) -> bool:
+def _passes_evidence_contract(
+    verdict: str,
+    claim_text: str,
+    evidence: list[dict],
+    evidence_quality: float,
+) -> bool:
     if verdict == "unverified":
         return True
     if not evidence:
         return False
     has_citation = any((e.get("source") and e.get("text")) for e in evidence)
     quality_threshold = 48.0 if verdict in {"supported", "contradicted"} else 38.0
+    if not has_declarative_predicate(claim_text):
+        quality_threshold = max(quality_threshold, 58.0)
+    if len((claim_text or "").split()) <= 6:
+        quality_threshold = max(quality_threshold, 55.0)
     return has_citation and evidence_quality >= quality_threshold
 
 
-def _reason_codes(claim_text: str, evidence: list[dict], evidence_quality: float) -> list[str]:
-    reasons = []
-    if len((claim_text or "").split()) < 4:
+def _reason_codes(
+    claim_text: str,
+    evidence: list[dict],
+    evidence_quality: float,
+    claim_type: str | None = None,
+) -> list[str]:
+    reasons = list(claim_eligibility_reasons(claim_text, claim_type))
+    if len((claim_text or "").split()) < 4 and "claim_too_vague" not in reasons:
         reasons.append("claim_too_vague")
     if not evidence:
         reasons.append("no_external_sources")
@@ -300,7 +333,7 @@ def _reason_codes(claim_text: str, evidence: list[dict], evidence_quality: float
         reasons.append("low_alignment")
     if evidence and not any(e.get("url") for e in evidence):
         reasons.append("no_url_citations")
-    return reasons
+    return sorted(set(reasons))
 
 
 def _retrieval_metrics(claim_text: str, evidence: list[dict], query: str) -> dict:

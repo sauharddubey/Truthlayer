@@ -21,6 +21,9 @@ class AgentContext:
     mode: str = "verifier"
     tier: str = "verifier"
     metadata: dict = field(default_factory=dict)
+    source_url: Optional[str] = None
+    platform: Optional[str] = None
+    duration_seconds: Optional[float] = None
     # Product context (business tier).
     product_id: Optional[str] = None
     product_name: Optional[str] = None

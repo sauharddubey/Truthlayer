@@ -256,6 +256,15 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
           No external evidence was retrieved for this run. Verdict confidence may be lower.
         </div>
       )}
+      {diagnostics?.media_integrity_used_stub && video.mode === "business" && (
+        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
+          Authenticity used a heuristic stub
+          {diagnostics?.media_integrity_stub_reason
+            ? ` (${String(diagnostics.media_integrity_stub_reason).replace(/_/g, " ")})`
+            : ""}
+          . Add a Hive API token, set BACKEND_PUBLIC_URL, and re-analyze for real deepfake detection.
+        </div>
+      )}
 
       <AnalysisBento
         video={video} report={report} claims={claims}

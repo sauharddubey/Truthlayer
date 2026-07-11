@@ -73,17 +73,19 @@ function Block({ label, icon, color, span = "", onClick, children }: {
   );
 }
 
-function Ring({ value, color, size = 92, label }: { value: number; color: string; size?: number; label?: string }) {
+function Ring({ value, color, size = 92, label }: { value?: number | null; color: string; size?: number; label?: string }) {
   const r = size / 2 - 7, circ = 2 * Math.PI * r;
+  const pct = value ?? 0;
+  const display = value == null ? "N/A" : String(Math.round(value));
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ width: size, height: size }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={circ * (1 - value / 100)} />
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-heavy text-2xl text-white leading-none">{Math.round(value)}</span>
+        <span className={`font-heavy leading-none text-white ${display === "N/A" ? "text-lg" : "text-2xl"}`}>{display}</span>
         {label && <span className="text-[7px] font-bold uppercase tracking-widest text-white/40 mt-0.5">{label}</span>}
       </div>
     </div>
@@ -101,6 +103,91 @@ function MiniBar({ label, value, invert = false }: { label: string; value?: numb
       <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
         <div className="h-full rounded-full" style={{ width: `${n ?? 0}%`, background: C(n, invert) }} />
       </div>
+    </div>
+  );
+}
+
+const SIGNAL_LABELS: Record<string, string> = {
+  ai_generated: "AI-generated visuals",
+  deepfake: "Visual deepfake",
+  ai_generated_audio: "Synthetic audio",
+};
+
+function formatMediaTimestamp(sec?: number | null) {
+  if (sec == null || Number.isNaN(sec)) return "—";
+  const total = Math.max(0, Math.floor(sec));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function signalPercent(value?: number | null) {
+  if (value == null) return null;
+  return Math.round(Math.max(0, Math.min(1, value)) * 100);
+}
+
+function LightMiniBar({ label, value, invert = false }: { label: string; value?: number | null; invert?: boolean }) {
+  const pct = signalPercent(value);
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-[10px] font-bold">
+        <span className="uppercase tracking-wider text-ink-faint">{label}</span>
+        <span style={{ color: C(pct, invert) }}>{pct ?? "—"}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface">
+        <div className="h-full rounded-full" style={{ width: `${pct ?? 0}%`, background: C(pct, invert) }} />
+      </div>
+    </div>
+  );
+}
+
+function MediaIntegrityDetails({ mi }: { mi: any }) {
+  if (!mi) return null;
+  const signals = mi.signals || {};
+  const evidence = mi.deepfake?.manipulation_evidence || mi.evidence || [];
+  const dominant = mi.dominant_signal as string | undefined;
+
+  return (
+    <div className="space-y-3 text-xs">
+      {dominant && (
+        <div className="rounded-lg border border-line bg-surface px-3 py-2">
+          <div className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Primary concern</div>
+          <div className="mt-1 font-semibold text-ink">
+            {SIGNAL_LABELS[dominant] || dominant.replace(/_/g, " ")}
+          </div>
+        </div>
+      )}
+      {(signals.ai_generated || signals.deepfake || signals.ai_generated_audio) && (
+        <div className="rounded-lg border border-line bg-surface p-3 space-y-2">
+          <div className="font-semibold text-ink">Hive signal breakdown</div>
+          <LightMiniBar label={SIGNAL_LABELS.ai_generated} value={signals.ai_generated?.max} invert />
+          <LightMiniBar label={SIGNAL_LABELS.deepfake} value={signals.deepfake?.max} invert />
+          <LightMiniBar label={SIGNAL_LABELS.ai_generated_audio} value={signals.ai_generated_audio?.max} invert />
+        </div>
+      )}
+      {evidence.length > 0 && (
+        <div className="rounded-lg border border-line bg-surface p-3 space-y-2">
+          <div className="font-semibold text-ink">Suspicious moments</div>
+          <ul className="space-y-1 text-ink-light">
+            {evidence.slice(0, 8).map((item: any, idx: number) => (
+              <li key={idx} className="flex items-center justify-between gap-3">
+                <span className="font-mono text-ink">{formatMediaTimestamp(item.timestamp_sec)}</span>
+                <span className="truncate">{SIGNAL_LABELS[item.class] || item.class || "Signal"}</span>
+                <span className="font-semibold text-ink">{Math.round((item.score ?? 0) * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {mi.deepfake?.notes && (
+        <p className="text-ink-faint italic font-mono">{mi.deepfake.notes}</p>
+      )}
+      {mi.method && (
+        <p className="text-ink-faint">
+          Detector: <span className="font-mono text-ink">{mi.method}</span>
+          {mi.provider && mi.provider !== mi.method ? ` (${mi.provider})` : ""}
+        </p>
+      )}
     </div>
   );
 }
@@ -136,6 +223,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const open = (title: string, node: ReactNode) => setModal({ title, node });
 
   const segs = content.segments || [];
+  const skippedClaims = agents.fact_check?.skipped_claims || [];
   const verified = claims.filter((c) => c.verdict === "supported").length;
   const flagged = claims.filter((c) => ["contradicted", "misleading"].includes(c.verdict)).length;
   const sentimentPct = report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null;
@@ -143,6 +231,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const bias = agents.bias;
   const comp = agents.compliance;
   const mi = agents.media_integrity;
+  const miEvidence = mi?.deepfake?.manipulation_evidence || mi?.evidence || [];
   const cr = agents.creator_risk;
   const senti = agents.sentiment;
 
@@ -154,7 +243,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         <Block label="Trust" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c" span="col-span-2 row-span-2"
           onClick={() => open("Scores", <ScoresModal report={report} isBusiness={isBusiness} mode={mode} />)}>
           <div className="flex flex-1 items-center gap-5">
-            <Ring value={report?.trust_score ?? 0} color={C(report?.trust_score)} label="trust" />
+            <Ring value={report?.trust_score ?? null} color={C(report?.trust_score)} label="trust" />
             <div className="flex-1 space-y-2">
               {!isVerifier && <MiniBar label="Risk" value={report?.risk_score} invert />}
               {!isVerifier && isBusiness && <MiniBar label="Compliance" value={report?.compliance_score} />}
@@ -167,7 +256,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           <div className="mt-2 text-[10px] font-medium text-white/40">
             {content.is_about_product ? "Product video" : (content.content_type || "video")}
             {report?.overall_confidence != null && ` · ${Math.round(report.overall_confidence * 100)}% confidence`}
-            {isVerifier && diagnostics?.no_claims_extracted && " · insufficient claims"}
+            {(isVerifier || diagnostics?.no_claims_extracted) && diagnostics?.no_claims_extracted && " · insufficient claims"}
           </div>
         </Block>
 
@@ -181,11 +270,14 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* CLAIMS */}
         <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
-          onClick={() => open("Fact-check claims", <ClaimsPanel claims={claims} showVerification={isBusiness} onReview={onReview} />)}>
-          <div className="mb-3 flex gap-2">
+          onClick={() => open("Fact-check claims", <ClaimsPanel claims={claims} skippedClaims={skippedClaims} showVerification={isBusiness} onReview={onReview} />)}>
+          <div className="mb-3 flex flex-wrap gap-2">
             <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} supported</span>
             <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
             <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/50">{claims.length} total</span>
+            {skippedClaims.length > 0 && (
+              <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/40">{skippedClaims.length} filtered</span>
+            )}
           </div>
           <div className="space-y-2 flex-1 overflow-hidden">
             {claims.slice(0, 7).map((c, i) => (
@@ -266,12 +358,18 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         {/* MEDIA INTEGRITY (business) */}
         {isBusiness && mi && (
           <Block label="Media integrity" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c"
-            onClick={() => open("Media integrity", <EvidencePanel title="Media integrity" agent={mi} />)}>
+            onClick={() => open("Media integrity", <MediaIntegrityDetails mi={mi} />)}>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-6 w-6 text-good" />
               <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{report?.authenticity_score ?? "—"}%</span>
             </div>
-            <div className="mt-1 text-[10px] text-white/40">authenticity</div>
+            <div className="mt-1 text-[10px] text-white/40">
+              authenticity
+              {mi.dominant_signal && mi.method === "hive" && (
+                <> · {SIGNAL_LABELS[mi.dominant_signal] || mi.dominant_signal}</>
+              )}
+              {miEvidence.length > 0 && <> · {miEvidence.length} suspicious moment(s)</>}
+            </div>
           </Block>
         )}
 
@@ -338,18 +436,27 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
           <p className="text-xs text-ink-light leading-relaxed">
             The Trust Score represents the structural reliability of the statements made in the video.
           </p>
-          <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
-            <div className="font-semibold text-ink">Scoring Formula:</div>
-            <p className="text-ink-light">
-              We extract claims and score them: Supported (1.0), Unverified (0.5), Misleading (0.15), and Contradicted (0.0). The base average is penalized by the bias index (up to -30%) and multiplied by the media authenticity score.
-            </p>
-            {agents.fact_check?.reasoning && (
-              <div className="mt-2 pt-2 border-t border-line">
-                <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
-                <p className="mt-1 text-ink-light italic">"{agents.fact_check.reasoning}"</p>
-              </div>
-            )}
-          </div>
+          {diagnostics?.no_claims_extracted ? (
+            <div className="rounded-lg border border-warn/20 bg-warn/5 p-3 text-xs text-warn">
+              Insufficient evidence: no checkable claims survived filtering, so trust cannot be calculated from claim verdicts.
+              {diagnostics?.skipped_claim_count > 0 && (
+                <span> {diagnostics.skipped_claim_count} candidate phrase(s) were filtered — expand Filtered phrases in the claims panel.</span>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
+              <div className="font-semibold text-ink">Scoring Formula:</div>
+              <p className="text-ink-light">
+                We extract claims and score them: Supported (1.0), Unverified (0.5), Misleading (0.15), and Contradicted (0.0). The base average is penalized by the bias index (up to -30%) and multiplied by the media authenticity score.
+              </p>
+              {agents.fact_check?.reasoning && (
+                <div className="mt-2 pt-2 border-t border-line">
+                  <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Model Reasoning:</span>
+                  <p className="mt-1 text-ink-light italic">"{agents.fact_check.reasoning}"</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )
     },
@@ -475,11 +582,22 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
             <p className="text-ink-light">
               Scans audio/video layers for splicing anomalies, synthetic voice modulations, and known celebrity face matches.
             </p>
-            {agents.media_integrity?.deepfake?.notes && (
+            {agents.media_integrity?.method === "hive" && (
+              <MediaIntegrityDetails mi={agents.media_integrity} />
+            )}
+            {agents.media_integrity?.deepfake?.notes && agents.media_integrity?.method !== "hive" && (
               <div className="mt-2 pt-2 border-t border-line">
                 <span className="font-bold text-[9px] uppercase tracking-wider text-ink-faint">Detector Notes:</span>
                 <p className="mt-1 text-ink-light italic font-mono">{agents.media_integrity.deepfake.notes}</p>
               </div>
+            )}
+            {agents.media_integrity?.method && agents.media_integrity?.method !== "hive" && (
+              <p className="text-ink-faint">
+                Detector: <span className="font-mono text-ink">{agents.media_integrity.method}</span>
+                {agents.media_integrity.provider && agents.media_integrity.provider !== agents.media_integrity.method
+                  ? ` (${agents.media_integrity.provider})`
+                  : ""}
+              </p>
             )}
           </div>
         </div>

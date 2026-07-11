@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 const verdictStyle: Record<string, string> = {
   supported: "bg-good/10 text-good",
   contradicted: "bg-bad/10 text-bad",
@@ -16,74 +18,144 @@ const verifyStyle: Record<string, string> = {
   not_applicable: "bg-surface text-ink-faint",
 };
 
+function FilteredPhrasesSection({ skippedClaims }: { skippedClaims: any[] }) {
+  const [open, setOpen] = useState(false);
+  if (!skippedClaims?.length) return null;
+
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left text-sm font-semibold text-ink-light hover:text-ink"
+      >
+        <span>Filtered phrases ({skippedClaims.length})</span>
+        <span className="text-xs text-ink-faint">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {skippedClaims.map((c, i) => (
+            <div key={i} className="rounded-md border border-line bg-surface/50 p-3">
+              <p className="text-sm text-ink-light">{c.claim_text}</p>
+              {c.skip_reasons?.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {c.skip_reasons.slice(0, 4).map((reason: string) => (
+                    <span key={reason} className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-ink-faint">
+                      {reason.replace(/_/g, " ")}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ClaimsPanel({
   claims,
+  skippedClaims = [],
   showVerification = false,
   onReview,
 }: {
   claims: any[];
+  skippedClaims?: any[];
   showVerification?: boolean;
   onReview?: (claimId: string, status: "approved" | "rejected") => void;
 }) {
-  if (!claims?.length) return <div className="card text-sm text-ink-light">No factual claims extracted.</div>;
+  const hasClaims = claims?.length > 0;
+  const hasSkipped = skippedClaims?.length > 0;
+
+  if (!hasClaims && !hasSkipped) {
+    return <div className="card text-sm text-ink-light">No factual claims extracted.</div>;
+  }
+
   return (
     <div className="card">
       <div className="mb-3 text-base font-semibold">Claims</div>
-      <div className="space-y-2.5">
-        {claims.map((c, i) => (
-          <div key={i} className="rounded-md border border-line p-3">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-medium text-ink">{c.claim_text}</p>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <span className={`rounded px-2 py-0.5 text-xs ${verdictStyle[c.verdict] || verdictStyle.unverified}`}>
-                  {c.verdict || "unverified"}
-                </span>
-                {showVerification && c.verification_status && (
-                  <span className={`rounded px-2 py-0.5 text-xs ${verifyStyle[c.verification_status] || "bg-surface text-ink-light"}`}>
-                    {c.verification_status.replace(/_/g, " ")}
-                  </span>
+      {!hasClaims && (
+        <p className="mb-3 text-sm text-ink-light">No checkable claims passed filtering for this run.</p>
+      )}
+      {hasClaims && (
+        <div className="space-y-2.5">
+          {claims.map((c, i) => {
+            const showProductFirst = showVerification && c.verification_status;
+            const primaryLabel = showProductFirst ? c.verification_status.replace(/_/g, " ") : (c.verdict || "unverified");
+            const primaryStyle = showProductFirst
+              ? verifyStyle[c.verification_status] || "bg-surface text-ink-light"
+              : verdictStyle[c.verdict] || verdictStyle.unverified;
+            const secondaryLabel = showProductFirst ? (c.verdict || "unverified") : null;
+            const secondaryMuted =
+              showProductFirst &&
+              c.verification_status === "not_applicable" &&
+              c.verdict === "supported";
+
+            return (
+              <div key={i} className="rounded-md border border-line p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-ink">{c.claim_text}</p>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`rounded px-2 py-0.5 text-xs ${primaryStyle}`}>
+                      {primaryLabel}
+                    </span>
+                    {secondaryLabel && (
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs ${
+                          secondaryMuted
+                            ? "bg-surface text-ink-faint"
+                            : verdictStyle[c.verdict] || verdictStyle.unverified
+                        }`}
+                        title="General web fact-check verdict"
+                      >
+                        web: {secondaryLabel}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-ink-faint">
+                  {c.claim_type}
+                  {c.confidence != null && ` · ${Math.round(c.confidence * 100)}% conf`}
+                  {c.evidence_quality_score != null && ` · evidence ${Math.round(c.evidence_quality_score)}%`}
+                  {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
+                </div>
+                {c.insufficient_evidence_reasons?.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {c.insufficient_evidence_reasons.slice(0, 3).map((reason: string) => (
+                      <span key={reason} className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-ink-faint">
+                        {reason.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {c.verification_note && showVerification && (
+                  <p className="mt-1 text-xs text-ink-light">{c.verification_note}</p>
+                )}
+                {c.evidence?.length > 0 && (
+                  <ul className="mt-1.5 space-y-0.5">
+                    {c.evidence.slice(0, 3).map((e: any, j: number) => (
+                      <li key={j} className="text-xs text-ink-light">
+                        {e.url ? (
+                          <a href={e.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
+                        ) : (<span className="font-medium">{e.source || "evidence"}</span>)}
+                        {e.text && <span> — {e.text}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {showVerification && onReview && c.verification_status === "needs_review" && (
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => onReview(c.id, "approved")} className="rounded-md bg-good/10 px-2.5 py-1 text-xs font-medium text-good hover:bg-good/20">Approve</button>
+                    <button onClick={() => onReview(c.id, "rejected")} className="rounded-md bg-bad/10 px-2.5 py-1 text-xs font-medium text-bad hover:bg-bad/20">Reject</button>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="mt-1 text-xs text-ink-faint">
-              {c.claim_type}
-              {c.confidence != null && ` · ${Math.round(c.confidence * 100)}% conf`}
-              {c.evidence_quality_score != null && ` · evidence ${Math.round(c.evidence_quality_score)}%`}
-              {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
-            </div>
-            {c.insufficient_evidence_reasons?.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {c.insufficient_evidence_reasons.slice(0, 3).map((reason: string) => (
-                  <span key={reason} className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-ink-faint">
-                    {reason.replace(/_/g, " ")}
-                  </span>
-                ))}
-              </div>
-            )}
-            {c.verification_note && showVerification && (
-              <p className="mt-1 text-xs text-ink-light">{c.verification_note}</p>
-            )}
-            {c.evidence?.length > 0 && (
-              <ul className="mt-1.5 space-y-0.5">
-                {c.evidence.slice(0, 3).map((e: any, j: number) => (
-                  <li key={j} className="text-xs text-ink-light">
-                    {e.url ? (
-                      <a href={e.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
-                    ) : (<span className="font-medium">{e.source || "evidence"}</span>)}
-                    {e.text && <span> — {e.text}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {showVerification && onReview && c.verification_status === "needs_review" && (
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => onReview(c.id, "approved")} className="rounded-md bg-good/10 px-2.5 py-1 text-xs font-medium text-good hover:bg-good/20">Approve</button>
-                <button onClick={() => onReview(c.id, "rejected")} className="rounded-md bg-bad/10 px-2.5 py-1 text-xs font-medium text-bad hover:bg-bad/20">Reject</button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
+      <FilteredPhrasesSection skippedClaims={skippedClaims} />
     </div>
   );
 }
