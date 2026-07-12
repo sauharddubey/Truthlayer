@@ -23,7 +23,7 @@ from typing import List, Optional
 from openai import OpenAI
 
 from app.config import settings
-from app.llm import _extract_json, effective_chat_key, effective_transcription_model
+from app.llm import _extract_json, effective_chat_key, effective_transcription_model, record_usage
 
 logger = logging.getLogger("truthlayer.transcription")
 
@@ -107,6 +107,13 @@ def _transcribe_openrouter(audio_path: str, duration: Optional[float]) -> Option
             }
         ],
     )
+    if resp and getattr(resp, "usage", None):
+        record_usage(
+            "transcription",
+            effective_transcription_model() or settings.TRANSCRIPTION_MODEL,
+            resp.usage.prompt_tokens,
+            resp.usage.completion_tokens,
+        )
     content = (resp.choices[0].message.content or "").strip()
     if not content:
         return None

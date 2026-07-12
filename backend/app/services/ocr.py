@@ -16,7 +16,7 @@ import tempfile
 from typing import List, Optional
 
 from app.config import settings
-from app.llm import _client, effective_chat_key, effective_transcription_model, _extract_json
+from app.llm import _client, effective_chat_key, effective_transcription_model, _extract_json, record_usage
 
 logger = logging.getLogger("truthlayer.ocr")
 
@@ -149,6 +149,13 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
                 {"role": "user", "content": content_list}
             ]
         )
+        if resp and getattr(resp, "usage", None):
+            record_usage(
+                "transcription",
+                model,
+                resp.usage.prompt_tokens,
+                resp.usage.completion_tokens,
+            )
         content = (resp.choices[0].message.content or "").strip()
         if not content:
             return _empty_result("Model returned an empty response.")
