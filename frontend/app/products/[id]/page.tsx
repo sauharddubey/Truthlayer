@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   getProduct, updateProduct, productOverview, productVideos, productDocuments, uploadProductDocument, deleteProductDocument,
-  productKeywords, addProductKeyword, deleteProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
+  productKeywords, addProductKeyword, deleteProductKeyword, productContradictions, recomputeProductContradictions,
+  productNarratives, recomputeProductNarratives, submitUrl,
   uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
@@ -43,6 +44,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [deletingKeywordId, setDeletingKeywordId] = useState<string | null>(null);
   const [contradictions, setContradictions] = useState<any>(null);
   const [narratives, setNarratives] = useState<any[]>([]);
+  const [narrativesLoaded, setNarrativesLoaded] = useState(false);
+  const [contradictionsLoaded, setContradictionsLoaded] = useState(false);
+  const [generatingNarratives, setGeneratingNarratives] = useState(false);
+  const [generatingContradictions, setGeneratingContradictions] = useState(false);
   const [url, setUrl] = useState("");
   const [kw, setKw] = useState("");
   const [msg, setMsg] = useState("");
@@ -72,6 +77,51 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   useEffect(() => { loadAll(); }, [loadAll]);
   useRefetchOnVisible(loadAll);
+
+  useEffect(() => {
+    if (tab !== "Narratives" || narrativesLoaded) return;
+    productNarratives(id)
+      .then((rows) => { setNarratives(rows || []); setNarrativesLoaded(true); })
+      .catch((e: any) => { setMsg(e.message); setNarrativesLoaded(true); });
+  }, [tab, id, narrativesLoaded]);
+
+  useEffect(() => {
+    if (tab !== "Contradictions" || contradictionsLoaded) return;
+    productContradictions(id)
+      .then((report) => { setContradictions(report); setContradictionsLoaded(true); })
+      .catch((e: any) => { setMsg(e.message); setContradictionsLoaded(true); });
+  }, [tab, id, contradictionsLoaded]);
+
+  async function generateNarratives() {
+    setGeneratingNarratives(true);
+    setMsg("");
+    try {
+      const rows = await recomputeProductNarratives(id);
+      setNarratives(rows || []);
+      setNarrativesLoaded(true);
+      setMsg(rows?.length ? `Narrative report ready — ${rows.length} cluster${rows.length === 1 ? "" : "s"} found.` : "Narrative report ready — no clusters (analyze more videos first).");
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setGeneratingNarratives(false);
+    }
+  }
+
+  async function generateContradictions() {
+    setGeneratingContradictions(true);
+    setMsg("");
+    try {
+      const report = await recomputeProductContradictions(id);
+      setContradictions(report);
+      setContradictionsLoaded(true);
+      const count = report?.contradictions?.length ?? 0;
+      setMsg(count ? `Contradiction report ready — ${count} pair${count === 1 ? "" : "s"} found.` : "Contradiction report ready — no contradictions found.");
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setGeneratingContradictions(false);
+    }
+  }
 
   async function submitForProduct(e: React.FormEvent) {
     e.preventDefault();
@@ -281,7 +331,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       <div className="mb-5 flex flex-wrap gap-1 rounded-full border border-line bg-sidebar p-1">
         {TABS.map((t) => (
           <button key={t}
-            onClick={() => { setTab(t); if (t === "Contradictions" && !contradictions) productContradictions(id).then(setContradictions); }}
+            onClick={() => setTab(t)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${tab === t ? "bg-ink text-paper shadow" : "text-ink-light hover:text-ink"}`}>
             {t}
           </button>
@@ -434,9 +484,18 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
       {tab === "Narratives" && (
         <div>
-          <button className="btn-ghost mb-4" onClick={() => recomputeProductNarratives(id).then(setNarratives)}>
-            <Network className="h-4 w-4" /> Recompute narratives
-          </button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-ink-light">Cluster this product&apos;s analyzed videos into shared narrative themes.</p>
+            <button
+              type="button"
+              className="btn-accent shrink-0"
+              onClick={generateNarratives}
+              disabled={generatingNarratives || busy}
+            >
+              <Network className="h-4 w-4" />
+              {generatingNarratives ? "Generating…" : narratives.length ? "Regenerate narrative report" : "Generate narrative report"}
+            </button>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {narratives.map((c) => (
               <div key={c.id} className="glass-tile p-4">
@@ -445,24 +504,60 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {formatMetric(c.risk_score)}</span>
                 </div>
                 <p className="mt-1.5 text-sm text-white/50">{c.summary}</p>
+                {c.video_count != null && (
+                  <p className="mt-2 text-xs text-white/40">{c.video_count} video{c.video_count === 1 ? "" : "s"} in cluster</p>
+                )}
               </div>
             ))}
-            {!narratives.length && <p className="text-sm text-ink-faint">Click recompute to cluster this product's videos into narratives.</p>}
+            {!narratives.length && !generatingNarratives && (
+              <p className="text-sm text-ink-faint sm:col-span-2">
+                {narrativesLoaded ? "No narrative clusters yet — analyze at least one video, then generate the report." : "Loading saved report…"}
+              </p>
+            )}
+            {generatingNarratives && (
+              <p className="text-sm text-ink-faint sm:col-span-2">Clustering transcripts and summarizing narratives…</p>
+            )}
           </div>
         </div>
       )}
 
       {tab === "Contradictions" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {contradictions === null && <p className="text-sm text-ink-faint">Loading…</p>}
-          {contradictions?.contradictions?.length ? contradictions.contradictions.map((c: any, i: number) => (
-            <div key={i} className="glass-tile p-4">
-              <div className="flex items-center gap-2 text-sm font-bold text-bad"><AlertTriangle className="h-4 w-4" /> Contradiction</div>
-              <p className="mt-2 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">"{c.claim_a}"</p>
-              <p className="mt-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">"{c.claim_b}"</p>
-              <p className="mt-2 text-xs text-white/40">{c.explanation}</p>
-            </div>
-          )) : contradictions && <p className="text-sm text-ink-faint">No contradictions found across this product's videos.</p>}
+        <div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-ink-light">Compare claims across all videos for this product and flag conflicts.</p>
+            <button
+              type="button"
+              className="btn-accent shrink-0"
+              onClick={generateContradictions}
+              disabled={generatingContradictions || busy}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {generatingContradictions ? "Generating…" : contradictions?.generated_at ? "Regenerate contradiction report" : "Generate contradiction report"}
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {!contradictionsLoaded && !generatingContradictions && (
+              <p className="text-sm text-ink-faint sm:col-span-2">Loading saved report…</p>
+            )}
+            {generatingContradictions && (
+              <p className="text-sm text-ink-faint sm:col-span-2">Scanning claims across videos…</p>
+            )}
+            {contradictionsLoaded && !generatingContradictions && !contradictions?.generated_at && (
+              <p className="text-sm text-ink-faint sm:col-span-2">
+                No report yet — analyze at least two videos with claims, then generate the report.
+              </p>
+            )}
+            {contradictions?.contradictions?.length ? contradictions.contradictions.map((c: any, i: number) => (
+              <div key={i} className="glass-tile p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-bad"><AlertTriangle className="h-4 w-4" /> Contradiction</div>
+                <p className="mt-2 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">&ldquo;{c.claim_a}&rdquo;</p>
+                <p className="mt-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">&ldquo;{c.claim_b}&rdquo;</p>
+                <p className="mt-2 text-xs text-white/40">{c.explanation}</p>
+              </div>
+            )) : contradictions?.generated_at && !generatingContradictions && (
+              <p className="text-sm text-ink-faint sm:col-span-2">No contradictions found across this product&apos;s videos.</p>
+            )}
+          </div>
         </div>
       )}
     </AppShell>

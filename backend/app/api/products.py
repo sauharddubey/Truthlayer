@@ -19,6 +19,7 @@ from app.models import (
     Claim,
     DocumentChunk,
     MonitoredKeyword,
+    NarrativeCluster,
     Product,
     ProcessingStatus,
     User,
@@ -186,6 +187,7 @@ def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends
         if settings.REDIS_URL:
             r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
             r.delete(f"brand_synthesis:{org_id}")
+            r.delete(f"product_contradictions:{pid}")
     except Exception:
         pass
 
@@ -383,40 +385,60 @@ def product_overview(pid: str, db: Session = Depends(get_db), user: User = Depen
     }
 
 
-@router.post("/{pid}/narratives/recompute")
-def recompute_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    _get_product(db, pid, user)
-    clusters = cluster_narratives(db, _org(user), product_id=pid)
+def _narrative_cards(clusters) -> list[dict]:
     return [
         {
-            "id": c.id, "topic": c.topic, "summary": c.summary,
-            "risk_score": c.risk_score, "propagation_risk": c.propagation_risk,
+            "id": c.id,
+            "topic": c.topic,
+            "summary": c.summary,
+            "risk_score": c.risk_score,
+            "propagation_risk": c.propagation_risk,
             "video_count": len(c.video_ids),
         }
         for c in clusters
     ]
 
 
-@router.get("/{pid}/contradictions")
-def contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    """Cross-transcript reference: find claims that contradict across this
-    product's videos."""
+@router.get("/{pid}/narratives")
+def list_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     _get_product(db, pid, user)
+    clusters = db.execute(
+        select(NarrativeCluster)
+        .where(
+            NarrativeCluster.organization_id == _org(user),
+            NarrativeCluster.product_id == pid,
+        )
+        .order_by(NarrativeCluster.risk_score.desc())
+    ).scalars().all()
+    return _narrative_cards(clusters)
+
+
+@router.post("/{pid}/narratives/recompute")
+def recompute_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    _get_product(db, pid, user)
+    clusters = cluster_narratives(db, _org(user), product_id=pid)
+    return _narrative_cards(clusters)
+
+
+def _compute_contradictions(db: Session, pid: str, user: User) -> dict:
+    """Cross-transcript reference: find claims that contradict across this product's videos."""
     rows = db.execute(
         select(Claim.claim_text, Claim.video_id, Video.title)
         .join(Video, Video.id == Claim.video_id)
         .where(Video.product_id == pid)
     ).all()
     if len(rows) < 2:
-        return {"contradictions": []}
+        return {"contradictions": [], "generated_at": None, "claim_count": len(rows)}
 
-    # Use the requesting user's own key — never the platform key.
     from app.crypto import decrypt_secret
     from app.llm import set_runtime_api_key, set_runtime_user_id
 
     user_key = decrypt_secret(user.openrouter_api_key)
     if not user_key:
-        return {"contradictions": []}
+        raise HTTPException(
+            status_code=400,
+            detail="Configure your OpenRouter API key in Settings to generate contradiction reports.",
+        )
     set_runtime_api_key(user_key)
     set_runtime_user_id(user.id)
 
@@ -432,7 +454,49 @@ def contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends
         user=f"Claims:\n{listing}",
         schema_hint='{"contradictions":[{"claim_a":"string","claim_b":"string","explanation":"string"}]}',
     )
-    return {"contradictions": result.get("contradictions", [])}
+    from datetime import datetime, timezone
+
+    return {
+        "contradictions": result.get("contradictions", []) if result else [],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "claim_count": len(rows),
+    }
+
+
+@router.get("/{pid}/contradictions")
+def get_contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    """Return the last generated contradiction report if cached, else an empty shell."""
+    _get_product(db, pid, user)
+    try:
+        import json
+        from redis import Redis
+        from app.config import settings
+
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            cached = r.get(f"product_contradictions:{pid}")
+            if cached:
+                return json.loads(cached)
+    except Exception:
+        pass
+    return {"contradictions": [], "generated_at": None, "claim_count": 0}
+
+
+@router.post("/{pid}/contradictions/recompute")
+def recompute_contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    _get_product(db, pid, user)
+    report = _compute_contradictions(db, pid, user)
+    try:
+        import json
+        from redis import Redis
+        from app.config import settings
+
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.set(f"product_contradictions:{pid}", json.dumps(report), ex=60 * 60 * 24 * 30)
+    except Exception:
+        pass
+    return report
 
 
 # ── Claim review (brand approves/rejects needs_review claims) ────────────────

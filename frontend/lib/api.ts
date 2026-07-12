@@ -239,11 +239,17 @@ export function productKeywords(id: string) {
 export function deleteProductKeyword(productId: string, keywordId: string) {
   return request<any>(`/products/${productId}/keywords/${keywordId}`, { method: "DELETE" });
 }
+export function productNarratives(id: string) {
+  return request<any[]>(`/products/${id}/narratives`);
+}
+export function recomputeProductNarratives(id: string) {
+  return request<any[]>(`/products/${id}/narratives/recompute`, { method: "POST" });
+}
 export function productContradictions(id: string) {
   return request<any>(`/products/${id}/contradictions`);
 }
-export function recomputeProductNarratives(id: string) {
-  return request<any>(`/products/${id}/narratives/recompute`, { method: "POST" });
+export function recomputeProductContradictions(id: string) {
+  return request<any>(`/products/${id}/contradictions/recompute`, { method: "POST" });
 }
 export function reviewClaim(claimId: string, status: "approved" | "rejected") {
   return request<any>(`/products/claims/${claimId}/review`, {
