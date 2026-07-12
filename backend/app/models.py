@@ -194,6 +194,9 @@ class Transcript(Base):
     language: Mapped[Optional[str]] = mapped_column(String)
     segments: Mapped[list] = mapped_column(JSON, default=list)
     structured_blocks: Mapped[list] = mapped_column(JSON, default=list)
+    ocr_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ocr_segments: Mapped[list] = mapped_column(JSON, default=list)
+    ocr_analysis: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     video: Mapped[Video] = relationship(back_populates="transcript")

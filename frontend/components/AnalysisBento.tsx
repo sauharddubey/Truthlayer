@@ -128,10 +128,11 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 }) {
   const agents = report?.agent_results || {};
   const content = agents.content || {};
+  const ocr = agents.ocr || {};
   const [modal, setModal] = useState<{ title: string; node: ReactNode } | null>(null);
   const open = (title: string, node: ReactNode) => setModal({ title, node });
 
-  const segs = content.segments || [];
+  const segs = content.segments?.length ? content.segments : (ocr.ocr_segments || []);
   const verified = claims.filter((c) => c.verdict === "supported").length;
   const flagged = claims.filter((c) => ["contradicted", "misleading"].includes(c.verdict)).length;
   const sentimentPct = report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null;
@@ -195,7 +196,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* TRANSCRIPT */}
         <Block label="Transcript" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f" span="col-span-2 row-span-2"
-          onClick={() => open("Transcript", <TranscriptPanel segments={segs} />)}>
+          onClick={() => open("Transcript", <TranscriptPanel segments={content.segments || []} ocr={ocr} />)}>
           <div className="flex-1 space-y-1.5 overflow-hidden">
             {segs.slice(0, 6).map((s: any, i: number) => {
               const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
