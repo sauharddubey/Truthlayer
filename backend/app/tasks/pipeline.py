@@ -157,7 +157,10 @@ def process_video(video_id: str) -> None:
                 segments=tr.segments,
                 ocr_text=ocr_result.get("ocr_text") if ocr_result else None,
                 ocr_segments=ocr_result.get("ocr_segments") if ocr_result else [],
-                ocr_analysis=ocr_result.get("ocr_analysis") if ocr_result else {},
+                ocr_analysis={
+                    **(ocr_result.get("ocr_analysis") or {}),
+                    "video_segment_analysis": ocr_result.get("video_segment_analysis") or []
+                } if ocr_result else {},
             )
             db.add(transcript)
             db.commit()

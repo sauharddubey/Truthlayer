@@ -256,6 +256,45 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           </Block>
         )}
 
+        {/* VIDEO SEGMENT ANALYSIS (Music + OCR only) */}
+        {ocr?.ocr_analysis?.video_segment_analysis?.length > 0 &&
+          (ocr.ocr_analysis.relationship_verdict === "unrelated" ||
+            ocr.ocr_analysis.relationship_verdict === "partially_related") && (
+          <Block
+            label="Video Segment Analysis"
+            icon={<Eye className="h-3.5 w-3.5" />}
+            color="#0f7b6c"
+            span="col-span-2 row-span-2"
+            onClick={() => open("Video Segment Analysis", <VisualAnalysisModal analysis={ocr.ocr_analysis.video_segment_analysis} />)}
+          >
+            <div className="text-[10px] text-white/50 mb-3 leading-relaxed">
+              Visual action summary for overlay text segments (only music/unrelated speech detected).
+            </div>
+            <div className="flex-1 space-y-2 overflow-hidden">
+              {ocr.ocr_analysis.video_segment_analysis.slice(0, 4).map((item: any, i: number) => (
+                <div key={i} className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                  <span className="font-mono text-[9px] text-accent shrink-0 mt-0.5 font-bold bg-accent/15 px-1.5 py-0.5 rounded">
+                    {fmt(item.timestamp)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {item.text_appeared && (
+                      <span className="text-[10px] font-bold text-white/70 block truncate mb-0.5">
+                        "{item.text_appeared}"
+                      </span>
+                    )}
+                    <span className="text-[11px] leading-snug text-white/50 line-clamp-1 block">
+                      {item.visual_description}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-[10px] font-bold text-white/40">
+              {ocr.ocr_analysis.video_segment_analysis.length} segments analyzed · tap to inspect
+            </div>
+          </Block>
+        )}
+
         {/* PERCEPTION */}
         {perc && (
           <Block label="Perception" icon={<Eye className="h-3.5 w-3.5" />} color="#9b59ff" span="col-span-2"
@@ -566,6 +605,35 @@ function ScoresModal({ report, isBusiness }: { report: any; isBusiness: boolean 
           </div>
         )}
         {activeItem.reasoning}
+      </div>
+    </div>
+  );
+}
+
+function VisualAnalysisModal({ analysis }: { analysis: any[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="text-xs text-ink-light leading-relaxed mb-2">
+        Detailed AI visual analysis of each segment when text appears on screen.
+      </div>
+      <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
+        {analysis.map((item: any, i: number) => (
+          <div key={i} className="rounded-xl border border-line bg-surface p-4 flex gap-4">
+            <div className="shrink-0 font-mono text-[10px] font-bold text-accent bg-accent/10 h-7 px-2.5 flex items-center justify-center rounded">
+              {fmt(item.timestamp)}
+            </div>
+            <div className="space-y-1.5 flex-1 min-w-0">
+              {item.text_appeared && (
+                <div className="text-[10px] font-bold text-ink bg-white/5 px-2 py-0.5 rounded inline-block truncate max-w-full">
+                  Text: "{item.text_appeared}"
+                </div>
+              )}
+              <p className="text-xs text-ink-light leading-relaxed">
+                {item.visual_description}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

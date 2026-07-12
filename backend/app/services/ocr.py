@@ -28,8 +28,8 @@ SYSTEM_PROMPT = (
     "or 'risky' (likely false, misleading, or could offend/hurt sentiments).\n"
     "Then, compare the screen text with the provided speech transcript. Determine if the on-screen text "
     "is related to the speech, and explain why or why not.\n"
-    "This is common in modern videos (like TikTok, Reels, Shorts) where a popular song or audio plays "
-    "in the background (speech transcript) but the on-screen text contains the actual content of the video.\n\n"
+    "Additionally, perform a visual segment analysis: for each frame where text appears or changes, "
+    "describe in detail what is visually happening in that frame (e.g., visual actions, actors, settings, gestures, or visual context).\n\n"
     "Return ONLY a valid JSON object matching this schema:\n"
     "{\n"
     '  "ocr_text": "all extracted text concatenated in chronological order",\n'
@@ -47,7 +47,14 @@ SYSTEM_PROMPT = (
     '    "is_related_to_speech": false,\n'
     '    "relationship_verdict": "unrelated|related|partially_related",\n'
     '    "explanation": "concise explanation of the relationship between on-screen text and speech transcript"\n'
-    '  }\n'
+    '  },\n'
+    '  "video_segment_analysis": [\n'
+    '    {\n'
+    '      "timestamp": 3.0,\n'
+    '      "text_appeared": "text that appeared in this frame",\n'
+    '      "visual_description": "detailed description of the visual scene, actions, or objects occurring at this timestamp"\n'
+    '    }\n'
+    '  ]\n'
     "}\n"
     "Do not include markdown fences or commentary."
 )
@@ -159,6 +166,7 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
             "relationship_verdict": "related",
             "explanation": "No analysis available."
         }
+        result["video_segment_analysis"] = result.get("video_segment_analysis") or []
         return result
     except Exception as exc:
         logger.exception("OpenRouter vision OCR API call failed: %s", exc)
@@ -173,5 +181,6 @@ def _empty_result(reason: str) -> dict:
             "is_related_to_speech": True,
             "relationship_verdict": "related",
             "explanation": reason
-        }
+        },
+        "video_segment_analysis": []
     }
