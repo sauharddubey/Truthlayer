@@ -60,7 +60,10 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
 
     ctx = AgentContext(
         video_id=video.id,
-        transcript_text=transcript.text if transcript else "",
+        transcript_text=(
+            (transcript.text if transcript else "") +
+            (f"\n\n--- On-Screen Text (OCR) ---\n{transcript.ocr_text}" if transcript and transcript.ocr_text else "")
+        ),
         segments=transcript.segments if transcript else [],
         structured_blocks=transcript.structured_blocks if transcript else [],
         organization_id=video.organization_id,
