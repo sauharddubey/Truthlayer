@@ -9,6 +9,7 @@ import {
   uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
+import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
 import { Box, Plus, Network, AlertTriangle, ArrowRight, FileSearch, Eye, Scale } from "@/components/icons";
@@ -20,11 +21,11 @@ const C = (t?: number | null, invert = false) => {
   return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
 };
 
-function GlassStat({ label, value, color }: { label: string; value: any; color?: string }) {
+function GlassStat({ label, value, color, isCount = false }: { label: string; value: any; color?: string; isCount?: boolean }) {
   return (
     <div className="glass-tile p-4">
       <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">{label}</div>
-      <div className="mt-1 font-heavy text-3xl" style={{ color: color || C(typeof value === "number" ? value : null) }}>{value ?? "—"}</div>
+      <div className="mt-1 font-heavy text-3xl" style={{ color: color || C(typeof value === "number" ? value : null) }}>{formatStatDisplay(value, isCount)}</div>
     </div>
   );
 }
@@ -173,9 +174,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         <div className="space-y-4">
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
             <GlassStat label="Trust" value={overview?.trust_score} />
-            <GlassStat label="Sentiment" value={overview?.sentiment_score != null ? Math.round((overview.sentiment_score + 1) * 50) : null} color="#2383e2" />
+            <GlassStat label="Sentiment" value={overview?.sentiment_score != null ? (overview.sentiment_score + 1) * 50 : null} color="#2383e2" />
             <GlassStat label="Compliance" value={overview?.compliance_score} />
-            <GlassStat label="Videos" value={overview?.video_count ?? 0} color="#cb912f" />
+            <GlassStat label="Videos" value={overview?.video_count ?? 0} color="#cb912f" isCount />
           </div>
           {overview?.claims_needing_review?.length > 0 && (
             <div className="glass-tile p-5">
@@ -286,7 +287,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               <div key={c.id} className="glass-tile p-4">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white">{c.topic}</span>
-                  <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {Math.round(c.risk_score)}</span>
+                  <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {formatMetric(c.risk_score)}</span>
                 </div>
                 <p className="mt-1.5 text-sm text-white/50">{c.summary}</p>
               </div>

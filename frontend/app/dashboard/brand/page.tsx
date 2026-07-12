@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { addBrandKeyword, deleteBrandKeyword, brandDashboard, mediaUrl } from "@/lib/api";
+import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
 import { AppShell } from "@/components/AppShell";
 import { ArrowRight, Box, Plus, Network } from "@/components/icons";
 
-function GlassStat({ label, value, color = "#2383e2" }: { label: string; value: any; color?: string }) {
+function GlassStat({ label, value, color = "#2383e2", isCount = false }: { label: string; value: any; color?: string; isCount?: boolean }) {
   return (
     <div className="glass-tile p-5">
       <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">{label}</div>
-      <div className="mt-1 font-heavy text-4xl" style={{ color }}>{value ?? "—"}</div>
+      <div className="mt-1 font-heavy text-4xl" style={{ color }}>{formatStatDisplay(value, isCount)}</div>
     </div>
   );
 }
@@ -47,7 +48,7 @@ export default function BrandDashboard() {
     }
   }
 
-  const sentiment = data?.brand_perception != null ? Math.round((data.brand_perception + 1) * 50) : null;
+  const sentiment = data?.brand_perception != null ? (data.brand_perception + 1) * 50 : null;
 
   return (
     <AppShell title="Brand overview" wide>
@@ -56,8 +57,8 @@ export default function BrandDashboard() {
       {/* Stat row */}
       <div className="mb-4 grid gap-4 sm:grid-cols-3">
         <GlassStat label="Brand perception" value={sentiment} color="#2383e2" />
-        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="#0f7b6c" />
-        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="#cb912f" />
+        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="#0f7b6c" isCount />
+        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="#cb912f" isCount />
       </div>
 
       {/* Brand identity */}
@@ -113,7 +114,7 @@ export default function BrandDashboard() {
                 )}
                 {p.trust_score != null && (
                   <span className="absolute right-2 top-2 rounded-full bg-ink/80 px-2 py-0.5 text-[10px] font-extrabold text-paper backdrop-blur">
-                    {p.trust_score}
+                    {formatMetric(p.trust_score)}
                   </span>
                 )}
               </div>
@@ -190,7 +191,7 @@ export default function BrandDashboard() {
             {(data?.narrative_clusters || []).slice(0, 5).map((c: any) => (
               <div key={c.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition hover:bg-white/5">
                 <span className="text-white/80">{c.topic}</span>
-                <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {Math.round(c.risk_score)}</span>
+                <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {formatMetric(c.risk_score)}</span>
               </div>
             ))}
             {!data?.narrative_clusters?.length && <p className="py-2 text-sm text-white/30">No narratives yet — analyze more videos.</p>}

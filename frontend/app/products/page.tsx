@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createProduct, deleteProduct, listProducts, mediaUrl } from "@/lib/api";
+import { formatMetric } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { Box, Plus, ArrowRight } from "@/components/icons";
 
@@ -109,7 +110,7 @@ export default function ProductsPage() {
                 {p.trust_score != null && (
                   <span className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white backdrop-blur"
                     style={{ background: C(p.trust_score) + "cc" }}>
-                    {p.trust_score}
+                    {formatMetric(p.trust_score)}
                   </span>
                 )}
                 {/* meta */}
