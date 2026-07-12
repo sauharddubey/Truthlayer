@@ -65,7 +65,9 @@ def run(ctx: AgentContext) -> dict:
             "Use calibrated scales:\n"
             "- sentiment_score from -1.0 to 1.0: -1.0 to -0.4 is strongly negative/hostile, -0.3 to 0.3 is neutral/objective, 0.4 to 1.0 is strongly positive/supportive.\n"
             "- emotional_intensity from 0.0 to 1.0: 0.0 to 0.25 is monotone/flat, 0.26 to 0.60 is standard conversational, 0.61 to 0.85 is passionate/urgent, 0.86 to 1.0 is screaming/extreme panic.\n"
-            "- audience persuasion_level from 0.0 to 1.0: 0.0 to 0.25 is informational/purely objective, 0.26 to 0.60 is mild marketing persuasion, 0.61 to 0.85 is high-pressure sales pitch, 0.86 to 1.0 is deceptive/extreme manipulation."
+            "- audience persuasion_level from 0.0 to 1.0: 0.0 to 0.25 is informational/purely objective, 0.26 to 0.60 is mild marketing persuasion, 0.61 to 0.85 is high-pressure sales pitch, 0.86 to 1.0 is deceptive/extreme manipulation.\n\n"
+            "CRITICAL TIMELINE REQUIREMENT: The timelines (overall timeline, speech_sentiment.timeline, and video_sentiment.timeline) must NOT be flat or repeat a single static sentiment or intensity value. "
+            "Evaluate each timestamped segment's local text, visual cue, or spoken phrase carefully to capture fluctuations, highs, and lows in emotional tone and intensity over the course of the video."
         ),
         user=user_content,
         schema_hint=_SCHEMA,

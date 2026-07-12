@@ -171,10 +171,16 @@ def process_video(video_id: str) -> None:
             
             speech_blocks = structuring.structure_transcript(tr.text, tr.segments)
             ocr_blocks = []
-            if ocr_result and ocr_result.get("ocr_text"):
-                ocr_blocks = structuring.structure_transcript(
-                    ocr_result["ocr_text"], ocr_result["ocr_segments"]
-                )
+            if ocr_result and ocr_result.get("ocr_segments"):
+                verify_ocr_segments = [
+                    s for s in ocr_result["ocr_segments"]
+                    if s.get("label") in ("verify", "risky")
+                ]
+                if verify_ocr_segments:
+                    verify_ocr_text = " ".join(s.get("text", "") for s in verify_ocr_segments)
+                    ocr_blocks = structuring.structure_transcript(
+                        verify_ocr_text, verify_ocr_segments
+                    )
             
             transcript.structured_blocks = speech_blocks + ocr_blocks
             db.commit()
