@@ -1,6 +1,10 @@
 """Tests for claim eligibility filtering and structuring sanitization."""
 
-from app.agents.fact_check import _passes_evidence_contract, _reason_codes
+from unittest.mock import patch
+
+from app.agents.base import AgentContext
+from app.agents import fact_check
+from app.agents.fact_check import _passes_evidence_contract, _prioritize_claims, _reason_codes
 from app.services.trust_scoring import compute_tier_trust_score, summarize_skipped_claims
 from app.services.claim_eligibility import (
     claim_in_verifiable_segment,
@@ -140,3 +144,107 @@ def test_diagnostics_include_skipped_claim_counts():
     assert summary["skipped_claim_count"] == 2
     assert summary["skipped_claim_reason_counts"]["not_declarative"] == 2
     assert summary["skipped_claim_reason_counts"]["claim_fragment"] == 1
+
+
+def _checkable_claim_blocks(count: int) -> tuple[list[dict], dict]:
+    claims = [
+        {
+            "claim_text": f"Claim number {i} states that model X{i} has feature Y included.",
+            "claim_type": "factual",
+        }
+        for i in range(count)
+    ]
+    blocks = [{"timestamp_start": 0.0, "timestamp_end": 100.0, "claims": claims}]
+    metadata = {
+        "content_segments": [{"start": 0.0, "end": 100.0, "label": "verify"}],
+        "content_type": "informational",
+    }
+    return blocks, metadata
+
+
+def test_prioritize_claims_limits_to_top_n():
+    claims = [{"claim_text": f"Claim {i} has a numeric value of {i}.", "claim_type": "factual"} for i in range(10)]
+    prioritized = _prioritize_claims(claims)
+    assert len(prioritized) == 8
+
+
+def test_run_retrieves_evidence_for_all_prompted_claims():
+    blocks, metadata = _checkable_claim_blocks(10)
+    ctx = AgentContext(
+        video_id="v1",
+        transcript_text="Test transcript for fact checking.",
+        structured_blocks=blocks,
+        metadata=metadata,
+    )
+    search_calls: list[str] = []
+    captured_user: list[str] = []
+
+    def fake_search(query, max_results=5):
+        search_calls.append(query)
+        return [
+            {
+                "content": "A long enough evidence snippet about the claim with many matching words included.",
+                "title": "Source",
+                "url": "https://example.com/article",
+            }
+        ]
+
+    def fake_chat_json(system, user, schema_hint):
+        captured_user.append(user)
+        return {"claims": []}
+
+    with patch("app.agents.fact_check.search_evidence", side_effect=fake_search), patch(
+        "app.agents.fact_check.chat_json", side_effect=fake_chat_json
+    ):
+        result = fact_check.run(ctx)
+
+    assert len(search_calls) == 10
+    assert captured_user
+    for i in range(10):
+        assert f"Claim number {i}" in captured_user[0]
+    assert len(result["claims"]) == 10
+
+
+def test_run_includes_missing_llm_claims_in_output():
+    blocks, metadata = _checkable_claim_blocks(10)
+    ctx = AgentContext(
+        video_id="v2",
+        transcript_text="Test transcript for fact checking.",
+        structured_blocks=blocks,
+        metadata=metadata,
+    )
+
+    def fake_search(query, max_results=5):
+        return [
+            {
+                "content": "A long enough evidence snippet about the claim with many matching words included.",
+                "title": "Source",
+                "url": "https://example.com/article",
+            }
+        ]
+
+    def fake_chat_json(system, user, schema_hint):
+        return {
+            "claims": [
+                {
+                    "claim_text": "Claim number 0 states that model X0 has feature Y included.",
+                    "claim_type": "factual",
+                    "verdict": "supported",
+                    "confidence": 0.9,
+                    "evidence": [],
+                }
+            ]
+        }
+
+    with patch("app.agents.fact_check.search_evidence", side_effect=fake_search), patch(
+        "app.agents.fact_check.chat_json", side_effect=fake_chat_json
+    ):
+        result = fact_check.run(ctx)
+
+    assert len(result["claims"]) == 10
+    by_text = {c["claim_text"]: c for c in result["claims"]}
+    assert "Claim number 0 states that model X0 has feature Y included." in by_text
+    assert by_text["Claim number 9 states that model X9 has feature Y included."]["verdict"] == "unverified"
+    assert "Claim was not returned by fact-check model." in by_text[
+        "Claim number 9 states that model X9 has feature Y included."
+    ]["reasoning"]

@@ -60,11 +60,11 @@ def run(ctx: AgentContext) -> dict:
         content_type=content_type,
     )
 
-    # Gather external evidence for the most checkable claims only.
+    # Retrieve evidence for every checkable claim; prompt uses the same set.
+    claims_for_review = checkable_claims
     claim_evidence_index: dict[str, list[dict]] = {}
     retrieval_diagnostics: dict[str, dict] = {}
-    claim_candidates = _prioritize_claims(checkable_claims)
-    for c in claim_candidates:
+    for c in claims_for_review:
         text = c.get("claim_text") or ""
         if not text:
             continue
@@ -98,6 +98,7 @@ def run(ctx: AgentContext) -> dict:
         claim_evidence_index[claim_key] = ranked
         retrieval_diagnostics[claim_key] = _retrieval_metrics(text, ranked, rewritten_query)
 
+    prompt_claims = _prioritize_claims(claims_for_review, limit=len(claims_for_review) or 1)
     result = chat_json(
         system=(
             "You are a rigorous fact-checking agent. For each claim, weigh the provided "
@@ -111,7 +112,7 @@ def run(ctx: AgentContext) -> dict:
         ),
         user=(
             f"Transcript:\n{ctx.transcript_text[:4000]}\n\n"
-            f"Candidate claims:\n{checkable_claims}\n\n"
+            f"Candidate claims:\n{prompt_claims}\n\n"
             f"Retrieved evidence:\n{_flatten_claim_evidence(claim_evidence_index)}"
         ),
         schema_hint=_SCHEMA,
@@ -119,75 +120,27 @@ def run(ctx: AgentContext) -> dict:
 
     if not result or "claims" not in result:
         # Heuristic fallback: everything unverified, low confidence.
+        fallback_claims = [
+            _fallback_claim_row(c, claim_evidence_index, reasoning="No LLM available.")
+            for c in claims_for_review
+        ]
         return {
-            "claims": [
-                {
-                    **c,
-                    "verdict": "unverified",
-                    "confidence": 0.25,
-                    "evidence": claim_evidence_index.get((c.get("claim_text") or "").strip().lower(), []),
-                    "reasoning": "No LLM available.",
-                }
-                for c in checkable_claims
-            ],
+            "claims": fallback_claims,
             "confidence": 0.3,
             "evidence": _flatten_claim_evidence(claim_evidence_index),
-            "evidence_summary": _summarize_evidence(checkable_claims, claim_evidence_index, retrieval_diagnostics),
+            "evidence_summary": _summarize_evidence(fallback_claims, claim_evidence_index, retrieval_diagnostics),
             "skipped_claims": skipped_claims,
         }
 
     claims = result.get("claims") or []
-    normalized_claims = []
-    for claim in claims:
-        text = (claim.get("claim_text") or "").strip()
-        key = text.lower()
-        model_evidence = [e for e in (claim.get("evidence") or []) if isinstance(e, dict)]
-        retrieved = claim_evidence_index.get(key, [])
-
-        # Merge model-selected and retrieved evidence by (text, source, url).
-        merged = []
-        seen = set()
-        for e in model_evidence + retrieved:
-            item = {
-                "text": (e.get("text") or "")[:600],
-                "source": e.get("source") or "evidence",
-                "url": e.get("url") or "",
-                "source_type": e.get("source_type") or ("web" if e.get("url") else "rag"),
-            }
-            ident = (item["text"], item["source"], item["url"])
-            if ident in seen:
-                continue
-            seen.add(ident)
-            merged.append(item)
-        merged = _rank_and_filter_evidence(text, merged, k=4)
-
-        confidence = claim.get("confidence")
-        try:
-            confidence = float(confidence) if confidence is not None else 0.0
-        except (TypeError, ValueError):
-            confidence = 0.0
-
-        verdict = claim.get("verdict") or "unverified"
-        evidence_quality = _evidence_quality_score(text, merged)
-        reason_codes = _reason_codes(text, merged, evidence_quality, claim.get("claim_type"))
-        if not _passes_evidence_contract(verdict, text, merged, evidence_quality):
-            verdict = "unverified"
-            confidence = min(confidence, 0.35 if merged else 0.25)
-        elif not merged:
-            confidence = min(confidence, 0.45)
-        else:
-            confidence = min(confidence, round(max(0.0, min(1.0, evidence_quality / 100)), 3))
-
-        normalized_claims.append(
-            {
-                **claim,
-                "verdict": verdict,
-                "confidence": round(max(0.0, min(1.0, confidence)), 3),
-                "evidence": merged,
-                "evidence_quality_score": round(evidence_quality, 2),
-                "insufficient_evidence_reasons": reason_codes,
-            }
-        )
+    normalized_claims = [
+        _normalize_claim_row(claim, claim_evidence_index) for claim in claims if claim.get("claim_text")
+    ]
+    normalized_claims = _reconcile_missing_claims(
+        normalized_claims,
+        claims_for_review,
+        claim_evidence_index,
+    )
 
     result["claims"] = normalized_claims
     result.setdefault("confidence", 0.6)
@@ -195,6 +148,103 @@ def run(ctx: AgentContext) -> dict:
     result["evidence_summary"] = _summarize_evidence(normalized_claims, claim_evidence_index, retrieval_diagnostics)
     result["skipped_claims"] = skipped_claims
     return result
+
+
+def _normalize_claim_row(claim: dict, claim_evidence_index: dict[str, list[dict]]) -> dict:
+    text = (claim.get("claim_text") or "").strip()
+    key = text.lower()
+    model_evidence = [e for e in (claim.get("evidence") or []) if isinstance(e, dict)]
+    retrieved = claim_evidence_index.get(key, [])
+
+    merged = []
+    seen = set()
+    for e in model_evidence + retrieved:
+        item = {
+            "text": (e.get("text") or "")[:600],
+            "source": e.get("source") or "evidence",
+            "url": e.get("url") or "",
+            "source_type": e.get("source_type") or ("web" if e.get("url") else "rag"),
+        }
+        ident = (item["text"], item["source"], item["url"])
+        if ident in seen:
+            continue
+        seen.add(ident)
+        merged.append(item)
+    merged = _rank_and_filter_evidence(text, merged, k=4)
+
+    confidence = claim.get("confidence")
+    try:
+        confidence = float(confidence) if confidence is not None else 0.0
+    except (TypeError, ValueError):
+        confidence = 0.0
+
+    verdict = claim.get("verdict") or "unverified"
+    evidence_quality = _evidence_quality_score(text, merged)
+    reason_codes = _reason_codes(text, merged, evidence_quality, claim.get("claim_type"))
+    if not _passes_evidence_contract(verdict, text, merged, evidence_quality):
+        verdict = "unverified"
+        confidence = min(confidence, 0.35 if merged else 0.25)
+    elif not merged:
+        confidence = min(confidence, 0.45)
+    else:
+        confidence = min(confidence, round(max(0.0, min(1.0, evidence_quality / 100)), 3))
+
+    return {
+        **claim,
+        "verdict": verdict,
+        "confidence": round(max(0.0, min(1.0, confidence)), 3),
+        "evidence": merged,
+        "evidence_quality_score": round(evidence_quality, 2),
+        "insufficient_evidence_reasons": reason_codes,
+    }
+
+
+def _fallback_claim_row(
+    claim: dict,
+    claim_evidence_index: dict[str, list[dict]],
+    *,
+    reasoning: str,
+) -> dict:
+    text = (claim.get("claim_text") or "").strip()
+    key = text.lower()
+    evidence = claim_evidence_index.get(key, [])
+    evidence_quality = _evidence_quality_score(text, evidence)
+    return {
+        **claim,
+        "verdict": "unverified",
+        "confidence": 0.25,
+        "evidence": evidence,
+        "evidence_quality_score": round(evidence_quality, 2),
+        "insufficient_evidence_reasons": _reason_codes(
+            text,
+            evidence,
+            evidence_quality,
+            claim.get("claim_type"),
+        ),
+        "reasoning": reasoning,
+    }
+
+
+def _reconcile_missing_claims(
+    normalized_claims: list[dict],
+    claims_for_review: list[dict],
+    claim_evidence_index: dict[str, list[dict]],
+) -> list[dict]:
+    seen = {(c.get("claim_text") or "").strip().lower() for c in normalized_claims if c.get("claim_text")}
+    out = list(normalized_claims)
+    for claim in claims_for_review:
+        key = (claim.get("claim_text") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        out.append(
+            _fallback_claim_row(
+                claim,
+                claim_evidence_index,
+                reasoning="Claim was not returned by fact-check model.",
+            )
+        )
+        seen.add(key)
+    return out
 
 
 def _prioritize_claims(claims: list[dict], limit: int = 8) -> list[dict]:
