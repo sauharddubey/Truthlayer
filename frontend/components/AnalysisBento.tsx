@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
@@ -141,13 +141,31 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const segs = content.segments || [];
   const verified = claims.filter((c) => c.verdict === "supported").length;
   const flagged = claims.filter((c) => ["contradicted", "misleading"].includes(c.verdict)).length;
-  const sentimentPct = report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null;
   const perc = agents.perception;
   const bias = agents.bias;
   const comp = agents.compliance;
   const mi = agents.media_integrity;
   const cr = agents.creator_risk;
   const senti = agents.sentiment;
+
+  // Determine if speech audio exists (i.e. has words that are not [Music])
+  const hasSpeech = segs.length > 0 && segs.some((s: any) => s.text && s.text !== "[Music]");
+  const hasVideoSenti = senti?.video_sentiment?.timeline?.length > 0;
+  const hasSpeechSenti = senti?.speech_sentiment?.timeline?.length > 0 || senti?.timeline?.length > 0;
+
+  const [sentimentSource, setSentimentSource] = useState<"speech" | "video">("speech");
+
+  useEffect(() => {
+    if (!hasSpeech && hasVideoSenti) {
+      setSentimentSource("video");
+    }
+  }, [hasSpeech, hasVideoSenti]);
+
+  const activeSentimentScore = (sentimentSource === "video" && senti?.video_sentiment?.sentiment_score != null)
+    ? senti.video_sentiment.sentiment_score
+    : report?.sentiment_score;
+
+  const sentimentPct = activeSentimentScore != null ? (activeSentimentScore + 1) * 50 : null;
 
   return (
     <>
@@ -323,10 +341,66 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         )}
 
         {/* SENTIMENT TIMELINE */}
-        {senti?.timeline?.length > 0 && (
-          <Block label="Sentiment timeline" icon={<Network className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2"
-            onClick={() => open("Sentiment timeline", <SentimentTimeline timeline={senti.timeline} />)}>
-            <div className="flex-1 opacity-90"><SentimentTimeline timeline={senti.timeline} /></div>
+        {((hasSpeechSenti && sentimentSource === "speech") || (hasVideoSenti && sentimentSource === "video")) && (
+          <Block
+            label="Sentiment timeline"
+            icon={<Network className="h-3.5 w-3.5" />}
+            color="#2383e2"
+            span="col-span-2"
+            onClick={() => open("Sentiment timeline", (
+              <div className="space-y-4">
+                {hasSpeechSenti && hasVideoSenti && (
+                  <div className="flex gap-1.5 rounded-lg border border-line bg-surface p-0.5 text-xs w-fit">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSentimentSource("speech"); }}
+                      className={`rounded px-2.5 py-1 font-semibold transition ${sentimentSource === "speech" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
+                    >
+                      Speech Audio
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSentimentSource("video"); }}
+                      className={`rounded px-2.5 py-1 font-semibold transition ${sentimentSource === "video" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
+                    >
+                      Video Visuals
+                    </button>
+                  </div>
+                )}
+                {!hasSpeech && (
+                  <div className="text-xs text-ink-light font-bold">
+                    Based on Video Segment Analysis (No speech audio detected)
+                  </div>
+                )}
+                <SentimentTimeline timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
+              </div>
+            ))}
+          >
+            <div className="flex flex-col h-full w-full justify-between">
+              <div className="flex items-center justify-between mb-2">
+                {!hasSpeech ? (
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-good bg-good/10 px-2 py-0.5 rounded">
+                    Based on Video Visuals (No speech)
+                  </span>
+                ) : hasSpeechSenti && hasVideoSenti ? (
+                  <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5 text-[9px] relative z-20" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setSentimentSource("speech")}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                    >
+                      Speech
+                    </button>
+                    <button
+                      onClick={() => setSentimentSource("video")}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                    >
+                      Video
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex-1 opacity-90 min-h-[90px]">
+                <SentimentTimeline timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
+              </div>
+            </div>
           </Block>
         )}
 

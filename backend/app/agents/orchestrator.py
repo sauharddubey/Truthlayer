@@ -290,23 +290,28 @@ def _generate_summary_and_reasonings(
     products = cont.get("products") or []
     content_type = cont.get("content_type", "unknown")
     perc = results.get("perception", {})
+    ocr_data = results.get("ocr", {})
+    ocr_text = ocr_data.get("ocr_text")
+    ocr_analysis = ocr_data.get("ocr_analysis") or {}
+    segment_analysis = ocr_analysis.get("video_segment_analysis") or []
 
     if is_product:
         focus = (
             f"This video IS about a product/service ({', '.join(products) or 'unnamed product'}). "
-            "Name the product(s), summarize the product claims and whether they are "
+            "Name the product(s), summarize the product claims (combining speech and OCR on-screen text) and whether they are "
             "supported, and note any compliance/disclosure issues."
         )
     else:
         focus = (
-            f"This video is NOT about a product (type: {content_type}). Do a fact-check "
-            "summary of the key claims AND a perception check: what could offend or hurt "
-            "people's sentiments."
+            f"This video is NOT about a product (type: {content_type}). Provide a combined summary "
+            "of the key claims (both spoken transcript and on-screen OCR text), the Video Segment Analysis "
+            "(visual action context), and a perception check (what could offend/hurt sentiments)."
         )
 
     system_prompt = (
         "You are an AI trust, compliance, and media-intelligence analyst. "
         "Your task is to generate both a high-level summary and detailed score reasonings for this video's analysis. "
+        "Ensure your overall summary combines findings from the Speech Transcript, the On-Screen Text (OCR), and the Video Segment Analysis (visual frame summaries).\n"
         "Provide solid, evidence-backed reasoning/explanations for why each score was assigned, referring "
         "to specific agent findings in the user input. "
         "Be professional, clear, objective, and do not use emojis in your responses.\n\n"
@@ -338,6 +343,9 @@ def _generate_summary_and_reasonings(
         f"Agent Analysis Data:\n"
         f"- Content Type: {content_type}\n"
         f"- Products mentioned: {products}\n"
+        f"- Speech Transcript & OCR Text Combined: <transcript_speech_ocr>\n{video.transcript.text if video.transcript else ''}\n</transcript_speech_ocr>\n"
+        f"- OCR On-Screen Text (raw): <ocr_text>\n{str(ocr_text)[:800]}\n</ocr_text>\n"
+        f"- Video Segment Analysis (Visual Scene Summaries): <video_segment_analysis>\n{str(segment_analysis)[:1200]}\n</video_segment_analysis>\n"
         f"- Fact Check: <fact_check>\n{str(results.get('fact_check', {}))[:1200]}\n</fact_check>\n"
         f"- Perception: <perception>\n{str(perc)[:800]}\n</perception>\n"
         f"- Compliance: <compliance>\n{str(results.get('compliance', {}))[:800]}\n</compliance>\n"

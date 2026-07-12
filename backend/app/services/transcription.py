@@ -119,6 +119,9 @@ def _transcribe_openrouter(audio_path: str, duration: Optional[float]) -> Option
             text = (s.get("text") or "").strip()
             if not text:
                 continue
+            text = clean_transcription_text(text)
+            if not text:
+                continue
             norm.append(
                 {
                     "start": _to_seconds(s.get("start")),
@@ -197,3 +200,41 @@ def _stub(fallback_text: str) -> TranscriptionResult:
         "Honestly, anyone who thinks otherwise just is not paying attention."
     )
     return _segment_plain_text(text, duration=30.0)
+
+
+def clean_transcription_text(text: str) -> str:
+    """Detect and clean up repetitive music-related hallucinations (like oh oh oh / ooh ooh / *[Music starts]*) in Whisper/Gemini audio transcripts."""
+    # 1. Strip out bracketed sound effects like *[Music starts]*, [music], (singing)
+    cleaned = re.sub(r'\*?\[[^\]]+\]\*?', '', text)
+    cleaned = re.sub(r'\(.*?\)', '', cleaned)
+    cleaned = cleaned.strip()
+
+    if not cleaned:
+        return "[Music]"
+
+    # 2. Split text into words to check frequency
+    words = [w.strip(",.!?").lower() for w in cleaned.split() if w.strip(",.!?")]
+    if not words:
+        return "[Music]"
+
+    # 3. Check for repetitive non-word phrases
+    repetitive_words = {"oh", "ah", "ooh", "uh", "la", "um", "hmm", "music", "song", "yeah", "eh", "hey", "ho"}
+    rep_count = sum(1 for w in words if w in repetitive_words)
+
+    # 4. Check for consecutive repeat spams
+    has_consec = False
+    consec_count = 1
+    for i in range(1, len(words)):
+        if words[i] == words[i-1]:
+            consec_count += 1
+            if consec_count >= 3:
+                has_consec = True
+                break
+        else:
+            consec_count = 1
+
+    # If the segment consists mostly of filler words or has consecutive repetitions, mark it as [Music]
+    if (len(words) >= 3 and rep_count / len(words) >= 0.5) or has_consec:
+        return "[Music]"
+
+    return text
