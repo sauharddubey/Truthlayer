@@ -198,6 +198,9 @@ export function createProduct(p: { name: string; description?: string; aliases?:
 export function getProduct(id: string) {
   return request<any>(`/products/${id}`);
 }
+export function deleteProduct(id: string) {
+  return request<any>(`/products/${id}`, { method: "DELETE" });
+}
 export function productOverview(id: string) {
   return request<any>(`/products/${id}/overview`);
 }

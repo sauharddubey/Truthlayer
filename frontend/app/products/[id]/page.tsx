@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   getProduct, productOverview, productVideos, productDocuments, uploadProductDocument,
   productKeywords, addProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
-  uploadProductImage, mediaUrl,
+  uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
@@ -29,6 +30,7 @@ function GlassStat({ label, value, color }: { label: string; value: any; color?:
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const id = params.id;
+  const router = useRouter();
   const [tab, setTab] = useState("Overview");
   const [product, setProduct] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
@@ -41,6 +43,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [kw, setKw] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function loadAll() {
     getProduct(id).then(setProduct).catch(() => {});
@@ -73,6 +76,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     try { const p = await uploadProductImage(id, f); setProduct(p); } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   }
 
+  async function removeProduct() {
+    const ok = window.confirm("Delete this product and all its videos, documents, and data? This cannot be undone.");
+    if (!ok) return;
+    setDeleting(true);
+    setMsg("");
+    try {
+      await deleteProduct(id);
+      router.push("/products");
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AppShell wide>
       <div className="mb-3 text-sm text-ink-light"><Link href="/products" className="hover:underline">Products</Link> <span className="mx-1">/</span> <span className="text-ink">{product?.name}</span></div>
@@ -92,8 +110,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <input type="file" accept="image/*" className="hidden" onChange={onImage} />
         </label>
         <div className="relative z-10 flex-1">
-          <h1 className="font-heavy text-3xl uppercase tracking-tight text-white">{product?.name || "Product"}</h1>
-          {product?.description && <p className="mt-1 max-w-xl text-sm text-white/50">{product.description}</p>}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="font-heavy text-3xl uppercase tracking-tight text-white">{product?.name || "Product"}</h1>
+              {product?.description && <p className="mt-1 max-w-xl text-sm text-white/50">{product.description}</p>}
+            </div>
+            <button
+              type="button"
+              className="btn-ghost shrink-0 text-bad"
+              onClick={removeProduct}
+              disabled={busy || deleting}
+            >
+              {deleting ? "Deleting…" : "Delete product"}
+            </button>
+          </div>
           <form onSubmit={submitForProduct} className="mt-4 flex flex-wrap gap-2">
             <input className="input flex-1 border-white/10 bg-white/5 text-white placeholder-white/30"
               placeholder="Paste a video URL to analyze for this product…" value={url} onChange={(e) => setUrl(e.target.value)} required />

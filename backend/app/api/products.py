@@ -25,6 +25,7 @@ from app.models import (
     Video,
 )
 from app.rag.store import ingest_document
+from app.services.product_cleanup import delete_product_and_related
 from app.schemas import (
     ClaimReviewRequest,
     DocumentOut,
@@ -145,7 +146,7 @@ def get_product(pid: str, db: Session = Depends(get_db), user: User = Depends(bu
 def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     p = _get_product(db, pid, user)
     org_id = p.organization_id
-    db.delete(p)
+    delete_product_and_related(db, p)
     db.commit()
 
     # Invalidate cache
