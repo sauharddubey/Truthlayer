@@ -50,8 +50,7 @@ export default function ProductsPage() {
 
   return (
     <AppShell title="Products" wide>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-light">Your catalog — each product carries its own videos, knowledge base, hashtags and narratives.</p>
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
         <button className="btn-accent" onClick={() => setOpen(!open)}><Plus className="h-4 w-4" /> New product</button>
       </div>
 
