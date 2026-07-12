@@ -35,8 +35,12 @@ def run(ctx: AgentContext) -> dict:
             "You are a media-bias analyst. Identify political bias, product bias, "
             "emotional manipulation, persuasive framing, fear-driven and hype-driven "
             "language. Determine overall narrative leaning and give explainable "
-            "reasoning with quoted evidence. bias_score is 0 (neutral) to 100 (highly "
-            "manipulative)."
+            "reasoning with quoted evidence. The bias_score is 0 (neutral) to 100 (highly "
+            "manipulative) and must be calibrated strictly against the following scale:\n"
+            "- 0-15: Completely neutral, objective, factual presentation without loaded adjectives or selective framing.\n"
+            "- 16-40: Mild persuasive tone or slight product favoritism, but mostly balanced.\n"
+            "- 41-70: Significant bias, emotional appeals, sensational headlines, one-sided product hype, or partisan framing.\n"
+            "- 71-100: Extreme manipulation, fear-mongering, active disinformation, or highly deceptive/hostile persuasive tactics."
         ),
         user=ctx.transcript_text[:5000],
         schema_hint=_SCHEMA,

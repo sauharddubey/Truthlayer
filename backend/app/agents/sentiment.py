@@ -33,8 +33,10 @@ def run(ctx: AgentContext) -> dict:
     result = chat_json(
         system=(
             "You are a sentiment and narrative analyst. Provide overall sentiment "
-            "(score -1..1), tone tags, emotional intensity (0-1), audience persuasion "
-            "level (0-1), narrative leaning, and a per-timestamp sentiment timeline."
+            "(sentiment_score calibrated strictly from -1.0 to 1.0: -1.0 to -0.4 is strongly negative/hostile, -0.3 to 0.3 is neutral/objective, 0.4 to 1.0 is strongly positive/supportive), "
+            "tone tags, emotional_intensity (calibrated strictly from 0.0 to 1.0: 0.0 to 0.25 is monotone/flat, 0.26 to 0.60 is standard conversational, 0.61 to 0.85 is passionate/urgent, 0.86 to 1.0 is screaming/extreme panic), "
+            "audience persuasion_level (calibrated strictly from 0.0 to 1.0: 0.0 to 0.25 is informational/purely objective, 0.26 to 0.60 is mild marketing persuasion, 0.61 to 0.85 is high-pressure sales pitch, 0.86 to 1.0 is deceptive/extreme manipulation), "
+            "narrative leaning, and a per-timestamp sentiment timeline."
         ),
         user=segment_view,
         schema_hint=_SCHEMA,
