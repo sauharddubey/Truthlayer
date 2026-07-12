@@ -6,13 +6,19 @@ import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { SentimentTimeline } from "@/components/SentimentTimeline";
-import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, Network, Sparkle, ArrowRight } from "@/components/icons";
+import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, Network, Sparkle, ArrowRight, ScanLine } from "@/components/icons";
 
 const C = (t?: number | null, invert = false) => {
   if (t == null) return "#9b9a97";
   const v = invert ? 100 - t : t;
   return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
 };
+
+function fmt(t?: number) {
+  if (t == null) return "0:00";
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 function formatMarkdown(text?: string | null) {
   if (!text) return null;
@@ -132,7 +138,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const [modal, setModal] = useState<{ title: string; node: ReactNode } | null>(null);
   const open = (title: string, node: ReactNode) => setModal({ title, node });
 
-  const segs = content.segments?.length ? content.segments : (ocr.ocr_segments || []);
+  const segs = content.segments || [];
   const verified = claims.filter((c) => c.verdict === "supported").length;
   const flagged = claims.filter((c) => ["contradicted", "misleading"].includes(c.verdict)).length;
   const sentimentPct = report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null;
@@ -196,7 +202,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* TRANSCRIPT */}
         <Block label="Transcript" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f" span="col-span-2 row-span-2"
-          onClick={() => open("Transcript", <TranscriptPanel segments={content.segments || []} ocr={ocr} />)}>
+          onClick={() => open("Transcript", <TranscriptPanel segments={segs} />)}>
           <div className="flex-1 space-y-1.5 overflow-hidden">
             {segs.slice(0, 6).map((s: any, i: number) => {
               const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
@@ -210,6 +216,45 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           </div>
           <div className="mt-2 text-[10px] font-bold text-white/40">{segs.length} segments · tap to read</div>
         </Block>
+
+        {/* ON-SCREEN TEXT (OCR) */}
+        {ocr?.ocr_segments?.length > 0 && (
+          <Block
+            label="On-Screen Text (OCR)"
+            icon={<ScanLine className="h-3.5 w-3.5" />}
+            color="#9b59ff"
+            span="col-span-2 row-span-2"
+            onClick={() => open("On-Screen Text (OCR)", <TranscriptPanel segments={ocr.ocr_segments} ocr={ocr} />)}
+          >
+            {ocr.ocr_analysis && (
+              <div className={`mb-2.5 rounded-lg border px-2.5 py-1 text-[10px] max-w-full truncate ${
+                ocr.ocr_analysis.relationship_verdict === "unrelated"
+                  ? "border-bad/20 bg-bad/5 text-bad"
+                  : ocr.ocr_analysis.relationship_verdict === "partially_related"
+                  ? "border-warn/20 bg-warn/5 text-warn"
+                  : "border-good/20 bg-good/5 text-good"
+              }`}>
+                <span className="font-extrabold uppercase tracking-wide">
+                  Alignment: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+                </span>
+              </div>
+            )}
+            <div className="flex-1 space-y-1.5 overflow-hidden">
+              {ocr.ocr_segments.slice(0, 6).map((s: any, i: number) => {
+                const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
+                return (
+                  <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
+                    <span className="text-[11px] leading-snug text-white/60 line-clamp-1">
+                      <span className="font-mono text-[9px] text-white/30 mr-1">{fmt(s.start)}</span>
+                      {s.text}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 text-[10px] font-bold text-white/40">{ocr.ocr_segments.length} segments · tap to read</div>
+          </Block>
+        )}
 
         {/* PERCEPTION */}
         {perc && (

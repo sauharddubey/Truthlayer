@@ -21,44 +21,20 @@ function fmt(t?: number) {
 }
 
 export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: any }) {
-  const [activeTab, setActiveTab] = useState<"speech" | "ocr">(ocr?.ocr_segments?.length ? "ocr" : "speech");
   const [filter, setFilter] = useState<"all" | "verify" | "risky">("all");
 
-  const currentSegments = activeTab === "ocr" ? (ocr?.ocr_segments || []) : (segments || []);
+  if (!segments?.length) return <div className="card text-sm text-ink-light">No segments available.</div>;
 
-  if (!currentSegments.length && activeTab === "speech" && ocr?.ocr_segments?.length) {
-    // If speech is empty but OCR has content, default to OCR tab
-    setActiveTab("ocr");
-  }
-
-  const counts = currentSegments.reduce((a: Record<string, number>, s: Segment) => {
+  const counts = segments.reduce((a: Record<string, number>, s: Segment) => {
     const l = s.label || "safe"; a[l] = (a[l] || 0) + 1; return a;
   }, {} as Record<string, number>);
 
-  const shown = currentSegments.filter((s: Segment) => filter === "all" || (s.label || "safe") === filter);
+  const shown = segments.filter((s: Segment) => filter === "all" || (s.label || "safe") === filter);
 
   return (
     <div className="card">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-base font-semibold">Transcript</div>
-          {ocr?.ocr_segments?.length > 0 && (
-            <div className="flex items-center gap-0.5 rounded-md border border-line p-0.5 text-xs bg-surface">
-              <button
-                onClick={() => { setActiveTab("speech"); setFilter("all"); }}
-                className={`rounded px-2.5 py-1 font-medium transition ${activeTab === "speech" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
-              >
-                Speech Audio
-              </button>
-              <button
-                onClick={() => { setActiveTab("ocr"); setFilter("all"); }}
-                className={`rounded px-2.5 py-1 font-medium transition ${activeTab === "ocr" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
-              >
-                On-Screen Text (OCR)
-              </button>
-            </div>
-          )}
-        </div>
+        <div className="text-base font-semibold">{ocr ? "On-Screen Text (OCR)" : "Transcript"}</div>
         <div className="flex items-center gap-0.5 rounded-md border border-line p-0.5 text-xs bg-surface">
           {(["all", "verify", "risky"] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)}
@@ -69,7 +45,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
         </div>
       </div>
 
-      {activeTab === "ocr" && ocr?.ocr_analysis && (
+      {ocr?.ocr_analysis && (
         <div className={`mb-4 rounded-xl border p-4 text-xs ${
           ocr.ocr_analysis.relationship_verdict === "unrelated"
             ? "border-bad/20 bg-bad/[0.03] text-bad"
@@ -120,7 +96,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
         )}
       </div>
       <div className="mt-2 text-[10px] font-bold text-white/40">
-        {currentSegments.length} segments · {activeTab === "ocr" ? "OCR on-screen text" : "speech transcript"}
+        {segments.length} segments · {ocr ? "OCR on-screen text" : "speech transcript"}
       </div>
     </div>
   );
