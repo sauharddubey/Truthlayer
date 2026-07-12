@@ -224,7 +224,10 @@ export function addProductKeyword(id: string, keyword: string) {
   });
 }
 export function productKeywords(id: string) {
-  return request<any[]>(`/products/${id}/keywords`);
+  return request<{ keywords: any[]; video_matches: any[] }>(`/products/${id}/keywords`);
+}
+export function deleteProductKeyword(productId: string, keywordId: string) {
+  return request<any>(`/products/${productId}/keywords/${keywordId}`, { method: "DELETE" });
 }
 export function productContradictions(id: string) {
   return request<any>(`/products/${id}/contradictions`);
@@ -251,6 +254,9 @@ export function addBrandKeyword(keyword: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ keyword, keyword_type: "brand" }),
   });
+}
+export function deleteBrandKeyword(keywordId: string) {
+  return request<any>(`/dashboard/brand/keywords/${keywordId}`, { method: "DELETE" });
 }
 
 // ── Videos / analysis ───────────────────────────────────────────────────────

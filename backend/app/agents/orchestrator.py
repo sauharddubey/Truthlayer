@@ -105,6 +105,10 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
     #    worker threads.
     agent_names = agents_for_tier(tier)
     results: Dict[str, dict] = {"content": content_result}
+    if tier == "business" and video.organization_id:
+        from app.services.hashtag_check import check_video_hashtags
+
+        results["hashtag_check"] = check_video_hashtags(db, video)
     if transcript and transcript.ocr_text:
         results["ocr"] = {
             "ocr_text": transcript.ocr_text,
@@ -125,7 +129,23 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
                 logger.exception("Agent %s failed: %s", name, exc)
                 results[name] = {"error": str(exc), "confidence": 0.0}
 
-    # 3) Business: verify each claim against the product's details + policies.
+    # Merge deterministic hashtag compliance issues after the compliance agent runs.
+    if results.get("hashtag_check"):
+        from app.services.hashtag_check import compliance_issues_for_missing, get_description_text
+
+        hashtag_result = results["hashtag_check"]
+        if hashtag_result.get("description_available"):
+            description_text, _ = get_description_text(video)
+            missing_issues = compliance_issues_for_missing(
+                hashtag_result.get("missing", []),
+                description_text,
+            )
+            if missing_issues:
+                compliance = results.setdefault("compliance", {"issues": [], "confidence": 1.0})
+                compliance.setdefault("issues", [])
+                compliance["issues"].extend(missing_issues)
+
+    # 4) Business: verify each claim against the product's details + policies.
     if tier == "business" and results.get("fact_check", {}).get("claims"):
         verified = verification.verify_claims(ctx, results["fact_check"]["claims"])
         results["fact_check"]["claims"] = verified

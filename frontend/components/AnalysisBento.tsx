@@ -57,6 +57,34 @@ function formatMarkdownInline(text?: string | null) {
   });
 }
 
+function HashtagCheckPanel({ hashtagCheck }: { hashtagCheck: any }) {
+  if (!hashtagCheck) return null;
+  if (!hashtagCheck.description_available) {
+    return (
+      <div className="rounded-lg border border-line bg-surface p-3 text-xs text-ink-light">
+        <div className="mb-1 font-semibold text-ink">Hashtag check</div>
+        <p>No platform description available — hashtags were not checked.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3 text-xs space-y-2">
+      <div className="font-semibold text-ink">Hashtag check (description)</div>
+      {(hashtagCheck.matches || []).map((m: any) => (
+        <div key={m.keyword_id} className="flex items-center justify-between gap-3">
+          <span className="text-ink-light">{m.keyword}</span>
+          <span className={`font-bold ${m.present ? "text-good" : "text-bad"}`}>
+            {m.present ? "Present" : "Missing"}
+          </span>
+        </div>
+      ))}
+      {!hashtagCheck.matches?.length && (
+        <p className="text-ink-faint">No monitored hashtags configured for this video.</p>
+      )}
+    </div>
+  );
+}
+
 /* ── Reusable bento block (dark glass, clickable to expand) ── */
 function Block({ label, icon, color, span = "", onClick, children }: {
   label: string; icon: ReactNode; color: string; span?: string; onClick?: () => void; children: ReactNode;
@@ -248,6 +276,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const miEvidence = mi?.deepfake?.manipulation_evidence || mi?.evidence || [];
   const cr = agents.creator_risk;
   const senti = agents.sentiment;
+  const hashtagCheck = agents.hashtag_check;
 
   // Determine if speech audio exists (i.e. has words that are not [Music])
   const hasSpeech = segs.length > 0 && segs.some((s: any) => s.text && s.text !== "[Music]");
@@ -337,7 +366,12 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         break;
       case "Product & compliance":
         title = "Product & compliance";
-        content = <EvidencePanel title="Product & compliance" agent={comp} />;
+        content = (
+          <div className="space-y-4">
+            {hashtagCheck && <HashtagCheckPanel hashtagCheck={hashtagCheck} />}
+            <EvidencePanel title="Product & compliance" agent={comp} />
+          </div>
+        );
         break;
       case "Media integrity":
         title = "Media integrity";
@@ -734,6 +768,7 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
           <p className="text-xs text-ink-light leading-relaxed">
             Grades compliance against commercial rules, sponsored disclosure mandates (#ad), and health/financial claim restrictions.
           </p>
+          {agents.hashtag_check && <HashtagCheckPanel hashtagCheck={agents.hashtag_check} />}
           <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
             {agents.compliance?.issues?.length > 0 ? (
               <div className="space-y-2">

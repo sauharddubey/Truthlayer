@@ -223,7 +223,37 @@ def list_keywords(pid: str, db: Session = Depends(get_db), user: User = Depends(
             MonitoredKeyword.organization_id == _org(user),
         )
     ).scalars().all()
-    return [{"id": k.id, "keyword": k.keyword, "keyword_type": k.keyword_type} for k in rows]
+    from app.services.hashtag_check import build_video_match_rows
+
+    vids = db.execute(
+        select(Video).where(Video.product_id == pid).order_by(Video.created_at.desc())
+    ).scalars().all()
+    return {
+        "keywords": [
+            {"id": k.id, "keyword": k.keyword, "keyword_type": k.keyword_type} for k in rows
+        ],
+        "video_matches": build_video_match_rows(vids),
+    }
+
+
+@router.delete("/{pid}/keywords/{kid}")
+def delete_keyword(
+    pid: str,
+    kid: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    _get_product(db, pid, user)
+    kw = db.get(MonitoredKeyword, kid)
+    if (
+        not kw
+        or kw.organization_id != _org(user)
+        or kw.product_id != pid
+    ):
+        raise HTTPException(status_code=404, detail="Keyword not found")
+    db.delete(kw)
+    db.commit()
+    return {"deleted": kid}
 
 
 # ── Videos & overview ─────────────────────────────────────────────────────────

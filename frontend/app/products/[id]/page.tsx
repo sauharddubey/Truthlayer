@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   getProduct, productOverview, productVideos, productDocuments, uploadProductDocument,
-  productKeywords, addProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
+  productKeywords, addProductKeyword, deleteProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
   uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
+import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
 import { Box, Plus, Network, AlertTriangle, ArrowRight, FileSearch, Eye, Scale } from "@/components/icons";
@@ -37,6 +38,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [vids, setVids] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [keywords, setKeywords] = useState<any[]>([]);
+  const [videoMatches, setVideoMatches] = useState<any[]>([]);
+  const [deletingKeywordId, setDeletingKeywordId] = useState<string | null>(null);
   const [contradictions, setContradictions] = useState<any>(null);
   const [narratives, setNarratives] = useState<any[]>([]);
   const [url, setUrl] = useState("");
@@ -45,14 +48,23 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  function loadAll() {
+  function loadKeywords() {
+    productKeywords(id).then((d) => {
+      setKeywords(d.keywords || []);
+      setVideoMatches(d.video_matches || []);
+    }).catch(() => {});
+  }
+
+  const loadAll = useCallback(() => {
     getProduct(id).then(setProduct).catch(() => {});
     productOverview(id).then(setOverview).catch(() => {});
     productVideos(id).then((d) => setVids(d.videos || [])).catch(() => {});
     productDocuments(id).then(setDocs).catch(() => {});
-    productKeywords(id).then(setKeywords).catch(() => {});
-  }
-  useEffect(loadAll, [id]);
+    loadKeywords();
+  }, [id]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+  useRefetchOnVisible(loadAll);
 
   async function submitForProduct(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +80,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
   async function addKw(e: React.FormEvent) {
     e.preventDefault();
-    try { await addProductKeyword(id, kw); setKw(""); productKeywords(id).then(setKeywords); } catch (e: any) { setMsg(e.message); }
+    try { await addProductKeyword(id, kw); setKw(""); loadKeywords(); } catch (e: any) { setMsg(e.message); }
+  }
+  async function removeKeyword(keywordId: string) {
+    const ok = window.confirm("Remove this hashtag?");
+    if (!ok) return;
+    setDeletingKeywordId(keywordId);
+    try {
+      await deleteProductKeyword(id, keywordId);
+      loadKeywords();
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setDeletingKeywordId(null);
+    }
   }
   async function onImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
@@ -197,17 +222,57 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Hashtags" && (
-        <div className="glass-tile max-w-lg p-5">
+        <div className="glass-tile max-w-3xl p-5">
           <div className="text-base font-bold text-white">Product hashtags</div>
-          <p className="mt-1 text-sm text-white/50">Monitor mentions of this product across platforms.</p>
+          <p className="mt-1 text-sm text-white/50">Required tags are checked against each video&apos;s platform description during analysis.</p>
           <form onSubmit={addKw} className="mt-3 flex gap-2">
             <input className="input border-white/10 bg-white/5 text-white placeholder-white/30" placeholder="#product" value={kw} onChange={(e) => setKw(e.target.value)} required />
             <button className="btn-accent shrink-0"><Plus className="h-4 w-4" /></button>
           </form>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {keywords.map((k) => <span key={k.id} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium text-white/70">{k.keyword}</span>)}
+            {keywords.map((k) => (
+              <span key={k.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-white/70">
+                {k.keyword}
+                <button
+                  type="button"
+                  className="rounded-full px-1.5 text-[10px] font-bold text-bad hover:bg-bad/10 disabled:opacity-50"
+                  onClick={() => removeKeyword(k.id)}
+                  disabled={deletingKeywordId === k.id}
+                  aria-label={`Remove ${k.keyword}`}
+                >
+                  {deletingKeywordId === k.id ? "…" : "×"}
+                </button>
+              </span>
+            ))}
             {!keywords.length && <p className="text-sm text-white/30">No hashtags monitored yet.</p>}
           </div>
+          {videoMatches.length > 0 && (
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">Video hashtag status</div>
+              <div className="space-y-2">
+                {videoMatches.map((v) => (
+                  <div key={v.video_id} className="rounded-xl border border-white/8 bg-white/5 p-3 text-sm">
+                    <Link href={`/analysis/${v.video_id}`} className="font-semibold text-white hover:underline">{v.title}</Link>
+                    {!v.description_available ? (
+                      <p className="mt-1 text-xs text-white/40">No description available</p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(v.present_keywords || []).map((tag: string) => (
+                          <span key={`p-${tag}`} className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-bold text-good">{tag}</span>
+                        ))}
+                        {(v.missing_keywords || []).map((tag: string) => (
+                          <span key={`m-${tag}`} className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-bold text-bad">{tag} missing</span>
+                        ))}
+                        {!v.present_keywords?.length && !v.missing_keywords?.length && (
+                          <span className="text-xs text-white/40">Not analyzed yet</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
