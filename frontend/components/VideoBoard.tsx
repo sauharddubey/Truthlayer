@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { deleteVideo } from "@/lib/api";
 import { ArrowRight, FileSearch } from "@/components/icons";
 
 type Video = {
@@ -60,7 +63,30 @@ export function VideoBoard({
   videos,
   emptyHref = "/analyze",
   variant = "default",
-}: { videos: Video[]; emptyHref?: string; variant?: "default" | "verifier" }) {
+  onDeleted,
+}: {
+  videos: Video[];
+  emptyHref?: string;
+  variant?: "default" | "verifier";
+  onDeleted?: (videoId: string) => void;
+}) {
+  const router = useRouter();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function confirmDelete(video: Video) {
+    const ok = window.confirm("Delete this analysis? This cannot be undone.");
+    if (!ok) return;
+    setDeletingId(video.video_id);
+    try {
+      await deleteVideo(video.video_id);
+      onDeleted?.(video.video_id);
+    } catch (e: any) {
+      window.alert(e?.message || "Failed to delete analysis");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (!videos.length) {
     return (
       <div className="glass-board flex h-[44vh] flex-col items-center justify-center text-center">
@@ -79,9 +105,14 @@ export function VideoBoard({
         const featured = i === 0;
         const st = statusTone(v.status);
         return (
-          <Link
+          <div
             key={v.video_id}
-            href={`/analysis/${v.video_id}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push(`/analysis/${v.video_id}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") router.push(`/analysis/${v.video_id}`);
+            }}
             className={`glass-tile group flex flex-col p-4 ${featured ? "col-span-2 row-span-2" : "col-span-2 lg:col-span-1"}`}
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-40" />
@@ -90,6 +121,19 @@ export function VideoBoard({
               <span className="ml-auto flex items-center gap-1 text-[9px] font-bold" style={{ color: st.c }}>
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.c }} /> {st.t}
               </span>
+              <button
+                type="button"
+                disabled={deletingId === v.video_id}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  confirmDelete(v);
+                }}
+                className="rounded-full border border-white/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white/35 transition hover:border-bad/40 hover:bg-bad/10 hover:text-bad disabled:opacity-50"
+                title="Delete analysis"
+              >
+                {deletingId === v.video_id ? "Deleting" : "Delete"}
+              </button>
             </div>
 
             <div className="relative z-10 flex flex-1 items-center gap-4">
@@ -126,7 +170,7 @@ export function VideoBoard({
             <div className="relative z-10 mt-1 flex items-center gap-1 text-[10px] font-bold text-white/30 transition group-hover:text-white/60">
               View analysis <ArrowRight className="h-3 w-3" />
             </div>
-          </Link>
+          </div>
         );
       })}
     </div>

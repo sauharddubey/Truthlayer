@@ -52,6 +52,26 @@ def _get_product(db: Session, pid: str, user: User) -> Product:
     return p
 
 
+def _avg_report_score(reports, attr: str):
+    vals = [getattr(r, attr) for r in reports if getattr(r, attr) is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+
+def _product_out(db: Session, product: Product) -> ProductOut:
+    vids = db.execute(select(Video).where(Video.product_id == product.id)).scalars().all()
+    reports = [v.report for v in vids if v.report]
+    return ProductOut(
+        id=product.id,
+        name=product.name,
+        description=product.description,
+        image_url=product.image_url,
+        aliases=product.aliases or [],
+        created_at=product.created_at,
+        video_count=len(vids),
+        trust_score=_avg_report_score(reports, "trust_score"),
+    )
+
+
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
 
@@ -79,7 +99,7 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db), user: 
     except Exception:
         pass
 
-    return p
+    return _product_out(db, p)
 
 
 @router.post("/{pid}/image", response_model=ProductOut)
@@ -105,19 +125,20 @@ async def upload_product_image(
     p.image_url = f"/media/{fname}"
     db.commit()
     db.refresh(p)
-    return p
+    return _product_out(db, p)
 
 
 @router.get("", response_model=list[ProductOut])
 def list_products(db: Session = Depends(get_db), user: User = Depends(business_only)):
-    return db.execute(
+    products = db.execute(
         select(Product).where(Product.organization_id == _org(user)).order_by(Product.created_at.desc())
     ).scalars().all()
+    return [_product_out(db, p) for p in products]
 
 
 @router.get("/{pid}", response_model=ProductOut)
 def get_product(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    return _get_product(db, pid, user)
+    return _product_out(db, _get_product(db, pid, user))
 
 
 @router.delete("/{pid}")

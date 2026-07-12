@@ -13,6 +13,12 @@ export default function CreatorDashboard() {
   useEffect(() => { getDashboard("creator").then(setData).catch((e) => setError(e.message)); }, []);
 
   const cards = data?.videos || [];
+  const removeVideo = (videoId: string) => {
+    setData((current: any) => ({
+      ...current,
+      videos: (current?.videos || []).filter((v: any) => v.video_id !== videoId),
+    }));
+  };
 
   return (
     <AppShell title="My videos" wide>
@@ -23,7 +29,7 @@ export default function CreatorDashboard() {
         </Link>
       </div>
       {error && <p className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</p>}
-      <VideoBoard videos={cards} />
+      <VideoBoard videos={cards} onDeleted={removeVideo} />
     </AppShell>
   );
 }

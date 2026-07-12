@@ -279,6 +279,10 @@ export function startAnalysis(videoId: string) {
   });
 }
 
+export function deleteVideo(videoId: string) {
+  return request<any>(`/videos/${videoId}`, { method: "DELETE" });
+}
+
 // ── Dashboards ──────────────────────────────────────────────────────────────
 
 export function getDashboard(kind: "creator" | "verifier") {

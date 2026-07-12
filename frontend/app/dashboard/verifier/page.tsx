@@ -13,6 +13,12 @@ export default function VerifierDashboard() {
   useEffect(() => { getDashboard("verifier").then(setData).catch((e) => setError(e.message)); }, []);
 
   const videos = data?.videos || [];
+  const removeVideo = (videoId: string) => {
+    setData((current: any) => ({
+      ...current,
+      videos: (current?.videos || []).filter((v: any) => v.video_id !== videoId),
+    }));
+  };
 
   return (
     <AppShell title="My checks" wide>
@@ -23,7 +29,7 @@ export default function VerifierDashboard() {
         </Link>
       </div>
       {error && <p className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</p>}
-      <VideoBoard videos={videos} variant="verifier" />
+      <VideoBoard videos={videos} variant="verifier" onDeleted={removeVideo} />
     </AppShell>
   );
 }

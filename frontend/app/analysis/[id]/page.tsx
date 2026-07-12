@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getAnalysis, getRole, reportPdfUrl, reviewClaim, startAnalysis } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { deleteVideo, getAnalysis, getRole, reportPdfUrl, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
 import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, AlertTriangle } from "@/components/icons";
@@ -42,10 +43,12 @@ const STAGES = [
 const TERMINAL = ["completed", "failed"];
 
 export default function AnalysisPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
   const [data, setData]       = useState<any>(null);
   const [error, setError]     = useState("");
   const [nonce, setNonce]     = useState(0);
   const [rerunning, setRerunning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [role, setRole]       = useState<string | null>(null);
   const timer = useRef<any>(null);
 
@@ -74,6 +77,21 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
   async function onReview(claimId: string, status: "approved" | "rejected") {
     try { await reviewClaim(claimId, status); setNonce((n) => n + 1); } catch (e: any) { setError(e.message); }
+  }
+
+  async function removeAnalysis() {
+    const ok = window.confirm("Delete this analysis? This cannot be undone.");
+    if (!ok) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteVideo(params.id);
+      router.push(role ? routeForRole(role) : "/dashboard/verifier");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (error) return (
@@ -214,7 +232,10 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         <div className="card mx-auto max-w-lg space-y-3 py-8 text-center">
           <div className="flex items-center justify-center gap-2 text-bad"><AlertTriangle className="h-5 w-5" /><h1 className="text-lg font-bold">Analysis failed</h1></div>
           <p className="text-sm text-ink-light">{video.error}</p>
-          <button className="btn-accent" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Retrying…" : "Try again"} <ArrowRight className="h-3.5 w-3.5" /></button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button className="btn-accent" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Retrying…" : "Try again"} <ArrowRight className="h-3.5 w-3.5" /></button>
+            <button className="btn-ghost text-bad" disabled={deleting} onClick={removeAnalysis}>{deleting ? "Deleting…" : "Delete"}</button>
+          </div>
         </div>
       </AppShell>
     );
@@ -237,6 +258,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         <div className="flex shrink-0 gap-2">
           <button className="btn" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Re-analyzing…" : "Re-analyze"} <ArrowRight className="h-3.5 w-3.5" /></button>
           <a className="btn-ghost" href={reportPdfUrl(video.id)} target="_blank" rel="noreferrer">PDF</a>
+          <button className="btn-ghost text-bad" disabled={deleting} onClick={removeAnalysis}>{deleting ? "Deleting…" : "Delete"}</button>
         </div>
       </div>
 
