@@ -23,6 +23,11 @@ def test_parse_txt_document():
     assert "24h hydration" in parse_document("specs.txt", raw)
 
 
+def test_parse_document_strips_nul_bytes():
+    raw = b"Battery life\x00\x00 up to 4 hours."
+    assert parse_document("specs.txt", raw) == "Battery life up to 4 hours."
+
+
 def test_ingest_document_rejects_unknown_type():
     class _Session:
         def add(self, *_args, **_kwargs):

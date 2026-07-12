@@ -219,6 +219,17 @@ async def upload_document(
             detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
     raw = await file.read()
+    from app.crypto import decrypt_secret
+    from app.llm import set_runtime_api_key, set_runtime_user_id
+
+    user_key = decrypt_secret(user.openrouter_api_key)
+    if not user_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure your OpenRouter API key in Settings to index documents.",
+        )
+    set_runtime_api_key(user_key)
+    set_runtime_user_id(user.id)
     try:
         return ingest_document(
             db,

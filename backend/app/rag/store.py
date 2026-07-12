@@ -31,14 +31,23 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
 # ── Parsing ──────────────────────────────────────────────────────────────────
 
 
+def _sanitize_text(text: str) -> str:
+    """Strip NUL bytes — PostgreSQL text columns reject them (common in PDF extraction)."""
+    if not text:
+        return ""
+    return text.replace("\x00", "")
+
+
 def parse_document(filename: str, raw: bytes) -> str:
     name = filename.lower()
     if name.endswith(".pdf"):
-        return _parse_pdf(raw)
-    if name.endswith(".docx"):
-        return _parse_docx(raw)
-    # txt / md / fallback
-    return raw.decode("utf-8", errors="ignore")
+        text = _parse_pdf(raw)
+    elif name.endswith(".docx"):
+        text = _parse_docx(raw)
+    else:
+        # txt / md / fallback
+        text = raw.decode("utf-8", errors="ignore")
+    return _sanitize_text(text)
 
 
 def _parse_pdf(raw: bytes) -> str:
