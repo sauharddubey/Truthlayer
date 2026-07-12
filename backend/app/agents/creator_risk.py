@@ -33,8 +33,12 @@ def run(ctx: AgentContext) -> dict:
             "You are a pre-publication risk advisor for content creators. Identify "
             "reputational, misinformation, moderation, controversial-narrative and "
             "toxic-language risks. Provide creator_risk_score, audience_backlash_risk "
-            "and platform_violation_risk (each 0-100) and concrete, actionable "
-            "recommendations to reduce risk before publishing."
+            "and platform_violation_risk (each 0-100) calibrated strictly using the following scale:\n"
+            "- 0-20: Safe, standard educational/conversational or informative content with no potential flags.\n"
+            "- 21-45: Mild risk, slight controversy, or potential minor platform guidelines warnings.\n"
+            "- 46-75: Significant risk of backlash, strong/hostile language, or highly controversial/unverified claims.\n"
+            "- 76-100: Critical risk of account ban, demonetization, severe toxic language/harassment, or dangerous misinformation.\n"
+            "Provide concrete, actionable recommendations to reduce risk before publishing."
         ),
         user=ctx.transcript_text[:5000],
         schema_hint=_SCHEMA,

@@ -86,6 +86,10 @@ def init_db() -> None:
         # Per-user external-service API keys (encrypted at rest).
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS tavily_api_key VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS media_integrity_api_key VARCHAR",
+        # OCR extension columns
+        "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_text TEXT",
+        "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_segments JSON DEFAULT '[]'",
+        "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_analysis JSON DEFAULT '{}'",
     ]
     with engine.connect() as conn:
         for stmt in _additive_migrations:

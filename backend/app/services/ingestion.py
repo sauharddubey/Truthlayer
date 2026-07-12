@@ -34,6 +34,7 @@ SUPPORTED_PLATFORMS = {
 class IngestResult:
     audio_path: Optional[str]
     platform: str
+    video_path: Optional[str] = None
     title: Optional[str] = None
     creator_handle: Optional[str] = None
     duration_seconds: Optional[float] = None
@@ -171,7 +172,8 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
         import yt_dlp  # imported lazily so the module loads without the binary
 
         ydl_opts = {
-            "format": "bestaudio/best",
+            # Download low-res video (max 360p height) to keep it fast & deployable on free tiers
+            "format": "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/worst",
             "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
             "quiet": True,
             "no_warnings": True,
@@ -179,13 +181,27 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
             "writesubtitles": True,
             "writeautomaticsub": True,
             "postprocessors": [
-                {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "128",
+                    "nopostoverwrites": False,
+                }
             ],
+            "keepvideo": True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             vid_id = info.get("id")
             audio_path = str(out_dir / f"{vid_id}.mp3")
+            
+            # Find the preserved video file among candidate video extensions
+            for ext in [".mp4", ".webm", ".mkv", ".avi", ".mov", ".m4v"]:
+                candidate = str(out_dir / f"{vid_id}{ext}")
+                if os.path.exists(candidate):
+                    video_path = candidate
+                    break
+
             meta = {
                 "title": info.get("title"),
                 "creator_handle": info.get("uploader") or info.get("channel"),
@@ -206,6 +222,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
     return IngestResult(
         audio_path=audio_path if audio_path and os.path.exists(audio_path) else None,
         platform=platform,
+        video_path=video_path,
         title=meta.get("title"),
         creator_handle=meta.get("creator_handle"),
         duration_seconds=meta.get("duration_seconds"),
@@ -218,9 +235,13 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
 def ingest_upload(file_path: str, platform: str = "upload") -> IngestResult:
     """Wrap an already-saved uploaded media file as an IngestResult."""
     exists = os.path.exists(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
+    is_video = ext in {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"}
+    video_path = file_path if is_video and exists else None
     return IngestResult(
         audio_path=file_path if exists else None,
         platform=platform,
+        video_path=video_path,
         title=Path(file_path).stem,
         content_hash=_hash_file(file_path) if exists else None,
         metadata={"video_path": file_path, "upload_path": file_path} if exists else {},

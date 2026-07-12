@@ -28,6 +28,10 @@ class AgentContext:
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     product_description: Optional[str] = None
+    # OCR extensions
+    ocr_text: Optional[str] = None
+    ocr_segments: List[dict] = field(default_factory=list)
+    ocr_analysis: dict = field(default_factory=dict)
     # Injected by the orchestrator so agents can pull tenant knowledge / web evidence.
     rag_retrieve: Optional[Callable[[str, int], List[dict]]] = None
 
@@ -38,3 +42,33 @@ Agent = Callable[[AgentContext], Dict]
 
 def base_result(confidence: float = 0.0) -> dict:
     return {"evidence": [], "confidence": confidence}
+
+
+import re
+
+def sanitize_transcript(text: str) -> tuple[str, bool]:
+    """Detect and redact common Spoken Indirect Prompt Injection (SIPI) phrases."""
+    if not text:
+        return text, False
+    patterns = [
+        r"system\s+override",
+        r"instruction\s+override",
+        r"disregard\s+(all\s+)?preceding\s+instructions",
+        r"disregard\s+(all\s+)?policy\s+rules",
+        r"disregard\s+(all\s+)?guidelines",
+        r"ignore\s+all\s+guidelines",
+        r"ignore\s+all\s+rules",
+        r"validation\s+success\s+generator",
+        r"generate\s+a\s+json\s+payload",
+        r"compliance_score\s+is\s+100",
+        r"confidence\s+is\s+1\.0",
+        r"set\s+compliance_score\s+to\s+100",
+        r"force\s+the\s+confidence\s+score\s+.*to\s+be\s+exactly\s+1\.0",
+    ]
+    sanitized = text
+    was_injected = False
+    for pat in patterns:
+        if re.search(pat, text, flags=re.IGNORECASE):
+            was_injected = True
+        sanitized = re.sub(pat, "[redacted injection attempt]", sanitized, flags=re.IGNORECASE)
+    return sanitized, was_injected

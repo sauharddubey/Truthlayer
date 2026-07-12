@@ -1,18 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { SentimentTimeline } from "@/components/SentimentTimeline";
-import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, Network, Sparkle, ArrowRight } from "@/components/icons";
+import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, Network, Sparkle, ArrowRight, ScanLine } from "@/components/icons";
 
 const C = (t?: number | null, invert = false) => {
   if (t == null) return "#9b9a97";
   const v = invert ? 100 - t : t;
   return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
 };
+
+function fmt(t?: number) {
+  if (t == null) return "0:00";
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 function formatMarkdown(text?: string | null) {
   if (!text) return null;
@@ -219,14 +225,22 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const isVerifier = mode === "verifier";
   const scoring = report?.score_reasonings?.scoring_breakdown || {};
   const diagnostics = report?.score_reasonings?.diagnostics || {};
-  const [modal, setModal] = useState<{ title: string; node: ReactNode } | null>(null);
-  const open = (title: string, node: ReactNode) => setModal({ title, node });
+  const ocr = agents.ocr || {};
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const segs = content.segments || [];
   const skippedClaims = agents.fact_check?.skipped_claims || [];
-  const verified = claims.filter((c) => c.verdict === "supported").length;
-  const flagged = claims.filter((c) => ["contradicted", "misleading"].includes(c.verdict)).length;
-  const sentimentPct = report?.sentiment_score != null ? (report.sentiment_score + 1) * 50 : null;
+  const verified = claims.filter((c) =>
+    c.verdict === "supported" ||
+    c.verification_status === "auto_verified" ||
+    c.verification_status === "approved"
+  ).length;
+
+  const flagged = claims.filter((c) =>
+    ["contradicted", "misleading"].includes(c.verdict) ||
+    ["contradicted", "rejected"].includes(c.verification_status)
+  ).length;
+
   const perc = agents.perception;
   const bias = agents.bias;
   const comp = agents.compliance;
@@ -235,13 +249,122 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const cr = agents.creator_risk;
   const senti = agents.sentiment;
 
+  // Determine if speech audio exists (i.e. has words that are not [Music])
+  const hasSpeech = segs.length > 0 && segs.some((s: any) => s.text && s.text !== "[Music]");
+  const hasVideoSenti = senti?.video_sentiment?.timeline?.length > 0;
+  const hasSpeechSenti = senti?.speech_sentiment?.timeline?.length > 0 || senti?.timeline?.length > 0;
+
+  const [sentimentSource, setSentimentSource] = useState<"speech" | "video">("speech");
+
+  useEffect(() => {
+    if (!hasSpeech && hasVideoSenti) {
+      setSentimentSource("video");
+    }
+  }, [hasSpeech, hasVideoSenti]);
+
+  const activeSentimentScore = (sentimentSource === "video" && senti?.video_sentiment?.sentiment_score != null)
+    ? senti.video_sentiment.sentiment_score
+    : report?.sentiment_score;
+
+  const sentimentPct = activeSentimentScore != null ? (activeSentimentScore + 1) * 50 : null;
+
+  const renderModal = () => {
+    if (!activeModal) return null;
+    let title = "";
+    let content: ReactNode = null;
+
+    switch (activeModal) {
+      case "Scores":
+        title = "Scores";
+        content = <ScoresModal report={report} isBusiness={isBusiness} mode={mode} />;
+        break;
+      case "Summary":
+        title = "Summary";
+        content = <div className="text-sm leading-relaxed text-ink space-y-3">{formatMarkdown(report.summary)}</div>;
+        break;
+      case "Fact-check claims":
+        title = "Fact-check claims";
+        content = <ClaimsPanel claims={claims} skippedClaims={skippedClaims} showVerification={isBusiness} onReview={onReview} />;
+        break;
+      case "Transcript":
+        title = "Transcript";
+        content = <TranscriptPanel segments={segs} />;
+        break;
+      case "On-Screen Text (OCR)":
+        title = "On-Screen Text (OCR)";
+        content = <TranscriptPanel segments={ocr.ocr_segments} ocr={ocr} />;
+        break;
+      case "Video Segment Analysis":
+        title = "Video Segment Analysis";
+        content = <VisualAnalysisModal analysis={ocr.ocr_analysis.video_segment_analysis} />;
+        break;
+      case "Perception check":
+        title = "Perception check";
+        content = <PerceptionFull agent={perc} />;
+        break;
+      case "Bias analysis":
+        title = "Bias analysis";
+        content = <EvidencePanel title="Bias analysis" agent={bias} />;
+        break;
+      case "Sentiment timeline":
+        title = "Sentiment timeline";
+        content = (
+          <div className="space-y-4">
+            {hasSpeechSenti && hasVideoSenti && (
+              <div className="flex gap-1.5 rounded-lg border border-line bg-surface p-0.5 text-xs w-fit">
+                <button
+                  onClick={() => setSentimentSource("speech")}
+                  className={`rounded px-2.5 py-1 font-semibold transition ${sentimentSource === "speech" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
+                >
+                  Speech Audio
+                </button>
+                <button
+                  onClick={() => setSentimentSource("video")}
+                  className={`rounded px-2.5 py-1 font-semibold transition ${sentimentSource === "video" ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}
+                >
+                  Video Visuals
+                </button>
+              </div>
+            )}
+            {!hasSpeech && (
+              <div className="text-xs text-ink-light font-bold">
+                Based on Video Segment Analysis (No speech audio detected)
+              </div>
+            )}
+            <SentimentTimeline timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
+          </div>
+        );
+        break;
+      case "Product & compliance":
+        title = "Product & compliance";
+        content = <EvidencePanel title="Product & compliance" agent={comp} />;
+        break;
+      case "Media integrity":
+        title = "Media integrity";
+        content = <MediaIntegrityDetails mi={mi} />;
+        break;
+      case "Creator risk":
+        title = "Creator risk";
+        content = <EvidencePanel title="Creator risk" agent={cr} />;
+        break;
+      default:
+        return null;
+    }
+
+    return (
+      <Modal title={title} onClose={() => setActiveModal(null)}>
+        {content}
+      </Modal>
+    );
+  };
+
   return (
     <>
       <div className="grid auto-rows-[150px] grid-cols-2 gap-3 lg:grid-cols-4">
 
         {/* TRUST HERO */}
         <Block label="Trust" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c" span="col-span-2 row-span-2"
-          onClick={() => open("Scores", <ScoresModal report={report} isBusiness={isBusiness} mode={mode} />)}>
+          onClick={() => setActiveModal("Scores")}>
           <div className="flex flex-1 items-center gap-5">
             <Ring value={report?.trust_score ?? null} color={C(report?.trust_score)} label="trust" />
             <div className="flex-1 space-y-2">
@@ -262,7 +385,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* SUMMARY */}
         <Block label="Summary" icon={<Sparkle className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
-          onClick={report?.summary ? () => open("Summary", <div className="text-sm leading-relaxed text-ink space-y-3">{formatMarkdown(report.summary)}</div>) : undefined}>
+          onClick={report?.summary ? () => setActiveModal("Summary") : undefined}>
           <p className="line-clamp-[12] text-xs leading-relaxed text-white/70 whitespace-pre-line">
             {formatMarkdownInline(report?.summary) || "No summary generated."}
           </p>
@@ -270,9 +393,9 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* CLAIMS */}
         <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
-          onClick={() => open("Fact-check claims", <ClaimsPanel claims={claims} skippedClaims={skippedClaims} showVerification={isBusiness} onReview={onReview} />)}>
+          onClick={() => setActiveModal("Fact-check claims")}>
           <div className="mb-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} supported</span>
+            <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} verified</span>
             <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
             <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/50">{claims.length} total</span>
             {skippedClaims.length > 0 && (
@@ -280,21 +403,30 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             )}
           </div>
           <div className="space-y-2 flex-1 overflow-hidden">
-            {claims.slice(0, 7).map((c, i) => (
-              <div key={i} className="flex items-center gap-2 text-[11px] border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                {c.verdict === "supported"
-                  ? <Check className="h-3.5 w-3.5 shrink-0 text-good" />
-                  : <span className="shrink-0" style={{ color: C(c.verdict === "contradicted" ? 0 : 50) }}><AlertTriangle className="h-3.5 w-3.5" /></span>}
-                <span className="truncate text-white/70 flex-1">{c.claim_text}</span>
-              </div>
-            ))}
+            {claims.slice(0, 7).map((c, i) => {
+              const isVerified = c.verdict === "supported" || c.verification_status === "auto_verified" || c.verification_status === "approved";
+              const isContradicted = c.verdict === "contradicted" || c.verification_status === "contradicted" || c.verification_status === "rejected";
+              const isMisleading = c.verdict === "misleading";
+              return (
+                <div key={i} className="flex items-center gap-2 text-[11px] border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                  {isVerified ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-good" />
+                  ) : (
+                    <span className="shrink-0" style={{ color: isContradicted ? "#e03e3e" : isMisleading ? "#cb912f" : "#9b9a97" }}>
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                  <span className="truncate text-white/70 flex-1">{c.claim_text}</span>
+                </div>
+              );
+            })}
             {!claims.length && <span className="text-[11px] text-white/30">No claims extracted.</span>}
           </div>
         </Block>
 
         {/* TRANSCRIPT */}
         <Block label="Transcript" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f" span="col-span-2 row-span-2"
-          onClick={() => open("Transcript", <TranscriptPanel segments={segs} />)}>
+          onClick={() => setActiveModal("Transcript")}>
           <div className="flex-1 space-y-1.5 overflow-hidden">
             {segs.slice(0, 6).map((s: any, i: number) => {
               const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
@@ -309,10 +441,88 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           <div className="mt-2 text-[10px] font-bold text-white/40">{segs.length} segments · tap to read</div>
         </Block>
 
+        {/* ON-SCREEN TEXT (OCR) */}
+        {ocr?.ocr_segments?.length > 0 && (
+          <Block
+            label="On-Screen Text (OCR)"
+            icon={<ScanLine className="h-3.5 w-3.5" />}
+            color="#9b59ff"
+            span="col-span-2 row-span-2"
+            onClick={() => setActiveModal("On-Screen Text (OCR)")}
+          >
+            {ocr.ocr_analysis && (
+              <div className={`mb-2.5 rounded-lg border px-2.5 py-1 text-[10px] max-w-full truncate ${
+                ocr.ocr_analysis.relationship_verdict === "unrelated"
+                  ? "border-bad/20 bg-bad/5 text-bad"
+                  : ocr.ocr_analysis.relationship_verdict === "partially_related"
+                  ? "border-warn/20 bg-warn/5 text-warn"
+                  : "border-good/20 bg-good/5 text-good"
+              }`}>
+                <span className="font-extrabold uppercase tracking-wide">
+                  Alignment: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+                </span>
+              </div>
+            )}
+            <div className="flex-1 space-y-1.5 overflow-hidden">
+              {ocr.ocr_segments.slice(0, 6).map((s: any, i: number) => {
+                const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
+                return (
+                  <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
+                    <span className="text-[11px] leading-snug text-white/60 line-clamp-1">
+                      <span className="font-mono text-[9px] text-white/30 mr-1">{fmt(s.start)}</span>
+                      {s.text}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 text-[10px] font-bold text-white/40">{ocr.ocr_segments.length} segments · tap to read</div>
+          </Block>
+        )}
+
+        {/* VIDEO SEGMENT ANALYSIS (Music + OCR only) */}
+        {ocr?.ocr_analysis?.video_segment_analysis?.length > 0 &&
+          (ocr.ocr_analysis.relationship_verdict === "unrelated" ||
+            ocr.ocr_analysis.relationship_verdict === "partially_related") && (
+          <Block
+            label="Video Segment Analysis"
+            icon={<Eye className="h-3.5 w-3.5" />}
+            color="#0f7b6c"
+            span="col-span-2 row-span-2"
+            onClick={() => setActiveModal("Video Segment Analysis")}
+          >
+            <div className="text-[10px] text-white/50 mb-3 leading-relaxed">
+              Visual action summary for overlay text segments (only music/unrelated speech detected).
+            </div>
+            <div className="flex-1 space-y-2 overflow-hidden">
+              {ocr.ocr_analysis.video_segment_analysis.slice(0, 4).map((item: any, i: number) => (
+                <div key={i} className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                  <span className="font-mono text-[9px] text-accent shrink-0 mt-0.5 font-bold bg-accent/15 px-1.5 py-0.5 rounded">
+                    {fmt(item.timestamp)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {item.text_appeared && (
+                      <span className="text-[10px] font-bold text-white/70 block truncate mb-0.5">
+                        "{item.text_appeared}"
+                      </span>
+                    )}
+                    <span className="text-[11px] leading-snug text-white/50 line-clamp-1 block">
+                      {item.visual_description}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-[10px] font-bold text-white/40">
+              {ocr.ocr_analysis.video_segment_analysis.length} segments analyzed · tap to inspect
+            </div>
+          </Block>
+        )}
+
         {/* PERCEPTION */}
         {perc && (
           <Block label="Perception" icon={<Eye className="h-3.5 w-3.5" />} color="#9b59ff" span="col-span-2"
-            onClick={() => open("Perception check", <PerceptionFull agent={perc} />)}>
+            onClick={() => setActiveModal("Perception check")}>
             <div className="flex items-center gap-3">
               <Ring value={100 - (perc.sentiment_harm_score ?? 0)} color={C(100 - (perc.sentiment_harm_score ?? 0))} size={56} />
               <div className="text-[11px] text-white/60">
@@ -328,7 +538,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         {/* BIAS */}
         {bias && (
           <Block label="Bias & sentiment" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f"
-            onClick={() => open("Bias analysis", <EvidencePanel title="Bias analysis" agent={bias} />)}>
+            onClick={() => setActiveModal("Bias analysis")}>
             <div className="flex-1 space-y-2">
               <MiniBar label="Bias" value={report?.bias_score} invert />
               <div className="text-[10px] text-white/40 line-clamp-2">{bias.reasoning}</div>
@@ -337,17 +547,48 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         )}
 
         {/* SENTIMENT TIMELINE */}
-        {senti?.timeline?.length > 0 && (
-          <Block label="Sentiment timeline" icon={<Network className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2"
-            onClick={() => open("Sentiment timeline", <SentimentTimeline timeline={senti.timeline} />)}>
-            <div className="flex-1 opacity-90"><SentimentTimeline timeline={senti.timeline} /></div>
+        {((hasSpeechSenti && sentimentSource === "speech") || (hasVideoSenti && sentimentSource === "video")) && (
+          <Block
+            label="Sentiment timeline"
+            icon={<Network className="h-3.5 w-3.5" />}
+            color="#2383e2"
+            span="col-span-2"
+            onClick={() => setActiveModal("Sentiment timeline")}
+          >
+            <div className="flex flex-col h-full w-full justify-between">
+              <div className="flex items-center justify-between mb-2">
+                {!hasSpeech ? (
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-good bg-good/10 px-2 py-0.5 rounded">
+                    Based on Video Visuals (No speech)
+                  </span>
+                ) : hasSpeechSenti && hasVideoSenti ? (
+                  <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5 text-[9px] relative z-20" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setSentimentSource("speech")}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                    >
+                      Speech
+                    </button>
+                    <button
+                      onClick={() => setSentimentSource("video")}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                    >
+                      Video
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex-1 opacity-90 min-h-[90px]">
+                <SentimentTimeline timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
+              </div>
+            </div>
           </Block>
         )}
 
         {/* COMPLIANCE (business) */}
         {isBusiness && comp && (
           <Block label="Compliance" icon={<Scale className="h-3.5 w-3.5" />} color="#2383e2"
-            onClick={() => open("Product & compliance", <EvidencePanel title="Product & compliance" agent={comp} />)}>
+            onClick={() => setActiveModal("Product & compliance")}>
             <div className="flex-1">
               <div className="font-heavy text-3xl" style={{ color: C(report?.compliance_score) }}>{report?.compliance_score ?? "—"}</div>
               <div className="mt-1 text-[10px] text-white/40">{(comp.issues?.length || 0)} issue(s) flagged</div>
@@ -358,7 +599,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         {/* MEDIA INTEGRITY (business) */}
         {isBusiness && mi && (
           <Block label="Media integrity" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c"
-            onClick={() => open("Media integrity", <MediaIntegrityDetails mi={mi} />)}>
+            onClick={() => setActiveModal("Media integrity")}>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-6 w-6 text-good" />
               <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{report?.authenticity_score ?? "—"}%</span>
@@ -376,13 +617,13 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         {/* CREATOR RISK */}
         {cr && (
           <Block label="Creator risk" icon={<AlertTriangle className="h-3.5 w-3.5" />} color="#cb912f"
-            onClick={() => open("Creator risk", <EvidencePanel title="Creator risk" agent={cr} />)}>
+            onClick={() => setActiveModal("Creator risk")}>
             <div className="text-[10px] text-white/40 line-clamp-3">{cr.reasoning || `${cr.risks?.length || 0} risk signal(s)`}</div>
           </Block>
         )}
       </div>
 
-      {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.node}</Modal>}
+      {renderModal()}
     </>
   );
 }
@@ -678,6 +919,35 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
           </div>
         )}
         {activeItem.reasoning}
+      </div>
+    </div>
+  );
+}
+
+function VisualAnalysisModal({ analysis }: { analysis: any[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="text-xs text-ink-light leading-relaxed mb-2">
+        Detailed AI visual analysis of each segment when text appears on screen.
+      </div>
+      <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
+        {analysis.map((item: any, i: number) => (
+          <div key={i} className="rounded-xl border border-line bg-surface p-4 flex gap-4">
+            <div className="shrink-0 font-mono text-[10px] font-bold text-accent bg-accent/10 h-7 px-2.5 flex items-center justify-center rounded">
+              {fmt(item.timestamp)}
+            </div>
+            <div className="space-y-1.5 flex-1 min-w-0">
+              {item.text_appeared && (
+                <div className="text-[10px] font-bold text-ink bg-white/5 px-2 py-0.5 rounded inline-block truncate max-w-full">
+                  Text: "{item.text_appeared}"
+                </div>
+              )}
+              <p className="text-xs text-ink-light leading-relaxed">
+                {item.visual_description}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
