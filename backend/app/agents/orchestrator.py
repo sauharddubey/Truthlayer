@@ -38,7 +38,7 @@ from app.models import (
     DeepfakeResult,
     Video,
 )
-from app.rag.store import retrieve
+from app.rag.store import MARKETING_POLICY, PRODUCT_DETAILS, retrieve
 from app.rights import agents_for_tier
 from app.services.trust_scoring import compute_tier_trust_score, summarize_skipped_claims
 
@@ -89,6 +89,22 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
             k=k,
             product_id=video.product_id,
         ),
+        rag_retrieve_product_details=lambda q, k=5: retrieve(
+            db,
+            organization_id=video.organization_id,
+            query=q,
+            k=k,
+            product_id=video.product_id,
+            document_types=[PRODUCT_DETAILS],
+        ) if video.product_id else None,
+        rag_retrieve_marketing_policies=lambda q, k=5: retrieve(
+            db,
+            organization_id=video.organization_id,
+            query=q,
+            k=k,
+            product_id=video.product_id,
+            document_types=[MARKETING_POLICY],
+        ) if video.product_id else None,
     )
 
     # 1) Content classification + segment labelling runs first.
@@ -253,7 +269,7 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         compliance_score = None
         authenticity_pct = None
     else:
-        trust = compute_tier_trust_score(fact, bias_r, mi)
+        trust = compute_tier_trust_score(fact, bias_r, mi, tier=tier)
         authenticity_val = authenticity if authenticity is not None else 1.0
         authenticity_pct = authenticity_val * 100
         # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm

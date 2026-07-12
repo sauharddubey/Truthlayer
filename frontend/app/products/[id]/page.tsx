@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getProduct, updateProduct, productOverview, productVideos, productDocuments, uploadProductDocument,
+  getProduct, updateProduct, productOverview, productVideos, productDocuments, uploadProductDocument, deleteProductDocument,
   productKeywords, addProductKeyword, deleteProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
   uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
@@ -52,6 +52,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [savingDetails, setSavingDetails] = useState(false);
+  const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
   function loadKeywords() {
     productKeywords(id).then((d) => {
@@ -79,9 +81,35 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>, type: string) {
     const f = e.target.files?.[0]; if (!f) return;
-    setBusy(true);
-    try { await uploadProductDocument(id, f, type); setMsg(`Indexed "${f.name}".`); productDocuments(id).then(setDocs); }
-    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+    setUploadingType(type);
+    setMsg("");
+    try {
+      const doc = await uploadProductDocument(id, f, type);
+      if (doc.status === "failed") {
+        setMsg(`Could not extract text from "${f.name}". Try a text-based PDF or DOCX.`);
+      } else {
+        setMsg(`Indexed "${f.name}" — used in compliance and claim verification.`);
+      }
+      productDocuments(id).then(setDocs);
+      productOverview(id).then(setOverview).catch(() => {});
+    } catch (e: any) { setMsg(e.message); }
+    finally { setUploadingType(null); e.target.value = ""; }
+  }
+  async function removeDocument(docId: string, filename: string) {
+    const ok = window.confirm(`Remove "${filename}" from the knowledge base?`);
+    if (!ok) return;
+    setDeletingDocId(docId);
+    setMsg("");
+    try {
+      await deleteProductDocument(id, docId);
+      productDocuments(id).then(setDocs);
+      productOverview(id).then(setOverview).catch(() => {});
+      setMsg(`Removed "${filename}". Re-analyze videos to refresh claim checks.`);
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setDeletingDocId(null);
+    }
   }
   async function addKw(e: React.FormEvent) {
     e.preventDefault();
@@ -268,6 +296,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <GlassStat label="Compliance" value={overview?.compliance_score} />
             <GlassStat label="Videos" value={overview?.video_count ?? 0} color="#cb912f" isCount />
           </div>
+          {overview?.knowledge_base && (
+            <div className="glass-tile p-5">
+              <div className="text-base font-bold text-white">Knowledge base</div>
+              <p className="mt-1 text-sm text-white/50">
+                Product details and marketing policies are indexed and used during video analysis for claim verification and compliance checks.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-white/70">
+                  {overview.knowledge_base.product_details ?? 0} product details doc{(overview.knowledge_base.product_details ?? 0) === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-white/70">
+                  {overview.knowledge_base.marketing_policy ?? 0} marketing polic{(overview.knowledge_base.marketing_policy ?? 0) === 1 ? "y" : "ies"}
+                </span>
+              </div>
+            </div>
+          )}
           {overview?.claims_needing_review?.length > 0 && (
             <div className="glass-tile p-5">
               <div className="flex items-center gap-2 text-base font-bold text-white"><AlertTriangle className="h-4 w-4 text-warn" /> Claims needing your review</div>
@@ -290,24 +334,45 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="glass-tile p-5">
             <div className="flex items-center gap-2 text-base font-bold text-white"><FileSearch className="h-4 w-4 text-accent" /> Product details</div>
-            <p className="mt-1 text-sm text-white/50">Specs &amp; approved facts. Claims matching these auto-verify.</p>
-            <label className="btn-white mt-4 cursor-pointer">Upload PDF / DOCX / TXT
-              <input type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={(e) => onUpload(e, "product_details")} /></label>
+            <p className="mt-1 text-sm text-white/50">Specs and approved facts. Matching claims are auto-verified during analysis.</p>
+            <label className={`btn-white mt-4 cursor-pointer ${uploadingType === "product_details" ? "opacity-60" : ""}`}>
+              {uploadingType === "product_details" ? "Indexing…" : "Upload PDF / DOCX / TXT"}
+              <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" disabled={!!uploadingType}
+                onChange={(e) => onUpload(e, "product_details")} /></label>
           </div>
           <div className="glass-tile p-5">
             <div className="flex items-center gap-2 text-base font-bold text-white"><Scale className="h-4 w-4 text-warn" /> Marketing policies</div>
-            <p className="mt-1 text-sm text-white/50">Disclosure rules, restricted claims, brand guidelines.</p>
-            <label className="btn-white mt-4 cursor-pointer">Upload PDF / DOCX / TXT
-              <input type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={(e) => onUpload(e, "marketing_policy")} /></label>
+            <p className="mt-1 text-sm text-white/50">Disclosure rules, restricted claims, and brand guidelines. Used by the compliance agent.</p>
+            <label className={`btn-white mt-4 cursor-pointer ${uploadingType === "marketing_policy" ? "opacity-60" : ""}`}>
+              {uploadingType === "marketing_policy" ? "Indexing…" : "Upload PDF / DOCX / TXT"}
+              <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" disabled={!!uploadingType}
+                onChange={(e) => onUpload(e, "marketing_policy")} /></label>
           </div>
           <div className="glass-tile p-5 sm:col-span-2">
             <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">Indexed documents</div>
             {docs.length ? docs.map((d) => (
-              <div key={d.id} className="flex items-center justify-between border-b border-white/8 py-2.5 text-sm text-white/80 last:border-0">
-                <span className="flex items-center gap-2"><FileSearch className="h-3.5 w-3.5 text-white/40" /> {d.filename}</span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/60">{d.document_type.replace(/_/g, " ")}</span>
+              <div key={d.id} className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 text-sm text-white/80 last:border-0">
+                <span className="flex min-w-0 items-center gap-2">
+                  <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                  <span className="truncate">{d.filename}</span>
+                  {d.status === "failed" && (
+                    <span className="shrink-0 rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-bold text-bad">failed</span>
+                  )}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/60">{d.document_type.replace(/_/g, " ")}</span>
+                  <button
+                    type="button"
+                    className="rounded-full px-1.5 text-[10px] font-bold text-bad hover:bg-bad/10 disabled:opacity-50"
+                    onClick={() => removeDocument(d.id, d.filename)}
+                    disabled={deletingDocId === d.id}
+                    aria-label={`Remove ${d.filename}`}
+                  >
+                    {deletingDocId === d.id ? "…" : "×"}
+                  </button>
+                </div>
               </div>
-            )) : <p className="text-sm text-white/30">No documents yet — upload spec sheets and policies above.</p>}
+            )) : <p className="text-sm text-white/30">No documents yet — upload spec sheets and policies above. They are embedded and searched during each video analysis.</p>}
           </div>
         </div>
       )}

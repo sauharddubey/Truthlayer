@@ -8,7 +8,7 @@ cross-transcript contradiction detection.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.agents.narrative import cluster_narratives
@@ -17,6 +17,7 @@ from app.llm import chat_json
 from app.models import (
     BusinessDocument,
     Claim,
+    DocumentChunk,
     MonitoredKeyword,
     Product,
     ProcessingStatus,
@@ -24,7 +25,7 @@ from app.models import (
     UserRole,
     Video,
 )
-from app.rag.store import ingest_document
+from app.rag.store import ALLOWED_DOCUMENT_TYPES, ALLOWED_EXTENSIONS, ingest_document
 from app.services.product_cleanup import delete_product_and_related
 from app.schemas import (
     ClaimReviewRequest,
@@ -203,15 +204,30 @@ async def upload_document(
     user: User = Depends(business_only),
 ):
     _get_product(db, pid, user)
+    if document_type not in ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"document_type must be one of: {', '.join(sorted(ALLOWED_DOCUMENT_TYPES))}",
+        )
+    filename = file.filename or "document"
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
     raw = await file.read()
-    return ingest_document(
-        db,
-        organization_id=_org(user),
-        product_id=pid,
-        filename=file.filename or "document",
-        document_type=document_type,
-        raw=raw,
-    )
+    try:
+        return ingest_document(
+            db,
+            organization_id=_org(user),
+            product_id=pid,
+            filename=filename,
+            document_type=document_type,
+            raw=raw,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{pid}/documents", response_model=list[DocumentOut])
@@ -221,8 +237,29 @@ def list_documents(pid: str, db: Session = Depends(get_db), user: User = Depends
         select(BusinessDocument).where(
             BusinessDocument.product_id == pid,
             BusinessDocument.organization_id == _org(user),
-        )
+        ).order_by(BusinessDocument.created_at.desc())
     ).scalars().all()
+
+
+@router.delete("/{pid}/documents/{doc_id}")
+def delete_document(
+    pid: str,
+    doc_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    _get_product(db, pid, user)
+    doc = db.get(BusinessDocument, doc_id)
+    if (
+        not doc
+        or doc.organization_id != _org(user)
+        or doc.product_id != pid
+    ):
+        raise HTTPException(status_code=404, detail="Document not found")
+    db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == doc_id))
+    db.delete(doc)
+    db.commit()
+    return {"deleted": doc_id}
 
 
 # ── Hashtag monitoring ────────────────────────────────────────────────────────
@@ -335,6 +372,10 @@ def product_overview(pid: str, db: Session = Depends(get_db), user: User = Depen
         "sentiment_score": avg("sentiment_score"),
         "compliance_score": avg("compliance_score"),
         "risk_score": avg("risk_score"),
+        "knowledge_base": {
+            "product_details": sum(1 for d in p.documents if d.document_type == "product_details" and d.status == "indexed"),
+            "marketing_policy": sum(1 for d in p.documents if d.document_type == "marketing_policy" and d.status == "indexed"),
+        },
         "claims_needing_review": [
             {"id": c.id, "video_id": c.video_id, "claim_text": c.claim_text, "note": c.verification_note}
             for c in needs_review

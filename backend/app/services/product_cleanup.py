@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import (
     BusinessDocument,
+    DocumentChunk,
     MonitoredKeyword,
     NarrativeCluster,
     Product,
@@ -59,6 +60,7 @@ def delete_product_and_related(db: Session, product: Product) -> None:
         cleanup_video_media(video.extra_metadata)
         db.delete(video)
 
+    db.execute(delete(DocumentChunk).where(DocumentChunk.product_id == pid))
     db.execute(delete(BusinessDocument).where(BusinessDocument.product_id == pid))
     db.execute(delete(MonitoredKeyword).where(MonitoredKeyword.product_id == pid))
     db.execute(delete(NarrativeCluster).where(NarrativeCluster.product_id == pid))

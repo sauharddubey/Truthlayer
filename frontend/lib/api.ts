@@ -223,6 +223,9 @@ export async function uploadProductDocument(id: string, file: File, documentType
   fd.append("document_type", documentType);
   return request<any>(`/products/${id}/documents`, { method: "POST", body: fd });
 }
+export function deleteProductDocument(productId: string, documentId: string) {
+  return request<any>(`/products/${productId}/documents/${documentId}`, { method: "DELETE" });
+}
 export function addProductKeyword(id: string, keyword: string) {
   return request<any>(`/products/${id}/keywords`, {
     method: "POST",

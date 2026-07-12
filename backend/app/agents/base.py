@@ -34,6 +34,8 @@ class AgentContext:
     ocr_analysis: dict = field(default_factory=dict)
     # Injected by the orchestrator so agents can pull tenant knowledge / web evidence.
     rag_retrieve: Optional[Callable[[str, int], List[dict]]] = None
+    rag_retrieve_product_details: Optional[Callable[[str, int], List[dict]]] = None
+    rag_retrieve_marketing_policies: Optional[Callable[[str, int], List[dict]]] = None
 
 
 # An agent: name -> callable(ctx) -> result dict
