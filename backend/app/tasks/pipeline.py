@@ -134,6 +134,20 @@ def process_video(video_id: str) -> None:
                 duration=ing.duration_seconds or video.duration_seconds,
             )
 
+            # Run OCR on the video if video path is available
+            ocr_result = None
+            if ing.video_path:
+                try:
+                    logger.info("Running OCR detection on video: %s", ing.video_path)
+                    from app.services import ocr
+                    ocr_result = ocr.run_ocr(
+                        video_path=ing.video_path,
+                        duration=ing.duration_seconds or video.duration_seconds,
+                        speech_transcript=tr.text
+                    )
+                except Exception as e:
+                    logger.exception("OCR detection failed: %s", e)
+
             from app.models import Transcript
 
             transcript = Transcript(
@@ -141,6 +155,12 @@ def process_video(video_id: str) -> None:
                 text=tr.text,
                 language=tr.language,
                 segments=tr.segments,
+                ocr_text=ocr_result.get("ocr_text") if ocr_result else None,
+                ocr_segments=ocr_result.get("ocr_segments") if ocr_result else [],
+                ocr_analysis={
+                    **(ocr_result.get("ocr_analysis") or {}),
+                    "video_segment_analysis": ocr_result.get("video_segment_analysis") or []
+                } if ocr_result else {},
             )
             db.add(transcript)
             db.commit()
@@ -148,9 +168,21 @@ def process_video(video_id: str) -> None:
             # 3. Structuring -----------------------------------------------
             video.processing_status = ProcessingStatus.STRUCTURING
             db.commit()
-            transcript.structured_blocks = structuring.structure_transcript(
-                tr.text, tr.segments
-            )
+            
+            speech_blocks = structuring.structure_transcript(tr.text, tr.segments)
+            ocr_blocks = []
+            if ocr_result and ocr_result.get("ocr_segments"):
+                verify_ocr_segments = [
+                    s for s in ocr_result["ocr_segments"]
+                    if s.get("label") in ("verify", "risky")
+                ]
+                if verify_ocr_segments:
+                    verify_ocr_text = " ".join(s.get("text", "") for s in verify_ocr_segments)
+                    ocr_blocks = structuring.structure_transcript(
+                        verify_ocr_text, verify_ocr_segments
+                    )
+            
+            transcript.structured_blocks = speech_blocks + ocr_blocks
             db.commit()
 
             # 3b. Business: auto-identify the product from title/captions/transcript

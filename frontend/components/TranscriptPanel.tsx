@@ -20,35 +20,57 @@ function fmt(t?: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function TranscriptPanel({ segments }: { segments: Segment[] }) {
+export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: any }) {
   const [filter, setFilter] = useState<"all" | "verify" | "risky">("all");
-  if (!segments?.length) return <div className="card text-sm text-ink-light">No transcript available.</div>;
 
-  const counts = segments.reduce((a, s) => {
+  if (!segments?.length) return <div className="card text-sm text-ink-light">No segments available.</div>;
+
+  const counts = segments.reduce((a: Record<string, number>, s: Segment) => {
     const l = s.label || "safe"; a[l] = (a[l] || 0) + 1; return a;
   }, {} as Record<string, number>);
-  const shown = segments.filter((s) => filter === "all" || (s.label || "safe") === filter);
+
+  const shown = segments.filter((s: Segment) => filter === "all" || (s.label || "safe") === filter);
 
   return (
     <div className="card">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-base font-semibold">Transcript</div>
-        <div className="flex items-center gap-0.5 rounded-md border border-line p-0.5 text-xs">
+        <div className="text-base font-semibold">{ocr ? "On-Screen Text (OCR)" : "Transcript"}</div>
+        <div className="flex items-center gap-0.5 rounded-md border border-line p-0.5 text-xs bg-surface">
           {(["all", "verify", "risky"] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`rounded px-2.5 py-1 font-medium capitalize transition ${filter === f ? "bg-ink text-paper" : "text-ink-light hover:bg-hover"}`}>
+              className={`rounded px-2.5 py-1 font-medium capitalize transition ${filter === f ? "bg-ink text-paper shadow-sm" : "text-ink-light hover:bg-hover"}`}>
               {f}{f !== "all" && counts[f] ? ` ${counts[f]}` : ""}
             </button>
           ))}
         </div>
       </div>
-      <div className="mb-3 flex flex-wrap gap-4 text-xs text-ink-light">
+
+      {ocr?.ocr_analysis && (
+        <div className={`mb-4 rounded-xl border p-4 text-xs ${
+          ocr.ocr_analysis.relationship_verdict === "unrelated"
+            ? "border-bad/20 bg-bad/[0.03] text-bad"
+            : ocr.ocr_analysis.relationship_verdict === "partially_related"
+            ? "border-warn/20 bg-warn/[0.03] text-warn"
+            : "border-good/20 bg-good/[0.03] text-good"
+        }`}>
+          <div className="font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full" style={{
+              backgroundColor: ocr.ocr_analysis.relationship_verdict === "unrelated" ? "#e03e3e" : ocr.ocr_analysis.relationship_verdict === "partially_related" ? "#cb912f" : "#0f7b6c"
+            }} />
+            Speech Relationship: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+          </div>
+          <p className="text-ink-light leading-relaxed mt-0.5">{ocr.ocr_analysis.explanation}</p>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-4 text-xs text-ink-light border-t border-line/40 pt-2">
         <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-line align-middle" />Safe {counts.safe || 0}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-warn align-middle" />Needs verification {counts.verify || 0}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-bad align-middle" />Risky {counts.risky || 0}</span>
       </div>
+
       <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
-        {shown.map((s, i) => {
+        {shown.map((s: Segment, i: number) => {
           const st = STYLES[s.label || "safe"];
           return (
             <div key={i} className={`rounded-r-md py-2 pl-3 pr-2 ${st.row}`}>
@@ -67,6 +89,14 @@ export function TranscriptPanel({ segments }: { segments: Segment[] }) {
             </div>
           );
         })}
+        {!shown.length && (
+          <div className="text-center py-6 text-sm text-ink-faint">
+            No segments found matching filter '{filter}'.
+          </div>
+        )}
+      </div>
+      <div className="mt-2 text-[10px] font-bold text-white/40">
+        {segments.length} segments · {ocr ? "OCR on-screen text" : "speech transcript"}
       </div>
     </div>
   );

@@ -495,6 +495,32 @@ export default function SettingsPage() {
               Leave selection blank to use default platform routing.
             </p>
 
+            {/* Model Mapping Documentation */}
+            <div className="rounded-xl border border-line bg-surface p-4 space-y-3.5">
+              <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">Model Architecture &amp; Task Mapping</div>
+              
+              <div className="grid gap-3 text-xs leading-relaxed text-ink-light">
+                <div className="flex gap-3">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent font-bold">1</div>
+                  <div>
+                    <strong className="text-ink">Chat LLM (Reasoning &amp; Fusion):</strong> Runs parallel agents (Fact-Check, Bias, Sentiment, Compliance, Creator Risk, Perception) and compiles final explainable reports and summaries.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-good/10 text-good font-bold">2</div>
+                  <div>
+                    <strong className="text-ink">Multimodal Transcription &amp; OCR (Vision):</strong> Gemini audio/vision models transcribe the speech track, perform optical character recognition (OCR) on video frames, check text-to-speech alignment, and power the Video Segment Analysis.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-warn/10 text-warn font-bold">3</div>
+                  <div>
+                    <strong className="text-ink">Vector Embeddings (RAG Retrieval):</strong> Generates search vector points of brand documents and marketing rules to verify claims against your knowledge base.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Chat LLM / Reasoning Select */}
             <div>
               <label className="label flex items-center gap-1.5 mb-1.5">

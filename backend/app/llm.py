@@ -182,6 +182,11 @@ def _record_usage(call_type: str, model: str, prompt_tokens: int, completion_tok
         logger.warning("Usage record failed (non-fatal): %s", exc)
 
 
+def record_usage(call_type: str, model: str, prompt_tokens: int, completion_tokens: int) -> None:
+    """Exposed wrapper to record usage from other services."""
+    _record_usage(call_type, model, prompt_tokens, completion_tokens)
+
+
 # ── Chat completions ──────────────────────────────────────────────────────────
 
 
