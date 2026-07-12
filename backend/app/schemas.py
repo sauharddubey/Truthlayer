@@ -56,6 +56,11 @@ class ProductCreate(BaseModel):
     aliases: List[str] = []
 
 
+class ProductUpdate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
 class ProductOut(BaseModel):
     id: str
     name: str

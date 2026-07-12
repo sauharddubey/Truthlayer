@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { addBrandKeyword, brandDashboard, mediaUrl } from "@/lib/api";
+import { addBrandKeyword, deleteBrandKeyword, brandDashboard, mediaUrl } from "@/lib/api";
+import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
+import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
 import { AppShell } from "@/components/AppShell";
 import { ArrowRight, Box, Plus, Network } from "@/components/icons";
 
-function GlassStat({ label, value, color = "#2383e2" }: { label: string; value: any; color?: string }) {
+function GlassStat({ label, value, color = "#2383e2", isCount = false }: { label: string; value: any; color?: string; isCount?: boolean }) {
   return (
     <div className="glass-tile p-5">
       <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">{label}</div>
-      <div className="mt-1 font-heavy text-4xl" style={{ color }}>{value ?? "—"}</div>
+      <div className="mt-1 font-heavy text-4xl" style={{ color }}>{formatStatDisplay(value, isCount)}</div>
     </div>
   );
 }
@@ -19,16 +21,34 @@ export default function BrandDashboard() {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
   const [kw, setKw] = useState("");
+  const [deletingKeywordId, setDeletingKeywordId] = useState<string | null>(null);
 
   function load() { brandDashboard().then(setData).catch((e) => setError(e.message)); }
-  useEffect(load, []);
+  const refresh = useCallback(() => { load(); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+  useRefetchOnVisible(refresh);
 
   async function addKw(e: React.FormEvent) {
     e.preventDefault();
     try { await addBrandKeyword(kw); setKw(""); load(); } catch (e: any) { setError(e.message); }
   }
 
-  const sentiment = data?.brand_perception != null ? Math.round((data.brand_perception + 1) * 50) : null;
+  async function removeKeyword(keywordId: string) {
+    const ok = window.confirm("Remove this hashtag?");
+    if (!ok) return;
+    setDeletingKeywordId(keywordId);
+    setError("");
+    try {
+      await deleteBrandKeyword(keywordId);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingKeywordId(null);
+    }
+  }
+
+  const sentiment = data?.brand_perception != null ? (data.brand_perception + 1) * 50 : null;
 
   return (
     <AppShell title="Brand overview" wide>
@@ -37,8 +57,8 @@ export default function BrandDashboard() {
       {/* Stat row */}
       <div className="mb-4 grid gap-4 sm:grid-cols-3">
         <GlassStat label="Brand perception" value={sentiment} color="#2383e2" />
-        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="#0f7b6c" />
-        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="#cb912f" />
+        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="#0f7b6c" isCount />
+        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="#cb912f" isCount />
       </div>
 
       {/* Brand identity */}
@@ -94,7 +114,7 @@ export default function BrandDashboard() {
                 )}
                 {p.trust_score != null && (
                   <span className="absolute right-2 top-2 rounded-full bg-ink/80 px-2 py-0.5 text-[10px] font-extrabold text-paper backdrop-blur">
-                    {p.trust_score}
+                    {formatMetric(p.trust_score)}
                   </span>
                 )}
               </div>
@@ -123,9 +143,44 @@ export default function BrandDashboard() {
           </form>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(data?.brand_keywords || []).map((k: any) => (
-              <span key={k.id} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium text-white/70">{k.keyword}</span>
+              <span key={k.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-white/70">
+                {k.keyword}
+                <button
+                  type="button"
+                  className="rounded-full px-1.5 text-[10px] font-bold text-bad hover:bg-bad/10 disabled:opacity-50"
+                  onClick={() => removeKeyword(k.id)}
+                  disabled={deletingKeywordId === k.id}
+                  aria-label={`Remove ${k.keyword}`}
+                >
+                  {deletingKeywordId === k.id ? "…" : "×"}
+                </button>
+              </span>
             ))}
           </div>
+          {(data?.brand_hashtag_video_matches || []).length > 0 && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">Recent video hashtag status</div>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {data.brand_hashtag_video_matches.slice(0, 8).map((v: any) => (
+                  <div key={v.video_id} className="rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-xs">
+                    <Link href={`/analysis/${v.video_id}`} className="font-semibold text-white hover:underline">{v.title}</Link>
+                    {!v.description_available ? (
+                      <p className="mt-1 text-white/40">No description available</p>
+                    ) : (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {(v.present_keywords || []).map((tag: string) => (
+                          <span key={`p-${tag}`} className="rounded-full bg-good/15 px-1.5 py-0.5 text-[10px] font-bold text-good">{tag}</span>
+                        ))}
+                        {(v.missing_keywords || []).map((tag: string) => (
+                          <span key={`m-${tag}`} className="rounded-full bg-bad/15 px-1.5 py-0.5 text-[10px] font-bold text-bad">{tag} missing</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="glass-tile p-5">
@@ -136,7 +191,7 @@ export default function BrandDashboard() {
             {(data?.narrative_clusters || []).slice(0, 5).map((c: any) => (
               <div key={c.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition hover:bg-white/5">
                 <span className="text-white/80">{c.topic}</span>
-                <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {Math.round(c.risk_score)}</span>
+                <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {formatMetric(c.risk_score)}</span>
               </div>
             ))}
             {!data?.narrative_clusters?.length && <p className="py-2 text-sm text-white/30">No narratives yet — analyze more videos.</p>}

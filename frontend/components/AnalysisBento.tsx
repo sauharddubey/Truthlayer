@@ -7,6 +7,7 @@ import { EvidencePanel } from "@/components/EvidencePanel";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { SentimentTimeline } from "@/components/SentimentTimeline";
 import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, Network, Sparkle, ArrowRight, ScanLine } from "@/components/icons";
+import { formatMetric, formatMetricNa, formatMetricPercent, formatUnitPercent, metricValue } from "@/lib/formatMetric";
 
 const C = (t?: number | null, invert = false) => {
   if (t == null) return "#9b9a97";
@@ -57,6 +58,34 @@ function formatMarkdownInline(text?: string | null) {
   });
 }
 
+function HashtagCheckPanel({ hashtagCheck }: { hashtagCheck: any }) {
+  if (!hashtagCheck) return null;
+  if (!hashtagCheck.description_available) {
+    return (
+      <div className="rounded-lg border border-line bg-surface p-3 text-xs text-ink-light">
+        <div className="mb-1 font-semibold text-ink">Hashtag check</div>
+        <p>No platform description available — hashtags were not checked.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3 text-xs space-y-2">
+      <div className="font-semibold text-ink">Hashtag check (description)</div>
+      {(hashtagCheck.matches || []).map((m: any) => (
+        <div key={m.keyword_id} className="flex items-center justify-between gap-3">
+          <span className="text-ink-light">{m.keyword}</span>
+          <span className={`font-bold ${m.present ? "text-good" : "text-bad"}`}>
+            {m.present ? "Present" : "Missing"}
+          </span>
+        </div>
+      ))}
+      {!hashtagCheck.matches?.length && (
+        <p className="text-ink-faint">No monitored hashtags configured for this video.</p>
+      )}
+    </div>
+  );
+}
+
 /* ── Reusable bento block (dark glass, clickable to expand) ── */
 function Block({ label, icon, color, span = "", onClick, children }: {
   label: string; icon: ReactNode; color: string; span?: string; onClick?: () => void; children: ReactNode;
@@ -81,8 +110,8 @@ function Block({ label, icon, color, span = "", onClick, children }: {
 
 function Ring({ value, color, size = 92, label }: { value?: number | null; color: string; size?: number; label?: string }) {
   const r = size / 2 - 7, circ = 2 * Math.PI * r;
-  const pct = value ?? 0;
-  const display = value == null ? "N/A" : String(Math.round(value));
+  const pct = metricValue(value) ?? 0;
+  const display = value == null ? "N/A" : formatMetricNa(value);
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ width: size, height: size }}>
@@ -99,12 +128,12 @@ function Ring({ value, color, size = 92, label }: { value?: number | null; color
 }
 
 function MiniBar({ label, value, invert = false }: { label: string; value?: number | null; invert?: boolean }) {
-  const n = value == null ? null : Math.round(value);
+  const n = metricValue(value);
   return (
     <div>
       <div className="mb-1 flex justify-between text-[9px] font-bold">
         <span className="uppercase tracking-wider text-white/40">{label}</span>
-        <span style={{ color: C(n, invert) }}>{n ?? "—"}</span>
+        <span style={{ color: C(n, invert) }}>{n == null ? "—" : formatMetric(n)}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
         <div className="h-full rounded-full" style={{ width: `${n ?? 0}%`, background: C(n, invert) }} />
@@ -129,7 +158,7 @@ function formatMediaTimestamp(sec?: number | null) {
 
 function signalPercent(value?: number | null) {
   if (value == null) return null;
-  return Math.round(Math.max(0, Math.min(1, value)) * 100);
+  return metricValue(Math.max(0, Math.min(1, value)) * 100);
 }
 
 function LightMiniBar({ label, value, invert = false }: { label: string; value?: number | null; invert?: boolean }) {
@@ -138,7 +167,7 @@ function LightMiniBar({ label, value, invert = false }: { label: string; value?:
     <div>
       <div className="mb-1 flex justify-between text-[10px] font-bold">
         <span className="uppercase tracking-wider text-ink-faint">{label}</span>
-        <span style={{ color: C(pct, invert) }}>{pct ?? "—"}%</span>
+        <span style={{ color: C(pct, invert) }}>{pct == null ? "—" : formatMetricPercent(pct)}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface">
         <div className="h-full rounded-full" style={{ width: `${pct ?? 0}%`, background: C(pct, invert) }} />
@@ -179,7 +208,7 @@ function MediaIntegrityDetails({ mi }: { mi: any }) {
               <li key={idx} className="flex items-center justify-between gap-3">
                 <span className="font-mono text-ink">{formatMediaTimestamp(item.timestamp_sec)}</span>
                 <span className="truncate">{SIGNAL_LABELS[item.class] || item.class || "Signal"}</span>
-                <span className="font-semibold text-ink">{Math.round((item.score ?? 0) * 100)}%</span>
+                <span className="font-semibold text-ink">{formatUnitPercent(item.score ?? 0, "0.0%")}</span>
               </li>
             ))}
           </ul>
@@ -228,7 +257,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const ocr = agents.ocr || {};
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const segs = content.segments || [];
+  const segs = Array.isArray(content.segments) ? content.segments : [];
   const skippedClaims = agents.fact_check?.skipped_claims || [];
   const verified = claims.filter((c) =>
     c.verdict === "supported" ||
@@ -248,6 +277,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const miEvidence = mi?.deepfake?.manipulation_evidence || mi?.evidence || [];
   const cr = agents.creator_risk;
   const senti = agents.sentiment;
+  const hashtagCheck = agents.hashtag_check;
 
   // Determine if speech audio exists (i.e. has words that are not [Music])
   const hasSpeech = segs.length > 0 && segs.some((s: any) => s.text && s.text !== "[Music]");
@@ -337,7 +367,12 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         break;
       case "Product & compliance":
         title = "Product & compliance";
-        content = <EvidencePanel title="Product & compliance" agent={comp} />;
+        content = (
+          <div className="space-y-4">
+            {hashtagCheck && <HashtagCheckPanel hashtagCheck={hashtagCheck} />}
+            <EvidencePanel title="Product & compliance" agent={comp} />
+          </div>
+        );
         break;
       case "Media integrity":
         title = "Media integrity";
@@ -378,7 +413,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           </div>
           <div className="mt-2 text-[10px] font-medium text-white/40">
             {content.is_about_product ? "Product video" : (content.content_type || "video")}
-            {report?.overall_confidence != null && ` · ${Math.round(report.overall_confidence * 100)}% confidence`}
+            {report?.overall_confidence != null && ` · ${formatUnitPercent(report.overall_confidence)} confidence`}
             {(isVerifier || diagnostics?.no_claims_extracted) && diagnostics?.no_claims_extracted && " · insufficient claims"}
           </div>
         </Block>
@@ -459,7 +494,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                   : "border-good/20 bg-good/5 text-good"
               }`}>
                 <span className="font-extrabold uppercase tracking-wide">
-                  Alignment: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+                  Alignment: {(ocr.ocr_analysis.relationship_verdict || "unknown").replace(/_/g, " ")}
                 </span>
               </div>
             )}
@@ -590,7 +625,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           <Block label="Compliance" icon={<Scale className="h-3.5 w-3.5" />} color="#2383e2"
             onClick={() => setActiveModal("Product & compliance")}>
             <div className="flex-1">
-              <div className="font-heavy text-3xl" style={{ color: C(report?.compliance_score) }}>{report?.compliance_score ?? "—"}</div>
+              <div className="font-heavy text-3xl" style={{ color: C(report?.compliance_score) }}>{formatMetric(report?.compliance_score)}</div>
               <div className="mt-1 text-[10px] text-white/40">{(comp.issues?.length || 0)} issue(s) flagged</div>
             </div>
           </Block>
@@ -602,7 +637,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Media integrity")}>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-6 w-6 text-good" />
-              <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{report?.authenticity_score ?? "—"}%</span>
+              <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{formatMetricPercent(report?.authenticity_score)}</span>
             </div>
             <div className="mt-1 text-[10px] text-white/40">
               authenticity
@@ -734,6 +769,7 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
           <p className="text-xs text-ink-light leading-relaxed">
             Grades compliance against commercial rules, sponsored disclosure mandates (#ad), and health/financial claim restrictions.
           </p>
+          {agents.hashtag_check && <HashtagCheckPanel hashtagCheck={agents.hashtag_check} />}
           <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-2">
             {agents.compliance?.issues?.length > 0 ? (
               <div className="space-y-2">
@@ -854,10 +890,10 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
         <div className="space-y-3">
           <div className="rounded-lg bg-surface border border-line p-3 text-xs space-y-1.5">
             <div className="font-semibold text-ink">Verifier Scoring Breakdown</div>
-            <p className="text-ink-light">Verdict score: {scoring?.verdict_score ?? "n/a"} / 100</p>
-            <p className="text-ink-light">Evidence coverage: {scoring?.evidence_coverage ?? "n/a"}%</p>
-            <p className="text-ink-light">Evidence quality: {scoring?.evidence_quality ?? "n/a"}%</p>
-            <p className="text-ink-light">Confidence factor: {scoring?.confidence_factor ?? "n/a"}%</p>
+            <p className="text-ink-light">Verdict score: {typeof scoring?.verdict_score === "number" ? formatMetric(scoring.verdict_score) : (scoring?.verdict_score ?? "n/a")} / 100</p>
+            <p className="text-ink-light">Evidence coverage: {typeof scoring?.evidence_coverage === "number" ? formatMetricPercent(scoring.evidence_coverage) : `${scoring?.evidence_coverage ?? "n/a"}%`}</p>
+            <p className="text-ink-light">Evidence quality: {typeof scoring?.evidence_quality === "number" ? formatMetricPercent(scoring.evidence_quality) : `${scoring?.evidence_quality ?? "n/a"}%`}</p>
+            <p className="text-ink-light">Confidence factor: {typeof scoring?.confidence_factor === "number" ? formatMetricPercent(scoring.confidence_factor) : `${scoring?.confidence_factor ?? "n/a"}%`}</p>
             {scoring?.claim_counts && (
               <p className="text-ink-light">
                 Claims — supported: {scoring.claim_counts.supported ?? 0}, unverified: {scoring.claim_counts.unverified ?? 0}, misleading: {scoring.claim_counts.misleading ?? 0}, contradicted: {scoring.claim_counts.contradicted ?? 0}
@@ -882,7 +918,7 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
     <div className="space-y-5">
       <div className="grid grid-cols-3 gap-3">
         {items.map((item) => {
-          const n = item.value == null ? null : Math.round(item.value);
+          const n = metricValue(item.value);
           const active = item.label === activeScore;
           return (
             <button
@@ -895,7 +931,7 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
               }`}
             >
               <div className="font-heavy text-3xl" style={{ color: C(n, item.invert) }}>
-                {n ?? "—"}
+                {n == null ? "—" : formatMetric(n)}
               </div>
               <div className="mt-1 text-[9px] font-extrabold uppercase tracking-widest text-ink">{item.label}</div>
             </button>

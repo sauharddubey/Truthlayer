@@ -27,6 +27,15 @@ if settings.REDIS_URL:
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
+def _brand_hashtag_video_matches(db: Session, org_id: str) -> list[dict]:
+    from app.services.hashtag_check import build_video_match_rows
+
+    videos = db.execute(
+        select(Video).where(Video.organization_id == org_id).order_by(Video.created_at.desc())
+    ).scalars().all()
+    return build_video_match_rows(videos)
+
+
 def _cards_for_user(db: Session, user: User):
     vids = db.execute(
         select(Video).where(Video.submitted_by == user.id).order_by(Video.created_at.desc()).limit(60)
@@ -171,6 +180,7 @@ def brand_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curr
         "weaknesses": synthesis.get("weaknesses", []),
         "brand_perception": brand_perception,
         "brand_keywords": [{"id": k.id, "keyword": k.keyword} for k in brand_keywords],
+        "brand_hashtag_video_matches": _brand_hashtag_video_matches(db, org_id),
         "narrative_clusters": [
             {"id": c.id, "topic": c.topic, "summary": c.summary, "risk_score": c.risk_score,
              "product_id": c.product_id, "video_count": len(c.video_ids)}
@@ -193,3 +203,23 @@ def add_brand_keyword(payload: KeywordRequest, db: Session = Depends(get_db), us
     db.commit()
     db.refresh(kw)
     return {"id": kw.id, "keyword": kw.keyword}
+
+
+@router.delete("/brand/keywords/{kid}")
+def delete_brand_keyword(
+    kid: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != UserRole.BUSINESS or not user.organization_id:
+        raise HTTPException(status_code=403, detail="Business accounts only")
+    kw = db.get(MonitoredKeyword, kid)
+    if (
+        not kw
+        or kw.organization_id != user.organization_id
+        or kw.keyword_type != "brand"
+    ):
+        raise HTTPException(status_code=404, detail="Keyword not found")
+    db.delete(kw)
+    db.commit()
+    return {"deleted": kid}

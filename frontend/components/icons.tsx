@@ -142,6 +142,12 @@ export const Plus = ({ className }: P) => (
   </svg>
 );
 
+export const Pencil = ({ className }: P) => (
+  <svg {...base} className={className} width="1em" height="1em">
+    <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+  </svg>
+);
+
 export const Upload = ({ className }: P) => (
   <svg {...base} className={className} width="1em" height="1em">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 9l5-5 5 5M12 4v12" />

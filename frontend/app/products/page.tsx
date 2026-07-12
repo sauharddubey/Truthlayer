@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createProduct, listProducts, mediaUrl } from "@/lib/api";
+import { createProduct, deleteProduct, listProducts, mediaUrl } from "@/lib/api";
+import { formatMetric } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { Box, Plus, ArrowRight } from "@/components/icons";
 
@@ -12,6 +13,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", description: "", aliases: "" });
 
   function load() { listProducts().then(setProducts).catch((e) => setError(e.message)); }
@@ -29,10 +31,26 @@ export default function ProductsPage() {
     } catch (e: any) { setError(e.message); }
   }
 
+  async function removeProduct(e: React.MouseEvent, productId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const ok = window.confirm("Delete this product and all its videos, documents, and data? This cannot be undone.");
+    if (!ok) return;
+    setDeletingId(productId);
+    setError("");
+    try {
+      await deleteProduct(productId);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <AppShell title="Products" wide>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-light">Your catalog — each product carries its own videos, knowledge base, hashtags and narratives.</p>
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
         <button className="btn-accent" onClick={() => setOpen(!open)}><Plus className="h-4 w-4" /> New product</button>
       </div>
 
@@ -79,11 +97,19 @@ export default function ProductsPage() {
                 )}
                 {/* dark gradient for legibility */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <button
+                  type="button"
+                  className="absolute left-3 top-3 z-10 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-bad backdrop-blur transition hover:bg-black/60"
+                  onClick={(e) => removeProduct(e, p.id)}
+                  disabled={deletingId === p.id}
+                >
+                  {deletingId === p.id ? "Deleting…" : "Delete"}
+                </button>
                 {/* trust badge */}
                 {p.trust_score != null && (
                   <span className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white backdrop-blur"
                     style={{ background: C(p.trust_score) + "cc" }}>
-                    {p.trust_score}
+                    {formatMetric(p.trust_score)}
                   </span>
                 )}
                 {/* meta */}
@@ -98,23 +124,14 @@ export default function ProductsPage() {
               </Link>
             );
           })}
-          {/* add tile */}
-          <button onClick={() => setOpen(true)}
-            className="col-span-2 flex flex-col items-center justify-center gap-2 rounded-[20px] border border-dashed border-line text-ink-light transition hover:bg-hover lg:col-span-1">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface"><Plus className="h-5 w-5" /></span>
-            <span className="text-sm font-semibold">Add product</span>
-          </button>
         </div>
       ) : (
         !open && (
-          <button onClick={() => setOpen(true)}
-            className="glass-board flex h-[44vh] w-full flex-col items-center justify-center gap-3 text-center">
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-[90px]" />
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white"><Box className="h-6 w-6" /></span>
-            <span className="text-sm font-semibold text-white/80">No products yet</span>
-            <span className="max-w-xs text-xs text-white/40">Create a product to organize its videos and upload spec sheets & policies.</span>
-            <span className="btn-accent mt-2"><Plus className="h-4 w-4" /> Add your first product</span>
-          </button>
+          <div className="glass-board flex h-[44vh] w-full flex-col items-center justify-center gap-2 text-center">
+            <Box className="h-8 w-8 text-white/30" />
+            <p className="text-sm font-semibold text-white/80">No products yet</p>
+            <p className="max-w-xs text-xs text-white/40">Use <span className="font-semibold text-white/60">New product</span> above to create your first one.</p>
+          </div>
         )
       )}
     </AppShell>

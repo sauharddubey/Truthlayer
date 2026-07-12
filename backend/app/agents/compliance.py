@@ -30,21 +30,7 @@ _SCHEMA = """{
 
 def run(ctx: AgentContext) -> dict:
     # Pull the most relevant policy/rule chunks for this transcript.
-    policy_context = []
-    if ctx.rag_retrieve:
-        queries = [
-            "advertising disclosure requirements",
-            "restricted terminology and prohibited claims",
-            "brand guidelines and tone",
-            ctx.transcript_text[:300],
-        ]
-        seen = set()
-        for q in queries:
-            for r in ctx.rag_retrieve(q, 3):
-                key = (r["document_id"], r["chunk_index"])
-                if key not in seen:
-                    seen.add(key)
-                    policy_context.append(r["content"])
+    policy_context = _retrieve_policy_excerpts(ctx)
 
     if not policy_context:
         # No org policies indexed → apply generic advertising-standards baseline.
@@ -103,3 +89,24 @@ def run(ctx: AgentContext) -> dict:
     result["evidence"] = [{"text": p[:300]} for p in policy_context[:3]]
     result.setdefault("confidence", 0.6)
     return result
+
+
+def _retrieve_policy_excerpts(ctx: AgentContext) -> list[str]:
+    retrieve_fn = ctx.rag_retrieve_marketing_policies or ctx.rag_retrieve
+    if not retrieve_fn:
+        return []
+    queries = [
+        "advertising disclosure requirements",
+        "restricted terminology and prohibited claims",
+        "brand guidelines and tone",
+        ctx.transcript_text[:300],
+    ]
+    seen: set[tuple] = set()
+    excerpts: list[str] = []
+    for q in queries:
+        for r in retrieve_fn(q, 3):
+            key = (r.get("document_id"), r.get("chunk_index"))
+            if key not in seen:
+                seen.add(key)
+                excerpts.append(r["content"])
+    return excerpts

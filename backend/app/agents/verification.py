@@ -29,21 +29,32 @@ def verify_claims(ctx: AgentContext, claims: List[dict]) -> List[dict]:
     if not claims:
         return []
 
-    # Pull the most relevant product knowledge for the whole transcript + claims.
-    excerpts: List[str] = []
-    if ctx.rag_retrieve:
-        queries = [ctx.transcript_text[:300]] + [c.get("claim_text", "") for c in claims[:6]]
-        seen = set()
-        for q in queries:
-            if not q:
-                continue
-            for r in ctx.rag_retrieve(q, 3):
-                key = (r.get("document_id"), r.get("chunk_index"))
-                if key not in seen:
-                    seen.add(key)
-                    excerpts.append(r["content"])
+    details_excerpts = _retrieve_excerpts(
+        ctx.rag_retrieve_product_details,
+        [ctx.transcript_text[:300]] + [c.get("claim_text", "") for c in claims[:6]],
+    )
+    policy_excerpts = _retrieve_excerpts(
+        ctx.rag_retrieve_marketing_policies,
+        [
+            "approved marketing claims and restrictions",
+            "disclosure and advertising policy",
+            ctx.transcript_text[:300],
+        ],
+    )
+    if not details_excerpts and not policy_excerpts and ctx.rag_retrieve:
+        details_excerpts = _retrieve_excerpts(
+            ctx.rag_retrieve,
+            [ctx.transcript_text[:300]] + [c.get("claim_text", "") for c in claims[:6]],
+        )
 
-    knowledge = (ctx.product_description or "") + "\n\n" + "\n---\n".join(excerpts[:8])
+    knowledge_parts = []
+    if ctx.product_description:
+        knowledge_parts.append(f"PRODUCT SUMMARY:\n{ctx.product_description}")
+    if details_excerpts:
+        knowledge_parts.append("PRODUCT DETAILS:\n" + "\n---\n".join(details_excerpts[:6]))
+    if policy_excerpts:
+        knowledge_parts.append("MARKETING POLICIES:\n" + "\n---\n".join(policy_excerpts[:4]))
+    knowledge = "\n\n".join(knowledge_parts)
     indexed = "\n".join(f"[{i}] {c.get('claim_text','')}" for i, c in enumerate(claims))
 
     result = chat_json(
@@ -75,3 +86,19 @@ def verify_claims(ctx: AgentContext, claims: List[dict]) -> List[dict]:
             }
         )
     return out
+
+
+def _retrieve_excerpts(retrieve_fn, queries: List[str], per_query: int = 3) -> List[str]:
+    if not retrieve_fn:
+        return []
+    seen: set[tuple] = set()
+    excerpts: List[str] = []
+    for q in queries:
+        if not q:
+            continue
+        for r in retrieve_fn(q, per_query):
+            key = (r.get("document_id"), r.get("chunk_index"))
+            if key not in seen:
+                seen.add(key)
+                excerpts.append(r["content"])
+    return excerpts

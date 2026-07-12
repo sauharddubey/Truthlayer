@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { deleteVideo } from "@/lib/api";
+import { formatMetric, formatMetricPercent, formatUnitPercent, metricValue } from "@/lib/formatMetric";
 import { ArrowRight, FileSearch } from "@/components/icons";
 
 type Video = {
@@ -23,7 +24,7 @@ const C = (t?: number | null, invert = false) => {
 };
 
 function Ring({ value, size = 56 }: { value?: number | null; size?: number }) {
-  const v = value ?? 0, r = size / 2 - 5, circ = 2 * Math.PI * r, col = C(value);
+  const v = metricValue(value) ?? 0, r = size / 2 - 5, circ = 2 * Math.PI * r, col = C(value);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ width: size, height: size }}>
@@ -32,19 +33,19 @@ function Ring({ value, size = 56 }: { value?: number | null; size?: number }) {
           strokeDasharray={circ} strokeDashoffset={circ * (1 - v / 100)} />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center font-heavy text-sm text-white">
-        {value == null ? "·" : Math.round(value)}
+        {value == null ? "·" : formatMetric(value)}
       </div>
     </div>
   );
 }
 
 function Bar({ label, value, invert = false }: { label: string; value?: number | null; invert?: boolean }) {
-  const n = value == null ? null : Math.round(value);
+  const n = metricValue(value);
   return (
     <div>
       <div className="mb-0.5 flex justify-between text-[8.5px] font-bold">
         <span className="uppercase tracking-wider text-white/40">{label}</span>
-        <span style={{ color: C(n, invert) }}>{n ?? "—"}</span>
+        <span style={{ color: C(n, invert) }}>{n == null ? "—" : formatMetric(n)}</span>
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-white/8">
         <div className="h-full rounded-full" style={{ width: `${n ?? 0}%`, background: C(n, invert) }} />
@@ -156,7 +157,7 @@ export function VideoBoard({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="uppercase tracking-wider text-white/40">Evidence</span>
-                    <span>{v.evidence_coverage_pct != null ? `${Math.round(v.evidence_coverage_pct)}%` : "n/a"}</span>
+                    <span>{v.evidence_coverage_pct != null ? formatMetricPercent(v.evidence_coverage_pct) : "n/a"}</span>
                   </div>
                 </div>
               ) : (

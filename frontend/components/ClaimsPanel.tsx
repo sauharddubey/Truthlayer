@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatMetricPercent, formatUnitPercent } from "@/lib/formatMetric";
 
 const verdictStyle: Record<string, string> = {
   supported: "bg-good/10 text-good",
@@ -116,8 +117,8 @@ export function ClaimsPanel({
                 </div>
                 <div className="mt-1 text-xs text-ink-faint">
                   {c.claim_type}
-                  {c.confidence != null && ` · ${Math.round(c.confidence * 100)}% conf`}
-                  {c.evidence_quality_score != null && ` · evidence ${Math.round(c.evidence_quality_score)}%`}
+                  {c.confidence != null && ` · ${formatUnitPercent(c.confidence)} conf`}
+                  {c.evidence_quality_score != null && ` · evidence ${formatMetricPercent(c.evidence_quality_score)}`}
                   {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
                 </div>
                 {c.insufficient_evidence_reasons?.length > 0 && (

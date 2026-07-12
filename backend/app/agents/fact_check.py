@@ -82,7 +82,29 @@ def run(ctx: AgentContext) -> dict:
                 "query": rewritten_query,
             }
             claim_evidence_index[claim_key].append(item)
-        if ctx.rag_retrieve:
+        if ctx.rag_retrieve_product_details:
+            for r in ctx.rag_retrieve_product_details(text, 3):
+                item = {
+                    "for_claim": text,
+                    "text": r["content"],
+                    "source": "product_details",
+                    "url": "",
+                    "source_type": "rag",
+                    "query": rewritten_query,
+                }
+                claim_evidence_index[claim_key].append(item)
+        if ctx.rag_retrieve_marketing_policies:
+            for r in ctx.rag_retrieve_marketing_policies(text, 2):
+                item = {
+                    "for_claim": text,
+                    "text": r["content"],
+                    "source": "marketing_policy",
+                    "url": "",
+                    "source_type": "rag",
+                    "query": rewritten_query,
+                }
+                claim_evidence_index[claim_key].append(item)
+        if ctx.rag_retrieve and not ctx.rag_retrieve_product_details:
             for r in ctx.rag_retrieve(text, 3):
                 item = {
                     "for_claim": text,

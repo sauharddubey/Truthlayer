@@ -1,12 +1,14 @@
 "use client";
 
+import { formatUnitPercent } from "@/lib/formatMetric";
+
 export function EvidencePanel({ title, agent }: { title: string; agent: any }) {
-  const confidence = agent.confidence != null ? Math.round(agent.confidence * 100) : null;
+  const confidence = agent.confidence != null ? formatUnitPercent(agent.confidence) : null;
   return (
     <div className="card">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-base font-semibold">{title}</div>
-        {confidence != null && <span className="chip">{confidence}% conf</span>}
+        {confidence != null && <span className="chip">{confidence} conf</span>}
       </div>
       {agent.reasoning && <p className="text-sm leading-relaxed text-ink-light">{agent.reasoning}</p>}
 
@@ -44,8 +46,8 @@ export function EvidencePanel({ title, agent }: { title: string; agent: any }) {
       )}
       {agent.deepfake && (
         <div className="mt-2 rounded-md bg-surface p-2.5 text-sm text-ink-light">
-          Deepfake probability <b className="text-ink">{Math.round(agent.deepfake.probability_score * 100)}%</b> ·
-          authenticity <b className="text-ink">{Math.round(agent.deepfake.authenticity_score * 100)}%</b>
+          Deepfake probability <b className="text-ink">{formatUnitPercent(agent.deepfake.probability_score)}</b> ·
+          authenticity <b className="text-ink">{formatUnitPercent(agent.deepfake.authenticity_score)}</b>
         </div>
       )}
     </div>

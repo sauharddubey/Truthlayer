@@ -12,13 +12,37 @@ def _as_float(v):
         return None
 
 
-def compute_tier_trust_score(fact: dict, bias_r: dict, mi: dict) -> Optional[float]:
+def compute_tier_trust_score(
+    fact: dict,
+    bias_r: dict,
+    mi: dict,
+    *,
+    tier: str = "business",
+) -> Optional[float]:
     """Return nullable trust for non-verifier tiers based on claim verdicts."""
     claims = fact.get("claims", []) or []
     if not claims:
         return None
-    weights = {"supported": 1.0, "unverified": 0.5, "misleading": 0.15, "contradicted": 0.0}
-    base = sum(weights.get(c.get("verdict", "unverified"), 0.5) for c in claims) / len(claims)
+
+    verdict_weights = {"supported": 1.0, "unverified": 0.5, "misleading": 0.15, "contradicted": 0.0}
+    verification_weights = {
+        "auto_verified": 1.0,
+        "approved": 1.0,
+        "needs_review": 0.55,
+        "contradicted": 0.0,
+        "rejected": 0.0,
+    }
+
+    total = 0.0
+    for c in claims:
+        vs = c.get("verification_status")
+        if tier == "business" and vs in verification_weights:
+            total += verification_weights[vs]
+        elif vs == "not_applicable":
+            total += verdict_weights.get(c.get("verdict", "unverified"), 0.5)
+        else:
+            total += verdict_weights.get(c.get("verdict", "unverified"), 0.5)
+    base = total / len(claims)
     bias_penalty = (_as_float(bias_r.get("bias_score")) or 0.0) / 100 * 0.3
     authenticity = _as_float((mi.get("deepfake") or {}).get("authenticity_score")) or 1.0
     score = (base - bias_penalty) * authenticity

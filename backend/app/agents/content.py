@@ -20,6 +20,13 @@ from app.llm import chat_json
 
 NAME = "content"
 
+_ALLOWED_LABELS = {"safe", "verify", "risky"}
+
+
+def _normalize_label(raw: object) -> str:
+    label = str(raw or "safe").lower().strip()
+    return label if label in _ALLOWED_LABELS else "safe"
+
 _SCHEMA = """{
   "content_type": "product|informational|opinion|news|entertainment|tutorial|other",
   "is_about_product": false,
@@ -84,7 +91,7 @@ def run(ctx: AgentContext) -> dict:
                 "start": s.get("start"),
                 "end": s.get("end"),
                 "text": s.get("text", ""),
-                "label": lab.get("label", "safe"),
+                "label": _normalize_label(lab.get("label", "safe")),
                 "category": lab.get("category", "other"),
                 "reason": lab.get("reason", ""),
             }

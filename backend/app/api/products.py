@@ -8,7 +8,7 @@ cross-transcript contradiction detection.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.agents.narrative import cluster_narratives
@@ -17,20 +17,24 @@ from app.llm import chat_json
 from app.models import (
     BusinessDocument,
     Claim,
+    DocumentChunk,
     MonitoredKeyword,
+    NarrativeCluster,
     Product,
     ProcessingStatus,
     User,
     UserRole,
     Video,
 )
-from app.rag.store import ingest_document
+from app.rag.store import ALLOWED_DOCUMENT_TYPES, ALLOWED_EXTENSIONS, ingest_document
+from app.services.product_cleanup import delete_product_and_related
 from app.schemas import (
     ClaimReviewRequest,
     DocumentOut,
     KeywordRequest,
     ProductCreate,
     ProductOut,
+    ProductUpdate,
     VideoOut,
 )
 from app.security import require_roles
@@ -141,11 +145,39 @@ def get_product(pid: str, db: Session = Depends(get_db), user: User = Depends(bu
     return _product_out(db, _get_product(db, pid, user))
 
 
+@router.put("/{pid}", response_model=ProductOut)
+def update_product(
+    pid: str,
+    payload: ProductUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    p = _get_product(db, pid, user)
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Product name is required")
+    p.name = name
+    p.description = (payload.description or "").strip() or None
+    db.commit()
+    db.refresh(p)
+
+    try:
+        from redis import Redis
+        from app.config import settings
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.delete(f"brand_synthesis:{p.organization_id}")
+    except Exception:
+        pass
+
+    return _product_out(db, p)
+
+
 @router.delete("/{pid}")
 def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     p = _get_product(db, pid, user)
     org_id = p.organization_id
-    db.delete(p)
+    delete_product_and_related(db, p)
     db.commit()
 
     # Invalidate cache
@@ -155,6 +187,7 @@ def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends
         if settings.REDIS_URL:
             r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
             r.delete(f"brand_synthesis:{org_id}")
+            r.delete(f"product_contradictions:{pid}")
     except Exception:
         pass
 
@@ -173,15 +206,41 @@ async def upload_document(
     user: User = Depends(business_only),
 ):
     _get_product(db, pid, user)
+    if document_type not in ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"document_type must be one of: {', '.join(sorted(ALLOWED_DOCUMENT_TYPES))}",
+        )
+    filename = file.filename or "document"
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
     raw = await file.read()
-    return ingest_document(
-        db,
-        organization_id=_org(user),
-        product_id=pid,
-        filename=file.filename or "document",
-        document_type=document_type,
-        raw=raw,
-    )
+    from app.crypto import decrypt_secret
+    from app.llm import set_runtime_api_key, set_runtime_user_id
+
+    user_key = decrypt_secret(user.openrouter_api_key)
+    if not user_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure your OpenRouter API key in Settings to index documents.",
+        )
+    set_runtime_api_key(user_key)
+    set_runtime_user_id(user.id)
+    try:
+        return ingest_document(
+            db,
+            organization_id=_org(user),
+            product_id=pid,
+            filename=filename,
+            document_type=document_type,
+            raw=raw,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{pid}/documents", response_model=list[DocumentOut])
@@ -191,8 +250,29 @@ def list_documents(pid: str, db: Session = Depends(get_db), user: User = Depends
         select(BusinessDocument).where(
             BusinessDocument.product_id == pid,
             BusinessDocument.organization_id == _org(user),
-        )
+        ).order_by(BusinessDocument.created_at.desc())
     ).scalars().all()
+
+
+@router.delete("/{pid}/documents/{doc_id}")
+def delete_document(
+    pid: str,
+    doc_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    _get_product(db, pid, user)
+    doc = db.get(BusinessDocument, doc_id)
+    if (
+        not doc
+        or doc.organization_id != _org(user)
+        or doc.product_id != pid
+    ):
+        raise HTTPException(status_code=404, detail="Document not found")
+    db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == doc_id))
+    db.delete(doc)
+    db.commit()
+    return {"deleted": doc_id}
 
 
 # ── Hashtag monitoring ────────────────────────────────────────────────────────
@@ -222,7 +302,37 @@ def list_keywords(pid: str, db: Session = Depends(get_db), user: User = Depends(
             MonitoredKeyword.organization_id == _org(user),
         )
     ).scalars().all()
-    return [{"id": k.id, "keyword": k.keyword, "keyword_type": k.keyword_type} for k in rows]
+    from app.services.hashtag_check import build_video_match_rows
+
+    vids = db.execute(
+        select(Video).where(Video.product_id == pid).order_by(Video.created_at.desc())
+    ).scalars().all()
+    return {
+        "keywords": [
+            {"id": k.id, "keyword": k.keyword, "keyword_type": k.keyword_type} for k in rows
+        ],
+        "video_matches": build_video_match_rows(vids),
+    }
+
+
+@router.delete("/{pid}/keywords/{kid}")
+def delete_keyword(
+    pid: str,
+    kid: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    _get_product(db, pid, user)
+    kw = db.get(MonitoredKeyword, kid)
+    if (
+        not kw
+        or kw.organization_id != _org(user)
+        or kw.product_id != pid
+    ):
+        raise HTTPException(status_code=404, detail="Keyword not found")
+    db.delete(kw)
+    db.commit()
+    return {"deleted": kid}
 
 
 # ── Videos & overview ─────────────────────────────────────────────────────────
@@ -275,6 +385,10 @@ def product_overview(pid: str, db: Session = Depends(get_db), user: User = Depen
         "sentiment_score": avg("sentiment_score"),
         "compliance_score": avg("compliance_score"),
         "risk_score": avg("risk_score"),
+        "knowledge_base": {
+            "product_details": sum(1 for d in p.documents if d.document_type == "product_details" and d.status == "indexed"),
+            "marketing_policy": sum(1 for d in p.documents if d.document_type == "marketing_policy" and d.status == "indexed"),
+        },
         "claims_needing_review": [
             {"id": c.id, "video_id": c.video_id, "claim_text": c.claim_text, "note": c.verification_note}
             for c in needs_review
@@ -282,40 +396,60 @@ def product_overview(pid: str, db: Session = Depends(get_db), user: User = Depen
     }
 
 
-@router.post("/{pid}/narratives/recompute")
-def recompute_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    _get_product(db, pid, user)
-    clusters = cluster_narratives(db, _org(user), product_id=pid)
+def _narrative_cards(clusters) -> list[dict]:
     return [
         {
-            "id": c.id, "topic": c.topic, "summary": c.summary,
-            "risk_score": c.risk_score, "propagation_risk": c.propagation_risk,
+            "id": c.id,
+            "topic": c.topic,
+            "summary": c.summary,
+            "risk_score": c.risk_score,
+            "propagation_risk": c.propagation_risk,
             "video_count": len(c.video_ids),
         }
         for c in clusters
     ]
 
 
-@router.get("/{pid}/contradictions")
-def contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
-    """Cross-transcript reference: find claims that contradict across this
-    product's videos."""
+@router.get("/{pid}/narratives")
+def list_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     _get_product(db, pid, user)
+    clusters = db.execute(
+        select(NarrativeCluster)
+        .where(
+            NarrativeCluster.organization_id == _org(user),
+            NarrativeCluster.product_id == pid,
+        )
+        .order_by(NarrativeCluster.risk_score.desc())
+    ).scalars().all()
+    return _narrative_cards(clusters)
+
+
+@router.post("/{pid}/narratives/recompute")
+def recompute_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    _get_product(db, pid, user)
+    clusters = cluster_narratives(db, _org(user), product_id=pid)
+    return _narrative_cards(clusters)
+
+
+def _compute_contradictions(db: Session, pid: str, user: User) -> dict:
+    """Cross-transcript reference: find claims that contradict across this product's videos."""
     rows = db.execute(
         select(Claim.claim_text, Claim.video_id, Video.title)
         .join(Video, Video.id == Claim.video_id)
         .where(Video.product_id == pid)
     ).all()
     if len(rows) < 2:
-        return {"contradictions": []}
+        return {"contradictions": [], "generated_at": None, "claim_count": len(rows)}
 
-    # Use the requesting user's own key — never the platform key.
     from app.crypto import decrypt_secret
     from app.llm import set_runtime_api_key, set_runtime_user_id
 
     user_key = decrypt_secret(user.openrouter_api_key)
     if not user_key:
-        return {"contradictions": []}
+        raise HTTPException(
+            status_code=400,
+            detail="Configure your OpenRouter API key in Settings to generate contradiction reports.",
+        )
     set_runtime_api_key(user_key)
     set_runtime_user_id(user.id)
 
@@ -331,7 +465,49 @@ def contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends
         user=f"Claims:\n{listing}",
         schema_hint='{"contradictions":[{"claim_a":"string","claim_b":"string","explanation":"string"}]}',
     )
-    return {"contradictions": result.get("contradictions", [])}
+    from datetime import datetime, timezone
+
+    return {
+        "contradictions": result.get("contradictions", []) if result else [],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "claim_count": len(rows),
+    }
+
+
+@router.get("/{pid}/contradictions")
+def get_contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    """Return the last generated contradiction report if cached, else an empty shell."""
+    _get_product(db, pid, user)
+    try:
+        import json
+        from redis import Redis
+        from app.config import settings
+
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            cached = r.get(f"product_contradictions:{pid}")
+            if cached:
+                return json.loads(cached)
+    except Exception:
+        pass
+    return {"contradictions": [], "generated_at": None, "claim_count": 0}
+
+
+@router.post("/{pid}/contradictions/recompute")
+def recompute_contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+    _get_product(db, pid, user)
+    report = _compute_contradictions(db, pid, user)
+    try:
+        import json
+        from redis import Redis
+        from app.config import settings
+
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.set(f"product_contradictions:{pid}", json.dumps(report), ex=60 * 60 * 24 * 30)
+    except Exception:
+        pass
+    return report
 
 
 # ── Claim review (brand approves/rejects needs_review claims) ────────────────

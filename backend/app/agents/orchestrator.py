@@ -38,7 +38,7 @@ from app.models import (
     DeepfakeResult,
     Video,
 )
-from app.rag.store import retrieve
+from app.rag.store import MARKETING_POLICY, PRODUCT_DETAILS, retrieve
 from app.rights import agents_for_tier
 from app.services.trust_scoring import compute_tier_trust_score, summarize_skipped_claims
 
@@ -89,6 +89,22 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
             k=k,
             product_id=video.product_id,
         ),
+        rag_retrieve_product_details=lambda q, k=5: retrieve(
+            db,
+            organization_id=video.organization_id,
+            query=q,
+            k=k,
+            product_id=video.product_id,
+            document_types=[PRODUCT_DETAILS],
+        ) if video.product_id else None,
+        rag_retrieve_marketing_policies=lambda q, k=5: retrieve(
+            db,
+            organization_id=video.organization_id,
+            query=q,
+            k=k,
+            product_id=video.product_id,
+            document_types=[MARKETING_POLICY],
+        ) if video.product_id else None,
     )
 
     # 1) Content classification + segment labelling runs first.
@@ -105,6 +121,10 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
     #    worker threads.
     agent_names = agents_for_tier(tier)
     results: Dict[str, dict] = {"content": content_result}
+    if tier == "business" and video.organization_id:
+        from app.services.hashtag_check import check_video_hashtags
+
+        results["hashtag_check"] = check_video_hashtags(db, video)
     if transcript and transcript.ocr_text:
         results["ocr"] = {
             "ocr_text": transcript.ocr_text,
@@ -125,7 +145,23 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
                 logger.exception("Agent %s failed: %s", name, exc)
                 results[name] = {"error": str(exc), "confidence": 0.0}
 
-    # 3) Business: verify each claim against the product's details + policies.
+    # Merge deterministic hashtag compliance issues after the compliance agent runs.
+    if results.get("hashtag_check"):
+        from app.services.hashtag_check import compliance_issues_for_missing, get_description_text
+
+        hashtag_result = results["hashtag_check"]
+        if hashtag_result.get("description_available"):
+            description_text, _ = get_description_text(video)
+            missing_issues = compliance_issues_for_missing(
+                hashtag_result.get("missing", []),
+                description_text,
+            )
+            if missing_issues:
+                compliance = results.setdefault("compliance", {"issues": [], "confidence": 1.0})
+                compliance.setdefault("issues", [])
+                compliance["issues"].extend(missing_issues)
+
+    # 4) Business: verify each claim against the product's details + policies.
     if tier == "business" and results.get("fact_check", {}).get("claims"):
         verified = verification.verify_claims(ctx, results["fact_check"]["claims"])
         results["fact_check"]["claims"] = verified
@@ -233,7 +269,7 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         compliance_score = None
         authenticity_pct = None
     else:
-        trust = compute_tier_trust_score(fact, bias_r, mi)
+        trust = compute_tier_trust_score(fact, bias_r, mi, tier=tier)
         authenticity_val = authenticity if authenticity is not None else 1.0
         authenticity_pct = authenticity_val * 100
         # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm

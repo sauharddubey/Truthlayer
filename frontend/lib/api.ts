@@ -198,6 +198,16 @@ export function createProduct(p: { name: string; description?: string; aliases?:
 export function getProduct(id: string) {
   return request<any>(`/products/${id}`);
 }
+export function updateProduct(id: string, p: { name: string; description?: string }) {
+  return request<any>(`/products/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(p),
+  });
+}
+export function deleteProduct(id: string) {
+  return request<any>(`/products/${id}`, { method: "DELETE" });
+}
 export function productOverview(id: string) {
   return request<any>(`/products/${id}/overview`);
 }
@@ -213,6 +223,9 @@ export async function uploadProductDocument(id: string, file: File, documentType
   fd.append("document_type", documentType);
   return request<any>(`/products/${id}/documents`, { method: "POST", body: fd });
 }
+export function deleteProductDocument(productId: string, documentId: string) {
+  return request<any>(`/products/${productId}/documents/${documentId}`, { method: "DELETE" });
+}
 export function addProductKeyword(id: string, keyword: string) {
   return request<any>(`/products/${id}/keywords`, {
     method: "POST",
@@ -221,13 +234,22 @@ export function addProductKeyword(id: string, keyword: string) {
   });
 }
 export function productKeywords(id: string) {
-  return request<any[]>(`/products/${id}/keywords`);
+  return request<{ keywords: any[]; video_matches: any[] }>(`/products/${id}/keywords`);
+}
+export function deleteProductKeyword(productId: string, keywordId: string) {
+  return request<any>(`/products/${productId}/keywords/${keywordId}`, { method: "DELETE" });
+}
+export function productNarratives(id: string) {
+  return request<any[]>(`/products/${id}/narratives`);
+}
+export function recomputeProductNarratives(id: string) {
+  return request<any[]>(`/products/${id}/narratives/recompute`, { method: "POST" });
 }
 export function productContradictions(id: string) {
   return request<any>(`/products/${id}/contradictions`);
 }
-export function recomputeProductNarratives(id: string) {
-  return request<any>(`/products/${id}/narratives/recompute`, { method: "POST" });
+export function recomputeProductContradictions(id: string) {
+  return request<any>(`/products/${id}/contradictions/recompute`, { method: "POST" });
 }
 export function reviewClaim(claimId: string, status: "approved" | "rejected") {
   return request<any>(`/products/claims/${claimId}/review`, {
@@ -248,6 +270,9 @@ export function addBrandKeyword(keyword: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ keyword, keyword_type: "brand" }),
   });
+}
+export function deleteBrandKeyword(keywordId: string) {
+  return request<any>(`/dashboard/brand/keywords/${keywordId}`, { method: "DELETE" });
 }
 
 // ── Videos / analysis ───────────────────────────────────────────────────────
