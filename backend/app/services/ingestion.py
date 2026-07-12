@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,9 @@ from typing import Optional
 from app.config import settings
 
 logger = logging.getLogger("truthlayer.ingestion")
+
+# Hive V3 URL/base64 video inputs are limited to 180 seconds.
+HIVE_MAX_VIDEO_SECONDS = 180
 
 SUPPORTED_PLATFORMS = {
     "youtube.com": "youtube",
@@ -63,13 +67,106 @@ def _hash_file(path: str) -> Optional[str]:
         return None
 
 
-def ingest_url(url: str) -> IngestResult:
-    """Download audio + metadata from a public video URL."""
+def _normalize_video_for_hive(input_path: str, out_dir: Path, vid_id: str) -> Optional[str]:
+    """Transcode to a Hive-friendly MP4 (H.264/AAC, max 720p, faststart)."""
+    output_path = str(out_dir / f"{vid_id}_hive.mp4")
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        input_path,
+        "-t",
+        str(HIVE_MAX_VIDEO_SECONDS),
+        "-vf",
+        "scale='min(1280,iw)':-2",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        output_path,
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.warning(
+                "ffmpeg Hive normalization failed for %s: %s",
+                input_path,
+                (result.stderr or result.stdout or "")[:500],
+            )
+            return None
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return output_path
+    except Exception as exc:
+        logger.warning("ffmpeg Hive normalization failed for %s: %s", input_path, exc)
+    return None
+
+
+def _download_url_video(url: str, out_dir: Path, vid_id: str) -> Optional[str]:
+    """Download a compact mp4 for deepfake analysis (business tier)."""
+    raw_path: Optional[str] = None
+    try:
+        import yt_dlp
+
+        video_path = str(out_dir / f"{vid_id}_video.mp4")
+        ydl_opts = {
+            "format": "best[height<=720][ext=mp4]/best[ext=mp4]/best",
+            "outtmpl": str(out_dir / f"{vid_id}_video.%(ext)s"),
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info(url, download=True)
+        if os.path.exists(video_path):
+            raw_path = video_path
+        else:
+            # yt-dlp may use a different container extension.
+            for candidate in out_dir.glob(f"{vid_id}_video.*"):
+                if candidate.is_file():
+                    raw_path = str(candidate)
+                    break
+    except Exception as exc:
+        logger.warning("yt-dlp video download failed for %s: %s", url, exc)
+        return None
+
+    if not raw_path:
+        return None
+
+    normalized = _normalize_video_for_hive(raw_path, out_dir, vid_id)
+    if normalized:
+        return normalized
+
+    logger.warning(
+        "Using raw downloaded video for Hive analysis after normalization failed: %s",
+        raw_path,
+    )
+    return raw_path
+
+
+def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
+    """Download audio + metadata from a public video URL.
+
+    When ``include_video`` is True (business tier), also persist a local mp4
+    for media-integrity / deepfake analysis.
+    """
     platform = detect_platform(url)
     out_dir = _storage_dir()
     audio_path: Optional[str] = None
     video_path: Optional[str] = None
     meta: dict = {}
+    vid_id: Optional[str] = None
 
     try:
         import yt_dlp  # imported lazily so the module loads without the binary
@@ -114,6 +211,10 @@ def ingest_url(url: str) -> IngestResult:
                 "upload_date": info.get("upload_date"),
                 "description": info.get("description"),
             }
+        if include_video and vid_id:
+            video_path = _download_url_video(url, out_dir, vid_id)
+            if video_path:
+                meta["video_path"] = video_path
     except Exception as exc:
         logger.warning("yt-dlp ingestion failed for %s: %s", url, exc)
         meta = {"title": f"Video from {platform}", "ingest_error": str(exc)}
@@ -133,15 +234,15 @@ def ingest_url(url: str) -> IngestResult:
 
 def ingest_upload(file_path: str, platform: str = "upload") -> IngestResult:
     """Wrap an already-saved uploaded media file as an IngestResult."""
-    # Check if the uploaded file has a video extension
+    exists = os.path.exists(file_path)
     ext = os.path.splitext(file_path)[1].lower()
     is_video = ext in {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"}
-    video_path = file_path if is_video and os.path.exists(file_path) else None
-
+    video_path = file_path if is_video and exists else None
     return IngestResult(
-        audio_path=file_path if os.path.exists(file_path) else None,
+        audio_path=file_path if exists else None,
         platform=platform,
         video_path=video_path,
         title=Path(file_path).stem,
-        content_hash=_hash_file(file_path),
+        content_hash=_hash_file(file_path) if exists else None,
+        metadata={"video_path": file_path, "upload_path": file_path} if exists else {},
     )

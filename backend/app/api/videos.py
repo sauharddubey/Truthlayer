@@ -13,6 +13,7 @@ from app.models import AnalysisMode, Claim, ProcessingStatus, User, UserRole, Vi
 from app.rights import rights_for_role, tier_for_role
 from app.schemas import AnalysisOut, AnalysisStartRequest, VideoOut, VideoUrlRequest
 from app.security import get_current_user
+from app.services.video_cleanup import cleanup_video_media, is_video_submitter
 from app.tasks.pipeline import dispatch
 
 router = APIRouter(tags=["videos"])
@@ -147,6 +148,18 @@ def upload_video(
 def get_video(video_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     video = _get_scoped(db, video_id, user)
     return video
+
+
+@router.delete("/videos/{video_id}")
+def delete_video(video_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    video = _get_scoped(db, video_id, user)
+    if not is_video_submitter(video.submitted_by, user.id):
+        raise HTTPException(status_code=403, detail="Only the submitting user can delete this video")
+
+    cleanup_video_media(video.extra_metadata)
+    db.delete(video)
+    db.commit()
+    return {"deleted": video_id}
 
 
 @router.post("/analysis/start", response_model=VideoOut)

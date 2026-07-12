@@ -109,8 +109,12 @@ def process_video(video_id: str) -> None:
             video.processing_status = ProcessingStatus.INGESTING
             db.commit()
 
+            tier = (video.extra_metadata or {}).get("tier", "verifier")
             if video.source_url:
-                ing = ingestion.ingest_url(video.source_url)
+                ing = ingestion.ingest_url(
+                    video.source_url,
+                    include_video=(tier == "business"),
+                )
             elif video.extra_metadata.get("upload_path"):
                 ing = ingestion.ingest_upload(video.extra_metadata["upload_path"])
             else:
@@ -133,6 +137,12 @@ def process_video(video_id: str) -> None:
                 fallback_text=video.captions or "",
                 duration=ing.duration_seconds or video.duration_seconds,
             )
+            video.extra_metadata = {
+                **(video.extra_metadata or {}),
+                "transcription_provider": transcription.settings.TRANSCRIPTION_PROVIDER.lower(),
+                "transcription_stub": transcription.settings.TRANSCRIPTION_PROVIDER.lower() == "stub",
+            }
+            db.commit()
 
             # Run OCR on the video if video path is available
             ocr_result = None

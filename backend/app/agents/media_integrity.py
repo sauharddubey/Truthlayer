@@ -1,11 +1,10 @@
 """Media Integrity: Deepfake, Celebrity & Manipulation detection.
 
-Covers FR-CELEB-*, FR-DEEP-*, FR-VM-*. Real face-recognition (DeepFace/InsightFace)
-and deepfake (FaceForensics++/XceptionNet) models require GPU and are not free-tier
-friendly, so this agent delegates to an external inference endpoint when
-``MEDIA_INTEGRITY_URL`` is configured, and otherwise returns transparent heuristic
-stub scores. The interface (inputs/outputs) is stable so the GPU service can be
-swapped in without touching the pipeline.
+Covers FR-CELEB-*, FR-DEEP-*, FR-VM-*. Real face-recognition and deepfake models
+require GPU and are not free-tier friendly, so this agent delegates to an external
+provider (Hive v1) when configured, and otherwise returns transparent heuristic
+stub scores. The interface (inputs/outputs) is stable so providers can be swapped
+without touching the pipeline.
 """
 
 from __future__ import annotations
@@ -13,10 +12,11 @@ from __future__ import annotations
 import hashlib
 import logging
 
-import httpx
-
 from app.agents.base import AgentContext
 from app.config import settings
+from app.llm import effective_media_integrity_key
+from app.services.media_integrity.base import build_media_integrity_request, resolve_video_path
+from app.services.media_integrity.hive import analyze_with_hive
 
 logger = logging.getLogger("truthlayer.media_integrity")
 
@@ -24,35 +24,33 @@ NAME = "media_integrity"
 
 
 def run(ctx: AgentContext) -> dict:
-    if settings.MEDIA_INTEGRITY_URL:
-        external = _call_external(ctx)
+    if ctx.tier != "business":
+        return _stub(ctx, reason="business_tier_only")
+
+    provider = (settings.MEDIA_INTEGRITY_PROVIDER or "").strip().lower()
+    if provider == "hive":
+        external = analyze_with_hive(ctx)
         if external is not None:
             return external
-    return _stub(ctx)
+        return _stub(ctx, reason=_hive_fallback_reason(ctx))
+
+    return _stub(ctx, reason="provider_not_configured")
 
 
-def _call_external(ctx: AgentContext) -> dict | None:
-    try:
-        from app.llm import effective_media_integrity_key
-
-        headers = {}
-        mi_key = effective_media_integrity_key()  # per-user key; no env fallback
-        if mi_key:
-            headers["Authorization"] = f"Bearer {mi_key}"
-        resp = httpx.post(
-            settings.MEDIA_INTEGRITY_URL.rstrip("/") + "/analyze",
-            json={"video_id": ctx.video_id, "metadata": ctx.metadata},
-            headers=headers,
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:  # pragma: no cover
-        logger.warning("External media-integrity service failed, using stub: %s", exc)
-        return None
+def _hive_fallback_reason(ctx: AgentContext) -> str:
+    if not effective_media_integrity_key():
+        return "missing_hive_api_key"
+    if not resolve_video_path(ctx):
+        return "missing_video_file"
+    req = build_media_integrity_request(ctx)
+    if not req.media_url:
+        if not (settings.BACKEND_PUBLIC_URL or "").strip():
+            return "missing_backend_public_url"
+        return "unsigned_media_url_failed"
+    return "hive_request_failed"
 
 
-def _stub(ctx: AgentContext) -> dict:
+def _stub(ctx: AgentContext, *, reason: str = "") -> dict:
     """Deterministic placeholder so the pipeline + schema stay populated.
 
     Derives a stable pseudo-score from the video id so results are reproducible.
@@ -62,16 +60,25 @@ def _stub(ctx: AgentContext) -> dict:
     deepfake_prob = round((seed % 25) / 100.0, 3)  # low baseline 0.0–0.24
     authenticity = round(1.0 - deepfake_prob, 3)
 
+    notes = (
+        "Heuristic stub. Set MEDIA_INTEGRITY_PROVIDER=hive, BACKEND_PUBLIC_URL, "
+        "and add a Hive API token in Settings for real deepfake detection."
+    )
+    if reason:
+        notes = f"{notes} Fallback reason: {reason}."
+
     return {
         "method": "stub",
+        "provider": "stub",
+        "stub_reason": reason or None,
         "deepfake": {
             "probability_score": deepfake_prob,
             "authenticity_score": authenticity,
             "confidence": 0.3,
             "manipulation_evidence": [],
-            "notes": "Heuristic stub. Configure MEDIA_INTEGRITY_URL for real GPU inference.",
+            "notes": notes,
         },
-        "celebrities": [],  # populated by real face-recognition service
+        "celebrities": [],
         "manipulation": {
             "edited_audio": False,
             "synthetic_speech": False,
