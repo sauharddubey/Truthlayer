@@ -14,6 +14,20 @@ const STYLES: Record<string, { row: string; tag: string; label: string }> = {
   safe: { row: "border-l-2 border-line", tag: "bg-surface text-ink-faint", label: "Safe" },
 };
 
+type SegmentLabel = "safe" | "verify" | "risky";
+
+function normalizeLabel(raw?: string | null): SegmentLabel {
+  const label = (raw || "safe").toLowerCase().trim();
+  if (label === "verify" || label === "risky") return label;
+  return "safe";
+}
+
+function segmentText(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw;
+  return String(raw);
+}
+
 function fmt(t?: number) {
   if (t == null) return "0:00";
   const m = Math.floor(t / 60), s = Math.floor(t % 60);
@@ -23,13 +37,16 @@ function fmt(t?: number) {
 export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: any }) {
   const [filter, setFilter] = useState<"all" | "verify" | "risky">("all");
 
-  if (!segments?.length) return <div className="card text-sm text-ink-light">No segments available.</div>;
+  const rows = Array.isArray(segments) ? segments : [];
+  if (!rows.length) return <div className="card text-sm text-ink-light">No segments available.</div>;
 
-  const counts = segments.reduce((a: Record<string, number>, s: Segment) => {
-    const l = s.label || "safe"; a[l] = (a[l] || 0) + 1; return a;
-  }, {} as Record<string, number>);
+  const counts = rows.reduce((a: Record<SegmentLabel, number>, s: Segment) => {
+    const l = normalizeLabel(s.label);
+    a[l] = (a[l] || 0) + 1;
+    return a;
+  }, { safe: 0, verify: 0, risky: 0 });
 
-  const shown = segments.filter((s: Segment) => filter === "all" || (s.label || "safe") === filter);
+  const shown = rows.filter((s: Segment) => filter === "all" || normalizeLabel(s.label) === filter);
 
   return (
     <div className="card">
@@ -57,7 +74,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
             <span className="h-1.5 w-1.5 rounded-full" style={{
               backgroundColor: ocr.ocr_analysis.relationship_verdict === "unrelated" ? "#e03e3e" : ocr.ocr_analysis.relationship_verdict === "partially_related" ? "#cb912f" : "#0f7b6c"
             }} />
-            Speech Relationship: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+            Speech Relationship: {(ocr.ocr_analysis.relationship_verdict || "unknown").replace(/_/g, " ")}
           </div>
           <p className="text-ink-light leading-relaxed mt-0.5">{ocr.ocr_analysis.explanation}</p>
         </div>
@@ -71,17 +88,18 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
 
       <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
         {shown.map((s: Segment, i: number) => {
-          const st = STYLES[s.label || "safe"];
+          const label = normalizeLabel(s.label);
+          const st = STYLES[label];
           return (
             <div key={i} className={`rounded-r-md py-2 pl-3 pr-2 ${st.row}`}>
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 shrink-0 font-mono text-xs text-ink-faint">{fmt(s.start)}</span>
-                <p className="flex-1 text-sm text-ink">{s.text}</p>
-                {s.label && s.label !== "safe" && (
+                <p className="flex-1 text-sm text-ink">{segmentText(s.text)}</p>
+                {label !== "safe" && (
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${st.tag}`}>{st.label}</span>
                 )}
               </div>
-              {s.reason && s.label !== "safe" && (
+              {s.reason && label !== "safe" && (
                 <p className="mt-1 flex items-start gap-1.5 pl-10 text-xs text-ink-light">
                   <CornerDownRight className="mt-0.5 h-3 w-3 shrink-0" /> {s.reason}
                 </p>
@@ -96,7 +114,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
         )}
       </div>
       <div className="mt-2 text-[10px] font-bold text-white/40">
-        {segments.length} segments · {ocr ? "OCR on-screen text" : "speech transcript"}
+        {rows.length} segments · {ocr ? "OCR on-screen text" : "speech transcript"}
       </div>
     </div>
   );

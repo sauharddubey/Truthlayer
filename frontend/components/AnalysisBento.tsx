@@ -257,7 +257,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
   const ocr = agents.ocr || {};
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const segs = content.segments || [];
+  const segs = Array.isArray(content.segments) ? content.segments : [];
   const skippedClaims = agents.fact_check?.skipped_claims || [];
   const verified = claims.filter((c) =>
     c.verdict === "supported" ||
@@ -494,7 +494,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                   : "border-good/20 bg-good/5 text-good"
               }`}>
                 <span className="font-extrabold uppercase tracking-wide">
-                  Alignment: {ocr.ocr_analysis.relationship_verdict.replace("_", " ")}
+                  Alignment: {(ocr.ocr_analysis.relationship_verdict || "unknown").replace(/_/g, " ")}
                 </span>
               </div>
             )}
