@@ -404,11 +404,28 @@ def _media_integrity_prompt_summary(media_integrity: dict) -> str:
     return json.dumps(summary, ensure_ascii=True)
 
 
+_INSUFFICIENT_TRUST_REASONING = (
+    "Trust score unavailable: no checkable factual claims were extracted from the transcript."
+)
+
+
+def _trust_score_label(trust: Optional[float]) -> str:
+    return f"{trust}/100" if trust is not None else "unavailable (no checkable claims)"
+
+
+def _fallback_trust_reasoning(trust: Optional[float], tier: str) -> str:
+    if trust is None:
+        return _INSUFFICIENT_TRUST_REASONING
+    if tier == "verifier":
+        return f"Calculated as {trust}/100 based on verified vs unverified claims and evidence quality."
+    return f"Calculated as {trust}/100 based on verified claims, bias penalties, and authenticity metrics."
+
+
 def _generate_summary_and_reasonings(
     video: Video,
     results: dict,
-    trust: float,
-    risk: float,
+    trust: Optional[float],
+    risk: Optional[float],
     compliance: Optional[float],
     bias: Optional[float],
     sentiment: Optional[float],
@@ -493,14 +510,21 @@ def _generate_summary_and_reasonings(
 
     if not result:
         kind = f"product video about {', '.join(products)}" if is_product else f"{content_type} video"
-        summary_text = (
-            f"Automated analysis of this {kind}. Trust score {trust}/100, risk score {risk}/100. "
-            "Configure an LLM API key for richer summaries."
-        )
+        if tier == "verifier":
+            summary_text = (
+                f"Automated analysis of this {kind}. Trust score {_trust_score_label(trust)}. "
+                "Configure an LLM API key for richer summaries."
+            )
+        else:
+            risk_label = f"{risk}/100" if risk is not None else "unavailable"
+            summary_text = (
+                f"Automated analysis of this {kind}. Trust score {_trust_score_label(trust)}, "
+                f"risk score {risk_label}. Configure an LLM API key for richer summaries."
+            )
         data = {
             "summary": summary_text,
-            "trust": f"Calculated as {trust}/100 based on verified claims, bias penalties, and authenticity metrics.",
-            "risk": f"Calculated as {risk}/100 from overall content safety labels, compliance issues, and sentiment harm.",
+            "trust": _fallback_trust_reasoning(trust, tier),
+            "risk": f"Calculated as {risk}/100 from overall content safety labels, compliance issues, and sentiment harm." if risk is not None else "",
             "compliance": f"Calculated as {compliance}/100 based on policy compliance checks against marketing guidelines." if compliance is not None else "No compliance check run.",
             "bias": f"Calculated as {bias}/100 based on language neutrality and narrative leaning analysis." if bias is not None else "No bias check run.",
             "sentiment": f"Calculated as {sentiment}/100 based on transcription emotional tone and polarity indicators." if sentiment is not None else "No sentiment check run.",
@@ -513,7 +537,9 @@ def _generate_summary_and_reasonings(
 
     data = {
         "summary": result.get("summary") or "",
-        "trust": result.get("trust") or f"Trust score of {trust}/100.",
+        "trust": result.get("trust") or (
+            f"Trust score of {trust}/100." if trust is not None else _INSUFFICIENT_TRUST_REASONING
+        ),
         "risk": result.get("risk") or f"Risk score of {risk}/100.",
         "compliance": result.get("compliance") or (f"Compliance score of {compliance}/100." if compliance is not None else ""),
         "bias": result.get("bias") or (f"Bias score of {bias}/100." if bias is not None else ""),
