@@ -192,7 +192,6 @@ def claim_in_verifiable_segment(
         return True
 
     ts = float(timestamp_start)
-    matched = False
     for seg in segments:
         start = seg.get("start")
         end = seg.get("end")
@@ -201,11 +200,10 @@ def claim_in_verifiable_segment(
         start_f = float(start or 0.0)
         end_f = float(end if end is not None else start_f)
         if start_f <= ts <= end_f:
-            matched = True
             label = (seg.get("label") or "safe").lower()
             return label in {"verify", "risky"}
 
-    return True if not matched else False
+    return False
 
 
 def filter_checkable_claims(

@@ -63,6 +63,11 @@ def test_segment_gate_allows_verify_and_risky():
     assert not claim_in_verifiable_segment(4.0, segments)
 
 
+def test_segment_gate_rejects_timestamps_outside_segments():
+    segments = [{"start": 0.0, "end": 10.0, "label": "verify"}]
+    assert not claim_in_verifiable_segment(15.0, segments)
+
+
 def test_segment_gate_falls_back_without_timestamps():
     segments = [{"start": 0.0, "end": 10.0, "label": "safe"}]
     assert claim_in_verifiable_segment(None, segments)
