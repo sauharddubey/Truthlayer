@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { deleteVideo, getAnalysis, getRole, reportPdfUrl, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
-import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, AlertTriangle } from "@/components/icons";
+import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, ArrowUpRight, AlertTriangle } from "@/components/icons";
 
 const STAGES = [
   {
@@ -254,6 +254,17 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             {isProduct && products.length > 0 && <span className="chip">{products.slice(0, 2).join(", ")}</span>}
           </div>
           <h1 className="font-heavy text-2xl uppercase leading-tight tracking-tight text-ink">{video.title || "Analysis"}</h1>
+          {video.source_url && (
+            <a
+              href={video.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-light transition hover:text-ink hover:underline"
+            >
+              Watch original video
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
         <div className="flex shrink-0 gap-2">
           <button className="btn" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Re-analyzing…" : "Re-analyze"} <ArrowRight className="h-3.5 w-3.5" /></button>
