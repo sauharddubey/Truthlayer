@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getProduct, productOverview, productVideos, productDocuments, uploadProductDocument,
+  getProduct, updateProduct, productOverview, productVideos, productDocuments, uploadProductDocument,
   productKeywords, addProductKeyword, deleteProductKeyword, productContradictions, recomputeProductNarratives, submitUrl,
   uploadProductImage, deleteProduct, mediaUrl,
 } from "@/lib/api";
@@ -12,7 +12,7 @@ import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
 import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
-import { Box, Plus, Network, AlertTriangle, ArrowRight, FileSearch, Eye, Scale } from "@/components/icons";
+import { Box, Plus, Network, AlertTriangle, ArrowRight, FileSearch, Eye, Scale, Pencil } from "@/components/icons";
 
 const TABS = ["Overview", "Videos", "Knowledge base", "Hashtags", "Narratives", "Contradictions"];
 const C = (t?: number | null, invert = false) => {
@@ -48,6 +48,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
 
   function loadKeywords() {
     productKeywords(id).then((d) => {
@@ -117,6 +121,40 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     }
   }
 
+  function startEditing() {
+    setEditName(product?.name || "");
+    setEditDescription(product?.description || "");
+    setEditing(true);
+    setMsg("");
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setEditName("");
+    setEditDescription("");
+  }
+
+  async function saveDetails(e: React.FormEvent) {
+    e.preventDefault();
+    const name = editName.trim();
+    if (!name) {
+      setMsg("Product name is required.");
+      return;
+    }
+    setSavingDetails(true);
+    setMsg("");
+    try {
+      const p = await updateProduct(id, { name, description: editDescription.trim() || undefined });
+      setProduct(p);
+      setEditing(false);
+      setMsg("Product details saved.");
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
   return (
     <AppShell wide>
       <div className="mb-3 text-sm text-ink-light"><Link href="/products" className="hover:underline">Products</Link> <span className="mx-1">/</span> <span className="text-ink">{product?.name}</span></div>
@@ -137,18 +175,70 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         </label>
         <div className="relative z-10 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-heavy text-3xl uppercase tracking-tight text-white">{product?.name || "Product"}</h1>
-              {product?.description && <p className="mt-1 max-w-xl text-sm text-white/50">{product.description}</p>}
+            <div className="min-w-0 flex-1">
+              {editing ? (
+                <form onSubmit={saveDetails} className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">Product name</label>
+                    <input
+                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">Description</label>
+                    <textarea
+                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      rows={3}
+                      placeholder="What it is, key specs, approved claims, restrictions…"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn-accent shrink-0" type="submit" disabled={savingDetails || busy || deleting}>
+                      {savingDetails ? "Saving…" : "Save"}
+                    </button>
+                    <button className="btn-ghost shrink-0" type="button" onClick={cancelEditing} disabled={savingDetails}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <h1 className="font-heavy text-3xl uppercase tracking-tight text-white">{product?.name || "Product"}</h1>
+                    <button
+                      type="button"
+                      className="btn-ghost shrink-0 px-2 py-1 text-xs text-white/50"
+                      onClick={startEditing}
+                      disabled={!product || busy || deleting}
+                      aria-label="Edit product details"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  </div>
+                  {product?.description ? (
+                    <p className="mt-1 max-w-xl text-sm text-white/50">{product.description}</p>
+                  ) : (
+                    <p className="mt-1 max-w-xl text-sm italic text-white/30">Add description…</p>
+                  )}
+                </>
+              )}
             </div>
-            <button
-              type="button"
-              className="btn-ghost shrink-0 text-bad"
-              onClick={removeProduct}
-              disabled={busy || deleting}
-            >
-              {deleting ? "Deleting…" : "Delete product"}
-            </button>
+            {!editing && (
+              <button
+                type="button"
+                className="btn-ghost shrink-0 text-bad"
+                onClick={removeProduct}
+                disabled={busy || deleting}
+              >
+                {deleting ? "Deleting…" : "Delete product"}
+              </button>
+            )}
           </div>
           <form onSubmit={submitForProduct} className="mt-4 flex flex-wrap gap-2">
             <input className="input flex-1 border-white/10 bg-white/5 text-white placeholder-white/30"

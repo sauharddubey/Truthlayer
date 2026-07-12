@@ -32,6 +32,7 @@ from app.schemas import (
     KeywordRequest,
     ProductCreate,
     ProductOut,
+    ProductUpdate,
     VideoOut,
 )
 from app.security import require_roles
@@ -140,6 +141,34 @@ def list_products(db: Session = Depends(get_db), user: User = Depends(business_o
 @router.get("/{pid}", response_model=ProductOut)
 def get_product(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     return _product_out(db, _get_product(db, pid, user))
+
+
+@router.put("/{pid}", response_model=ProductOut)
+def update_product(
+    pid: str,
+    payload: ProductUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(business_only),
+):
+    p = _get_product(db, pid, user)
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Product name is required")
+    p.name = name
+    p.description = (payload.description or "").strip() or None
+    db.commit()
+    db.refresh(p)
+
+    try:
+        from redis import Redis
+        from app.config import settings
+        if settings.REDIS_URL:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r.delete(f"brand_synthesis:{p.organization_id}")
+    except Exception:
+        pass
+
+    return _product_out(db, p)
 
 
 @router.delete("/{pid}")

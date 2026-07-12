@@ -198,6 +198,13 @@ export function createProduct(p: { name: string; description?: string; aliases?:
 export function getProduct(id: string) {
   return request<any>(`/products/${id}`);
 }
+export function updateProduct(id: string, p: { name: string; description?: string }) {
+  return request<any>(`/products/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(p),
+  });
+}
 export function deleteProduct(id: string) {
   return request<any>(`/products/${id}`, { method: "DELETE" });
 }
