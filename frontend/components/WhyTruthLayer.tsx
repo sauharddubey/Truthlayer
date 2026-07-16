@@ -67,10 +67,12 @@ export function WhyTruthLayer() {
 
       const progress = Math.min(Math.max(scrolled / totalScrollable, 0), 1);
 
-      // Transition through three tabs based on scroll progress
-      if (progress < 0.33) {
+      // Transition through three tabs based on scroll progress. The last
+      // threshold sits high (0.70) so the dead scroll after the final tab is
+      // short and "How We Verify" arrives quickly.
+      if (progress < 0.35) {
         setActiveTab("brands");
-      } else if (progress < 0.66) {
+      } else if (progress < 0.70) {
         setActiveTab("creators");
       } else {
         setActiveTab("viewers");
@@ -86,8 +88,9 @@ export function WhyTruthLayer() {
   }, []);
 
   return (
-    // Outer scroll wrapper (tall space on lg, natural on mobile)
-    <div ref={containerRef} className="relative h-auto lg:h-[280vh] bg-paper border-t border-line/60">
+    // Outer scroll wrapper (tall space on lg, natural on mobile). 220vh keeps
+    // the pinned tab cycle brisk (~40vh per tab) without a long empty tail.
+    <div ref={containerRef} className="relative h-auto lg:h-[220vh] bg-paper border-t border-line/60">
       
       {/* Sticky container — pinned to viewport on scroll */}
       <div className="h-auto lg:sticky lg:top-0 lg:h-screen w-full flex flex-col pt-12 pb-6 px-6 relative">
@@ -174,8 +177,9 @@ export function WhyTruthLayer() {
                         const viewHeight = window.innerHeight;
                         const totalScrollable = containerHeight - viewHeight;
 
+                        // Midpoints of each tab's scroll segment (see thresholds above)
                         let targetProgress = 0;
-                        if (tab.id === "creators") targetProgress = 0.45;
+                        if (tab.id === "creators") targetProgress = 0.52;
                         if (tab.id === "viewers") targetProgress = 0.85;
 
                         window.scrollTo({
@@ -201,7 +205,7 @@ export function WhyTruthLayer() {
           {/* Apple Style Bento Grid Layout — no scroll, fits viewport */}
           <div key={activeTab}>
             {activeTab === "brands" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[155px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Compliance Registry Status (App Library Style) */}
                 <div 
@@ -283,23 +287,26 @@ export function WhyTruthLayer() {
                   </div>
 
                   <div className="flex items-center gap-4 my-2">
-                    <div className="relative h-16 w-16 shrink-0 flex items-center justify-center">
-                      {/* Ring 1: FTC Safety (Green) */}
-                      <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#162e24" strokeWidth="3" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#0f7b6c" strokeWidth="3" strokeDasharray="100" strokeDashoffset="15" strokeLinecap="round" />
+                    <div className="relative h-[72px] w-[72px] shrink-0">
+                      {/* Apple Activity-style rings: one SVG, uniform stroke, even gaps */}
+                      <svg className="h-full w-full -rotate-90" viewBox="0 0 72 72">
+                        {/* Ring 1 (outer): FTC Safety — 85% */}
+                        <circle cx="36" cy="36" r="31" fill="none" stroke="#162e24" strokeWidth="6" />
+                        <circle cx="36" cy="36" r="31" fill="none" stroke="#0f7b6c" strokeWidth="6" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 31 * 0.85} ${2 * Math.PI * 31}`} />
+                        {/* Ring 2 (middle): RAG Alignment — 92% */}
+                        <circle cx="36" cy="36" r="23.5" fill="none" stroke="#0c253d" strokeWidth="6" />
+                        <circle cx="36" cy="36" r="23.5" fill="none" stroke="#2383e2" strokeWidth="6" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 23.5 * 0.92} ${2 * Math.PI * 23.5}`} />
+                        {/* Ring 3 (inner): Low Hype Risk — 70% */}
+                        <circle cx="36" cy="36" r="16" fill="none" stroke="#37260e" strokeWidth="6" />
+                        <circle cx="36" cy="36" r="16" fill="none" stroke="#cb912f" strokeWidth="6" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 16 * 0.70} ${2 * Math.PI * 16}`} />
                       </svg>
-                      {/* Ring 2: RAG Alignment (Blue) */}
-                      <svg className="absolute inset-0 h-full w-full -rotate-90 p-2" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#0c253d" strokeWidth="3.5" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#2383e2" strokeWidth="3.5" strokeDasharray="100" strokeDashoffset="8" strokeLinecap="round" />
-                      </svg>
-                      {/* Ring 3: Perception (Orange) */}
-                      <svg className="absolute inset-0 h-full w-full -rotate-90 p-4" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#37260e" strokeWidth="4" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#cb912f" strokeWidth="4" strokeDasharray="100" strokeDashoffset="30" strokeLinecap="round" />
-                      </svg>
-                      <div className="text-[10px] font-extrabold text-white text-center z-10 leading-none">94%<br /><span className="text-[7px] text-white/40">SAFE</span></div>
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center leading-none">
+                        <span className="text-[11px] font-extrabold text-white">94%</span>
+                        <span className="mt-0.5 text-[6.5px] font-extrabold tracking-wider text-white/40">SAFE</span>
+                      </div>
                     </div>
 
                     <div className="space-y-1 text-[10px]">
@@ -433,7 +440,7 @@ export function WhyTruthLayer() {
             )}
 
             {activeTab === "creators" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[155px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Video Pre-Flight Review */}
                 <div 
@@ -644,7 +651,7 @@ export function WhyTruthLayer() {
             )}
 
             {activeTab === "viewers" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[155px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Video Search Console */}
                 <div 

@@ -33,6 +33,11 @@ openai==1.57.4
 # recent build. Bump this if extraction starts failing.
 yt-dlp>=2025.6.0
 
+# Bundled static ffmpeg fallback so local (non-Docker) setups work without a
+# system ffmpeg install. Docker still uses the apt ffmpeg (found first on PATH);
+# see app/services/ffmpeg_utils.py for the resolution order.
+imageio-ffmpeg>=0.5.1
+
 # Document parsing (RAG ingestion)
 pypdf==5.1.0
 python-docx==1.1.2

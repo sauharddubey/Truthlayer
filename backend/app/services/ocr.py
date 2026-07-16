@@ -16,7 +16,8 @@ import tempfile
 from typing import List, Optional
 
 from app.config import settings
-from app.llm import _client, effective_chat_key, effective_transcription_model, _extract_json, record_usage
+from app.llm import _client, effective_chat_key, effective_vision_model, _extract_json, record_usage
+from app.services.ffmpeg_utils import ffmpeg_exe
 
 logger = logging.getLogger("truthlayer.ocr")
 
@@ -75,7 +76,7 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
     with tempfile.TemporaryDirectory() as tmpdir:
         # scale=640:-1 keeps aspect ratio and resizes to 640px width to keep payload sizes small/fast
         cmd = [
-            "ffmpeg", "-y",
+            ffmpeg_exe(), "-y",
             "-i", video_path,
             "-vf", f"fps=1/{interval},scale=640:-1",
             "-q:v", "2",
@@ -136,14 +137,20 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
             }
         })
 
-    # Use transcription model by default (since Gemini 2.5 Flash Lite is multimodal & cheap/free)
-    model = effective_transcription_model() or settings.TRANSCRIPTION_MODEL
-    logger.info("Calling OpenRouter multimodal model %s for OCR", model)
+    # Use the dedicated vision model — OCR sends images, so it must be a
+    # vision-capable model, independent of the (possibly audio-only) model the
+    # user picked for speech transcription.
+    model = effective_vision_model()
+    logger.info("Calling OpenRouter vision model %s for OCR", model)
 
     try:
         resp = client.chat.completions.create(
             model=model,
             temperature=0,
+            # Force a well-formed JSON object (no markdown fences / missing braces)
+            # and give it enough room so the OCR JSON isn't truncated mid-object.
+            response_format={"type": "json_object"},
+            max_tokens=8000,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": content_list}

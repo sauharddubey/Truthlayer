@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -50,7 +51,9 @@ def test_normalize_video_for_hive_uses_expected_ffmpeg_args(media_env, monkeypat
     ingestion._normalize_video_for_hive(str(raw), media_env, "abc123")
 
     cmd = captured["cmd"]
-    assert cmd[0] == "ffmpeg"
+    # cmd[0] is the resolved ffmpeg binary: bare "ffmpeg", an absolute system
+    # path, or the bundled imageio-ffmpeg binary (e.g. "ffmpeg-macos-aarch64-…").
+    assert os.path.basename(cmd[0]).startswith("ffmpeg")
     assert "-t" in cmd
     assert str(ingestion.HIVE_MAX_VIDEO_SECONDS) in cmd
     assert "libx264" in cmd

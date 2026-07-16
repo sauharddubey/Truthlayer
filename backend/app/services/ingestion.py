@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import settings
+from app.services.ffmpeg_utils import ffmpeg_exe
 
 logger = logging.getLogger("truthlayer.ingestion")
 
@@ -71,7 +72,7 @@ def _normalize_video_for_hive(input_path: str, out_dir: Path, vid_id: str) -> Op
     """Transcode to a Hive-friendly MP4 (H.264/AAC, max 720p, faststart)."""
     output_path = str(out_dir / f"{vid_id}_hive.mp4")
     cmd = [
-        "ffmpeg",
+        ffmpeg_exe(),
         "-y",
         "-i",
         input_path,
@@ -126,6 +127,7 @@ def _download_url_video(url: str, out_dir: Path, vid_id: str) -> Optional[str]:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            "ffmpeg_location": ffmpeg_exe(),
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info(url, download=True)
@@ -180,6 +182,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
             "noplaylist": True,
             "writesubtitles": True,
             "writeautomaticsub": True,
+            "ffmpeg_location": ffmpeg_exe(),
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",

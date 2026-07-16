@@ -89,21 +89,29 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
             k=k,
             product_id=video.product_id,
         ),
-        rag_retrieve_product_details=lambda q, k=5: retrieve(
-            db,
-            organization_id=video.organization_id,
-            query=q,
-            k=k,
-            product_id=video.product_id,
-            document_types=[PRODUCT_DETAILS],
+        # These stay ``None`` (not a lambda) when the video has no product, so the
+        # ``if ctx.rag_retrieve_product_details:`` guards in the agents skip them and
+        # the general knowledge-base fallback in fact_check kicks in. A lambda that
+        # returns ``None`` would be truthy and then crash on ``for r in None``.
+        rag_retrieve_product_details=(
+            lambda q, k=5: retrieve(
+                db,
+                organization_id=video.organization_id,
+                query=q,
+                k=k,
+                product_id=video.product_id,
+                document_types=[PRODUCT_DETAILS],
+            )
         ) if video.product_id else None,
-        rag_retrieve_marketing_policies=lambda q, k=5: retrieve(
-            db,
-            organization_id=video.organization_id,
-            query=q,
-            k=k,
-            product_id=video.product_id,
-            document_types=[MARKETING_POLICY],
+        rag_retrieve_marketing_policies=(
+            lambda q, k=5: retrieve(
+                db,
+                organization_id=video.organization_id,
+                query=q,
+                k=k,
+                product_id=video.product_id,
+                document_types=[MARKETING_POLICY],
+            )
         ) if video.product_id else None,
     )
 
