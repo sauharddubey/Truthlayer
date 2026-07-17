@@ -32,18 +32,32 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=False)
 
 # JWKS public keys (for asymmetric ES256/RS256 tokens), cached with a short TTL.
 _JWKS_TTL = 600
-_jwks_cache: dict = {"keys": None, "fetched": 0.0}
+# Minimum spacing between *forced* (rotation) refetches. Without this, a flood of
+# tokens carrying random unknown `kid`s would trigger a blocking upstream fetch on
+# every request (cheap-for-attacker unauthenticated DoS + upstream rate-limiting).
+_JWKS_FORCE_COOLDOWN = 30
+_jwks_cache: dict = {"keys": None, "fetched": 0.0, "forced": 0.0}
 
 
 def _fetch_jwks() -> list:
+    if not settings.SUPABASE_URL:
+        raise JWTError("SUPABASE_URL is not configured")
     url = settings.SUPABASE_URL.rstrip("/") + "/auth/v1/.well-known/jwks.json"
-    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 (trusted host)
+    if not url.lower().startswith("https://"):
+        raise JWTError("SUPABASE_URL must be https")
+    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 (trusted https host)
         return json.loads(resp.read()).get("keys", [])
 
 
 def _jwks_keys(force: bool = False) -> list:
     now = time.time()
-    if force or not _jwks_cache["keys"] or now - _jwks_cache["fetched"] > _JWKS_TTL:
+    if force:
+        # Rate-limit forced refetches regardless of how many misses occur.
+        if now - _jwks_cache["forced"] >= _JWKS_FORCE_COOLDOWN:
+            _jwks_cache["forced"] = now
+            _jwks_cache["keys"] = _fetch_jwks()
+            _jwks_cache["fetched"] = now
+    elif not _jwks_cache["keys"] or now - _jwks_cache["fetched"] > _JWKS_TTL:
         _jwks_cache["keys"] = _fetch_jwks()
         _jwks_cache["fetched"] = now
     return _jwks_cache["keys"] or []
@@ -77,14 +91,20 @@ def _decode_supabase_jwt(token: str) -> dict:
     if alg not in ("ES256", "RS256", "ES384", "RS384", "ES512", "RS512"):
         raise JWTError(f"Unsupported JWKS algorithm: {alg}")
 
-    # python-jose enforces signature, exp (when require_exp), and audience match.
-    # `sub` presence is enforced by the caller (get_current_user).
+    # python-jose enforces signature, exp (when require_exp), audience, and (when
+    # configured) issuer. `sub` presence is enforced by the caller.
+    issuer = None
+    verify_iss = False
+    if settings.SUPABASE_VERIFY_ISS:
+        issuer = settings.SUPABASE_URL.rstrip("/") + "/auth/v1"
+        verify_iss = True
     return jwt.decode(
         token,
         jwk,
         algorithms=[alg],
         audience=settings.SUPABASE_JWT_AUDIENCE,
-        options={"require_exp": True, "verify_aud": True},
+        issuer=issuer,
+        options={"require_exp": True, "verify_aud": True, "verify_iss": verify_iss},
     )
 
 
@@ -96,14 +116,33 @@ def _role_from_metadata(meta: dict) -> UserRole:
         return UserRole.VERIFIER
 
 
+def role_is_locked(claims: dict) -> bool:
+    """True when a trusted role is pinned in server-controlled ``app_metadata``."""
+    return "role" in (claims.get("app_metadata") or {})
+
+
+def _authoritative_role(claims: dict) -> UserRole:
+    """Resolve a user's role, trusting ``app_metadata`` over ``user_metadata``.
+
+    ``app_metadata`` can only be set server-side (Supabase service role / admin
+    API), so it is authoritative for entitlement tiers. ``user_metadata`` is
+    editable by the account holder, so it is used only as the (self-service)
+    fallback when no trusted role has been pinned — preserving today's sign-up
+    role selection while giving a way to lock tiers down before launch.
+    """
+    if role_is_locked(claims):
+        return _role_from_metadata(claims.get("app_metadata") or {})
+    return _role_from_metadata(claims.get("user_metadata") or {})
+
+
 def _provision_user(db: Session, claims: dict) -> User:
     """Create the local profile for a freshly-authenticated Supabase user.
 
-    Role / organization come from the metadata the frontend attaches at sign-up;
-    they can also be (re)applied later via the ``/auth/bootstrap`` endpoint.
+    Role comes from ``app_metadata`` when pinned there (trusted), else from the
+    sign-up ``user_metadata``; it can also be (re)applied via ``/auth/bootstrap``.
     """
     meta = claims.get("user_metadata") or {}
-    role = _role_from_metadata(meta)
+    role = _authoritative_role(claims)
     email = claims.get("email") or meta.get("email")
 
     org_id = None
@@ -154,6 +193,22 @@ def get_current_user(
     if not user.is_active:
         raise cred_exc
     return user
+
+
+def get_current_claims(token: Optional[str] = Depends(oauth2_scheme)) -> dict:
+    """Return the verified JWT claims for endpoints that must inspect metadata
+    (e.g. ``/auth/bootstrap`` enforcing the trusted-role lock)."""
+    cred_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if not token:
+        raise cred_exc
+    try:
+        return _decode_supabase_jwt(token)
+    except JWTError:
+        raise cred_exc
 
 
 def require_roles(*roles: UserRole):

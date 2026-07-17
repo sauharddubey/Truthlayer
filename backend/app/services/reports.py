@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
@@ -21,6 +22,13 @@ from reportlab.platypus import (
 from app.models import Video
 
 
+def _esc(value) -> str:
+    """Escape dynamic/model/transcript text before it enters a ReportLab
+    Paragraph, which parses an HTML-like markup subset. Prevents a stray '<' from
+    breaking the build and blocks markup injection via generated/ingested text."""
+    return escape("" if value is None else str(value))
+
+
 def build_pdf(video: Video) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=LETTER, title=f"TruthLayer Report — {video.id}")
@@ -28,10 +36,10 @@ def build_pdf(video: Video) -> bytes:
     flow = []
 
     flow.append(Paragraph("TruthLayer Analysis Report", styles["Title"]))
-    flow.append(Paragraph(video.title or video.source_url or video.id, styles["Heading2"]))
-    flow.append(Paragraph(f"Platform: {video.platform or 'n/a'} &nbsp;&nbsp; "
-                          f"Mode: {video.mode.value} &nbsp;&nbsp; "
-                          f"Status: {video.processing_status.value}", styles["Normal"]))
+    flow.append(Paragraph(_esc(video.title or video.source_url or video.id), styles["Heading2"]))
+    flow.append(Paragraph(f"Platform: {_esc(video.platform or 'n/a')} &nbsp;&nbsp; "
+                          f"Mode: {_esc(video.mode.value)} &nbsp;&nbsp; "
+                          f"Status: {_esc(video.processing_status.value)}", styles["Normal"]))
     flow.append(Spacer(1, 0.2 * inch))
 
     report = video.report
@@ -63,7 +71,7 @@ def build_pdf(video: Video) -> bytes:
 
         if report.summary:
             flow.append(Paragraph("Summary", styles["Heading3"]))
-            flow.append(Paragraph(report.summary, styles["Normal"]))
+            flow.append(Paragraph(_esc(report.summary), styles["Normal"]))
             flow.append(Spacer(1, 0.2 * inch))
 
     if video.claims:
@@ -71,8 +79,8 @@ def build_pdf(video: Video) -> bytes:
         items = [
             ListItem(
                 Paragraph(
-                    f"<b>[{c.verdict or 'unverified'}]</b> {c.claim_text} "
-                    f"<i>({c.claim_type}, conf {_fmt(c.confidence, pct=False)})</i>",
+                    f"<b>[{_esc(c.verdict or 'unverified')}]</b> {_esc(c.claim_text)} "
+                    f"<i>({_esc(c.claim_type)}, conf {_fmt(c.confidence, pct=False)})</i>",
                     styles["Normal"],
                 )
             )
@@ -86,7 +94,8 @@ def build_pdf(video: Video) -> bytes:
         items = [
             ListItem(
                 Paragraph(
-                    f"<b>[{i.severity}] {i.issue_type}</b>: {i.description}", styles["Normal"]
+                    f"<b>[{_esc(i.severity)}] {_esc(i.issue_type)}</b>: {_esc(i.description)}",
+                    styles["Normal"],
                 )
             )
             for i in video.compliance_issues

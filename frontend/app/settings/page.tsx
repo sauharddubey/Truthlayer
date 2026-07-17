@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { getMe, updateSettings, getUsage } from "@/lib/api";
+import { getMe, updateSettings, getUsage, deleteAccount } from "@/lib/api";
 import { Check, Sparkle, FileSearch, AudioLines, Network, Layers, ChevronDown } from "@/components/icons";
 
 const DEFAULT_LLM_MODELS = [
@@ -92,23 +93,25 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 /* ── Small labelled key input (optional service keys) ───────────────────────── */
 function KeyField({
-  label, badge, hint, placeholder, value, onChange, onRemove, canRemove, loading,
+  id, label, badge, hint, placeholder, value, onChange, onRemove, canRemove, loading,
 }: {
-  label: string; badge: boolean; hint: string; placeholder: string;
+  id: string; label: string; badge: boolean; hint: string; placeholder: string;
   value: string; onChange: (v: string) => void; onRemove: () => void;
   canRemove: boolean; loading: boolean;
 }) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <label className="label">{label}</label>
+        <label className="label" htmlFor={id}>{label}</label>
         <span className={`text-[10px] font-extrabold uppercase tracking-widest ${badge ? "text-good" : "text-ink-faint"}`}>
           {badge ? "Set" : "Not set"}
         </span>
       </div>
       <input
+        id={id}
         className="input font-mono"
         type="password"
+        autoComplete="off"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -127,6 +130,8 @@ function KeyField({
 
 /* ── Main page ────────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
+  const router = useRouter();
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [user, setUser]       = useState<any>(null);
   const [hasKey, setHasKey]   = useState(false);
   const [value, setValue]     = useState("");
@@ -309,7 +314,7 @@ export default function SettingsPage() {
           </div>
 
           {usageErr ? (
-            <div className="rounded-lg border border-bad/20 bg-bad/10 px-4 py-3 text-sm text-bad">{usageErr}</div>
+            <div className="rounded-lg border border-bad/20 bg-bad/10 px-4 py-3 text-sm text-bad" role="alert">{usageErr}</div>
           ) : !usage ? (
             <div className="flex items-center gap-2 text-sm text-ink-faint py-4">
               <div className="h-4 w-4 rounded-full border-2 border-accent border-t-transparent animate-spin" />
@@ -436,10 +441,12 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="label">Your OpenRouter key</label>
+              <label className="label" htmlFor="openrouter-key">Your OpenRouter key</label>
               <input
+                id="openrouter-key"
                 className="input font-mono"
                 type="password"
+                autoComplete="off"
                 placeholder="sk-or-v1-…"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -459,20 +466,22 @@ export default function SettingsPage() {
               </p>
 
               <KeyField
+                id="tavily-key"
                 label="Tavily key" badge={hasTavily} hint="Web-search evidence for fact-checking."
                 placeholder="tvly-…" value={tavilyVal} onChange={setTavilyVal}
                 onRemove={() => removeKey("tavily_api_key")} canRemove={hasTavily} loading={loading}
               />
               <KeyField
+                id="media-integrity-key"
                 label="Hive API token" badge={hasMedia} hint="Hive deepfake detection for business authenticity scoring. Requires MEDIA_INTEGRITY_PROVIDER=hive and a public BACKEND_PUBLIC_URL."
                 placeholder="Hive token…" value={mediaVal} onChange={setMediaVal}
                 onRemove={() => removeKey("media_integrity_api_key")} canRemove={hasMedia} loading={loading}
               />
             </div>
 
-            {error && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>}
+            {error && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">{error}</div>}
             {saved && (
-              <div className="rounded-lg border border-good/20 bg-good/10 px-3 py-2 text-sm text-good flex items-center gap-1.5">
+              <div className="rounded-lg border border-good/20 bg-good/10 px-3 py-2 text-sm text-good flex items-center gap-1.5" role="status">
                 <Check className="h-4 w-4" /> Saved successfully.
               </div>
             )}
@@ -535,12 +544,13 @@ export default function SettingsPage() {
 
             {/* Chat LLM / Reasoning Select */}
             <div>
-              <label className="label flex items-center gap-1.5 mb-1.5">
+              <label className="label flex items-center gap-1.5 mb-1.5" htmlFor="model-llm">
                 <Sparkle className="h-3.5 w-3.5 text-accent" />
                 Chat LLM (Reasoning &amp; Agents)
               </label>
               <div className="relative">
                 <select
+                  id="model-llm"
                   className="input pr-10 appearance-none font-mono"
                   value={llmVal}
                   onChange={(e) => setLlmVal(e.target.value)}
@@ -563,12 +573,13 @@ export default function SettingsPage() {
 
             {/* Transcription Select */}
             <div>
-              <label className="label flex items-center gap-1.5 mb-1.5">
+              <label className="label flex items-center gap-1.5 mb-1.5" htmlFor="model-transcription">
                 <AudioLines className="h-3.5 w-3.5 text-good" />
                 Audio Transcription (Speech-to-Text)
               </label>
               <div className="relative">
                 <select
+                  id="model-transcription"
                   className="input pr-10 appearance-none font-mono"
                   value={transcriptionVal}
                   onChange={(e) => setTranscriptionVal(e.target.value)}
@@ -629,12 +640,13 @@ export default function SettingsPage() {
             {/* Vector Embeddings Select (Only for BUSINESS tier users who have product RAG features) */}
             {user?.role === "business" && (
               <div>
-                <label className="label flex items-center gap-1.5 mb-1.5">
+                <label className="label flex items-center gap-1.5 mb-1.5" htmlFor="model-embeddings">
                   <Network className="h-3.5 w-3.5 text-warn" />
                   Vector Embeddings (RAG Retrieval)
                 </label>
                 <div className="relative">
                   <select
+                    id="model-embeddings"
                     className="input pr-10 appearance-none font-mono"
                     value={embedVal}
                     onChange={(e) => setEmbedVal(e.target.value)}
@@ -657,11 +669,11 @@ export default function SettingsPage() {
             )}
 
             {savedModels && (
-              <div className="rounded-lg border border-good/20 bg-good/10 px-3 py-2 text-sm text-good flex items-center gap-1.5">
+              <div className="rounded-lg border border-good/20 bg-good/10 px-3 py-2 text-sm text-good flex items-center gap-1.5" role="status">
                 <Check className="h-4 w-4" /> Saved successfully.
               </div>
             )}
-            {modelsError && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad">{modelsError}</div>}
+            {modelsError && <div className="rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">{modelsError}</div>}
 
             <div className="flex gap-2.5 pt-1">
               <button className="btn-accent" onClick={saveModelsConfig} disabled={savingModels}>
@@ -669,6 +681,32 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </section>
+
+        {/* ── Danger zone: right to erasure ── */}
+        <section className="card border-bad/30">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-bad">Delete account</h2>
+          <p className="mt-1.5 text-xs text-ink-light">
+            Permanently deletes your account and all associated data — your videos,
+            transcripts, analyses, products, and stored API keys. This cannot be undone.
+          </p>
+          <button
+            className="mt-3 rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm font-semibold text-bad transition hover:bg-bad/20 disabled:opacity-60"
+            disabled={deletingAccount}
+            onClick={async () => {
+              if (!window.confirm("Delete your account and ALL your data? This cannot be undone.")) return;
+              setDeletingAccount(true);
+              try {
+                await deleteAccount();
+                router.push("/");
+              } catch (e: any) {
+                setError(e.message);
+                setDeletingAccount(false);
+              }
+            }}
+          >
+            {deletingAccount ? "Deleting…" : "Delete my account and all data"}
+          </button>
         </section>
 
       </div>

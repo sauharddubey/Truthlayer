@@ -11,6 +11,7 @@ import re
 from urllib.parse import urlparse
 
 from app.agents.base import AgentContext, sanitize_transcript
+from app.config import settings
 from app.llm import chat_json
 from app.services.claim_eligibility import (
     claim_eligibility_reasons,
@@ -60,11 +61,16 @@ def run(ctx: AgentContext) -> dict:
         content_type=content_type,
     )
 
-    # Retrieve evidence for every checkable claim; prompt uses the same set.
+    # Retrieve evidence for the most salient claims. Capping the fan-out bounds
+    # cost/latency: each retrieved claim triggers a web search + RAG lookups +
+    # a query rewrite, so a claim-dense video is otherwise a linear explosion of
+    # external calls. Claims beyond the cap are still analysed (and reconciled as
+    # unverified below) — they just don't get freshly-retrieved evidence.
     claims_for_review = checkable_claims
+    retrieval_claims = _prioritize_claims(claims_for_review, limit=settings.MAX_CLAIMS_FOR_EVIDENCE)
     claim_evidence_index: dict[str, list[dict]] = {}
     retrieval_diagnostics: dict[str, dict] = {}
-    for c in claims_for_review:
+    for c in retrieval_claims:
         text = c.get("claim_text") or ""
         if not text:
             continue
@@ -205,9 +211,19 @@ def _normalize_claim_row(claim: dict, claim_evidence_index: dict[str, list[dict]
     model_evidence = [e for e in (claim.get("evidence") or []) if isinstance(e, dict)]
     retrieved = claim_evidence_index.get(key, [])
 
+    # Citation integrity: discard a model-supplied evidence item that cites a URL
+    # we never actually retrieved — a fabricated source must not be storable or
+    # able to satisfy the evidence/citation contract. Model evidence without a
+    # URL (plain reasoning text) is kept but is not treated as an external cite.
+    retrieved_urls = {(e.get("url") or "").strip() for e in retrieved if (e.get("url") or "").strip()}
+    trusted_model_evidence = [
+        e for e in model_evidence
+        if not (e.get("url") or "").strip() or (e.get("url") or "").strip() in retrieved_urls
+    ]
+
     merged = []
     seen = set()
-    for e in model_evidence + retrieved:
+    for e in trusted_model_evidence + retrieved:
         item = {
             "text": (e.get("text") or "")[:600],
             "source": e.get("source") or "evidence",
