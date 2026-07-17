@@ -24,6 +24,7 @@ import {
   mediaUrl,
 } from "@/lib/api";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
+import { useRoleGuard } from "@/lib/useRoleGuard";
 import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
@@ -83,6 +84,7 @@ function GlassStat({
 export default function ProductPage({ params }: { params: { id: string } }) {
   const id = params.id;
   const router = useRouter();
+  const guardOk = useRoleGuard(["business"]);
   const [tab, setTab] = useState("Overview");
   const [product, setProduct] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
@@ -103,14 +105,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [url, setUrl] = useState("");
   const [kw, setKw] = useState("");
   const [msg, setMsg] = useState("");
+  /** So success and failure don't share one accent-colored line. */
+  const [msgKind, setMsgKind] = useState<"success" | "error">("success");
+  /** A core fetch (the product itself) failed — show a banner + retry. */
+  const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editAliases, setEditAliases] = useState("");
   const [savingDetails, setSavingDetails] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+
+  function showOk(m: string) { setMsgKind("success"); setMsg(m); }
+  function showError(m: string) { setMsgKind("error"); setMsg(m); }
 
   function loadKeywords() {
     productKeywords(id)
@@ -122,9 +132,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
 
   const loadAll = useCallback(() => {
+    // The product itself is the page — if it can't load, say so and offer retry.
     getProduct(id)
-      .then(setProduct)
-      .catch(() => {});
+      .then((p) => { setProduct(p); setLoadError(""); })
+      .catch((e: any) => setLoadError(e?.message || "Couldn't load this product."));
     productOverview(id)
       .then(setOverview)
       .catch(() => {});
@@ -150,7 +161,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         setNarrativesLoaded(true);
       })
       .catch((e: any) => {
-        setMsg(e.message);
+        showError(e.message);
         setNarrativesLoaded(true);
       });
   }, [tab, id, narrativesLoaded]);
@@ -163,7 +174,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         setContradictionsLoaded(true);
       })
       .catch((e: any) => {
-        setMsg(e.message);
+        showError(e.message);
         setContradictionsLoaded(true);
       });
   }, [tab, id, contradictionsLoaded]);
@@ -175,7 +186,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const rows = await recomputeProductNarratives(id);
       setNarratives(rows || []);
       setNarrativesLoaded(true);
-      setMsg(
+      showOk(
         rows?.length
           ? `Narrative report ready — ${rows.length} cluster${
               rows.length === 1 ? "" : "s"
@@ -183,7 +194,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           : "Narrative report ready — no clusters (analyze more videos first)."
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setGeneratingNarratives(false);
     }
@@ -197,7 +208,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setContradictions(report);
       setContradictionsLoaded(true);
       const count = report?.contradictions?.length ?? 0;
-      setMsg(
+      showOk(
         count
           ? `Contradiction report ready — ${count} pair${
               count === 1 ? "" : "s"
@@ -205,7 +216,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           : "Contradiction report ready — no contradictions found."
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setGeneratingContradictions(false);
     }
@@ -220,7 +231,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setUrl("");
       window.location.href = `/analysis/${v.id}`;
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setBusy(false);
     }
@@ -236,11 +247,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     try {
       const doc = await uploadProductDocument(id, f, type);
       if (doc.status === "failed") {
-        setMsg(
+        showError(
           `Could not extract text from "${f.name}". Try a text-based PDF or DOCX.`
         );
       } else {
-        setMsg(
+        showOk(
           `Indexed "${f.name}" — used in compliance and claim verification.`
         );
       }
@@ -249,7 +260,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         .then(setOverview)
         .catch(() => {});
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setUploadingType(null);
       e.target.value = "";
@@ -266,11 +277,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       productOverview(id)
         .then(setOverview)
         .catch(() => {});
-      setMsg(
+      showOk(
         `Removed "${filename}". Re-analyze videos to refresh claim checks.`
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeletingDocId(null);
     }
@@ -282,7 +293,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setKw("");
       loadKeywords();
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     }
   }
   async function removeKeyword(keywordId: string) {
@@ -293,7 +304,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       await deleteProductKeyword(id, keywordId);
       loadKeywords();
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeletingKeywordId(null);
     }
@@ -306,7 +317,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const p = await uploadProductImage(id, f);
       setProduct(p);
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setBusy(false);
     }
@@ -323,7 +334,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       await deleteProduct(id);
       router.push("/products");
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeleting(false);
     }
@@ -332,6 +343,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   function startEditing() {
     setEditName(product?.name || "");
     setEditDescription(product?.description || "");
+    setEditAliases((product?.aliases || []).join(", "));
     setEditing(true);
     setMsg("");
   }
@@ -340,13 +352,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     setEditing(false);
     setEditName("");
     setEditDescription("");
+    setEditAliases("");
   }
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
     const name = editName.trim();
     if (!name) {
-      setMsg("Product name is required.");
+      showError("Product name is required.");
       return;
     }
     setSavingDetails(true);
@@ -355,12 +368,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const p = await updateProduct(id, {
         name,
         description: editDescription.trim() || undefined,
+        aliases: editAliases.split(",").map((s) => s.trim()).filter(Boolean),
       });
       setProduct(p);
       setEditing(false);
-      setMsg("Product details saved.");
+      showOk("Product details saved.");
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setSavingDetails(false);
     }
@@ -381,6 +395,34 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     document.getElementById(`product-tab-${tabSlug(nextTab)}`)?.focus();
   }
 
+  if (!guardOk) {
+    return (
+      <AppShell wide>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+      </AppShell>
+    );
+  }
+
+  if (loadError && !product) {
+    return (
+      <AppShell wide>
+        <div className="card mx-auto max-w-lg space-y-3 py-8 text-center">
+          <div className="flex items-center justify-center gap-2 text-bad">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            <h1 className="text-lg font-bold">Couldn&apos;t load this product</h1>
+          </div>
+          <p className="text-sm text-ink-light">{loadError}</p>
+          <div className="flex items-center justify-center gap-2">
+            <button className="btn-accent" onClick={() => { setLoadError(""); loadAll(); }}>
+              Try again <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <Link href="/products" className="btn-ghost">Back to products</Link>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell wide>
       <div className="mb-3 text-sm text-ink-light">
@@ -388,7 +430,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           Products
         </Link>{" "}
         <span className="mx-1">/</span>{" "}
-        <span className="text-ink">{product?.name}</span>
+        <span className="text-ink">{product?.name || "…"}</span>
       </div>
 
       {/* ── Glass hero header ── */}
@@ -448,6 +490,18 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       onChange={(e) => setEditDescription(e.target.value)}
                     />
                   </div>
+                  <div>
+                    <label htmlFor="product-edit-aliases" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+                      Aliases <span className="font-normal normal-case tracking-normal text-white/40">(comma-separated — other names used in videos)</span>
+                    </label>
+                    <input
+                      id="product-edit-aliases"
+                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      placeholder="e.g. Serum XL, HydraMax"
+                      value={editAliases}
+                      onChange={(e) => setEditAliases(e.target.value)}
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       className="btn-accent shrink-0"
@@ -491,6 +545,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       Add description…
                     </p>
                   )}
+                  {(product?.aliases?.length ?? 0) > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">Also known as</span>
+                      {product.aliases.map((a: string) => (
+                        <span key={a} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-white/70">{a}</span>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -521,7 +583,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               Analyze <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </form>
-          {msg && <p className="mt-2 text-sm text-accent" role="status">{msg}</p>}
+          {msg && (
+            <p
+              className={`mt-2 text-sm ${msgKind === "error" ? "text-bad" : "text-good"}`}
+              role={msgKind === "error" ? "alert" : "status"}
+            >
+              {msg}
+            </p>
+          )}
         </div>
       </div>
 
@@ -628,7 +697,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
       {tab === "Videos" && (
         <div role="tabpanel" id="product-panel-videos" aria-labelledby="product-tab-videos">
-          <VideoBoard videos={vids} emptyHref="#" />
+          <VideoBoard
+            videos={vids}
+            emptyHref={`/analyze?product=${id}`}
+            onDeleted={(vid) => setVids((cur) => cur.filter((v) => v.video_id !== vid))}
+          />
         </div>
       )}
 
@@ -859,12 +932,19 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   </span>
                 </div>
                 <p className="mt-1.5 text-sm text-white/70">{c.summary}</p>
-                {c.video_count != null && (
-                  <p className="mt-2 text-xs text-white/70">
-                    {c.video_count} video{c.video_count === 1 ? "" : "s"} in
-                    cluster
-                  </p>
-                )}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+                  {c.video_count != null && (
+                    <span>{c.video_count} video{c.video_count === 1 ? "" : "s"} in cluster</span>
+                  )}
+                  {c.propagation_risk != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-white/40">Spread risk</span>
+                      <span className="font-bold" style={{ color: c.propagation_risk >= 70 ? "#e03e3e" : c.propagation_risk >= 40 ? "#cb912f" : "#0f7b6c" }}>
+                        {formatMetric(c.propagation_risk)}
+                      </span>
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
             {!narratives.length && !generatingNarratives && (

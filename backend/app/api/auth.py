@@ -28,7 +28,7 @@ logger = logging.getLogger("truthlayer.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _user_out(user: User) -> UserOut:
+def _user_out(user: User, role_locked: bool = False) -> UserOut:
     return UserOut(
         id=user.id,
         email=user.email,
@@ -41,6 +41,7 @@ def _user_out(user: User) -> UserOut:
         llm_model=user.llm_model,
         embeddings_model=user.embeddings_model,
         transcription_model=user.transcription_model,
+        role_locked=role_locked,
     )
 
 
@@ -79,12 +80,12 @@ def bootstrap(
             user.organization_id = org.id
     db.commit()
     db.refresh(user)
-    return _user_out(user)
+    return _user_out(user, role_locked=role_is_locked(claims))
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
-    return _user_out(user)
+def me(user: User = Depends(get_current_user), claims: dict = Depends(get_current_claims)):
+    return _user_out(user, role_locked=role_is_locked(claims))
 
 
 def _delete_supabase_auth_user(user_id: str) -> bool:

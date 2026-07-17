@@ -65,14 +65,36 @@ export function VideoBoard({
   emptyHref = "/analyze",
   variant = "default",
   onDeleted,
+  loading = false,
+  searchable = false,
 }: {
   videos: Video[];
   emptyHref?: string;
   variant?: "default" | "verifier";
   onDeleted?: (videoId: string) => void;
+  /** Before the first fetch resolves — show skeletons, not the empty state. */
+  loading?: boolean;
+  /** Show a title search box above the grid (for longer boards). */
+  searchable?: boolean;
 }) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  // Skeletons while loading — so a populated board never flashes "No videos yet".
+  if (loading && !videos.length) {
+    return (
+      <div className="grid auto-rows-[168px] grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className={`glass-tile animate-pulse ${i === 0 ? "col-span-2 row-span-2" : "col-span-2 lg:col-span-1"}`}
+          />
+        ))}
+        <span className="sr-only">Loading your videos…</span>
+      </div>
+    );
+  }
 
   async function confirmDelete(video: Video) {
     const ok = window.confirm("Delete this analysis? This cannot be undone.");
@@ -89,20 +111,53 @@ export function VideoBoard({
   }
 
   if (!videos.length) {
+    const steps = variant === "verifier"
+      ? ["Paste any public video link", "We transcribe it and pull out every factual claim", "Each claim gets a verdict backed by live evidence"]
+      : ["Upload a draft or paste a link", "We check facts, tone, bias and audience risk", "See what to fix before you publish"];
     return (
-      <div className="glass-board flex h-[44vh] flex-col items-center justify-center text-center">
+      <div className="glass-board flex min-h-[44vh] flex-col items-center justify-center px-6 py-10 text-center">
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-[90px]" />
-        <FileSearch className="mb-3 h-8 w-8 text-white/30" />
-        <p className="text-sm font-semibold text-white/80">No videos yet</p>
-        <p className="mt-1 text-sm text-white/40">Analyze one to populate your board.</p>
-        <Link href={emptyHref} className="btn-accent mt-5">Analyze a video <ArrowRight className="h-3.5 w-3.5" /></Link>
+        <FileSearch className="mb-3 h-8 w-8 text-white/40" />
+        <p className="text-base font-semibold text-white/90">Your board is ready for its first video</p>
+        <p className="mt-1 text-sm text-white/50">Here&apos;s what happens when you add one:</p>
+        <ol className="mt-4 max-w-sm space-y-2 text-left">
+          {steps.map((s, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-sm text-white/70">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-white/80">{i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+        <Link href={emptyHref} className="btn-accent mt-6">Analyze a video <ArrowRight className="h-3.5 w-3.5" /></Link>
       </div>
     );
   }
 
+  const q = query.trim().toLowerCase();
+  const shown = searchable && q
+    ? videos.filter((v) => (v.title || "").toLowerCase().includes(q))
+    : videos;
+
   return (
-    <div className="grid auto-rows-[168px] grid-cols-2 gap-3 lg:grid-cols-4">
-      {videos.map((v, i) => {
+    <div className="space-y-3">
+      {searchable && (
+        <input
+          className="input max-w-xs"
+          type="search"
+          placeholder="Search by title…"
+          aria-label="Search videos"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+      {searchable && q && !shown.length ? (
+        <p className="py-6 text-center text-sm text-white/50">
+          No videos match “{query}”.{" "}
+          <button className="text-accent hover:underline" onClick={() => setQuery("")}>Clear</button>
+        </p>
+      ) : (
+      <div className="grid auto-rows-[168px] grid-cols-2 gap-3 lg:grid-cols-4">
+      {shown.map((v, i) => {
         const featured = i === 0;
         const st = statusTone(v.status);
         return (
@@ -174,6 +229,8 @@ export function VideoBoard({
           </div>
         );
       })}
+      </div>
+      )}
     </div>
   );
 }

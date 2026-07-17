@@ -25,6 +25,9 @@ class UserOut(BaseModel):
     llm_model: Optional[str] = None
     embeddings_model: Optional[str] = None
     transcription_model: Optional[str] = None
+    # True when the role is pinned in server-controlled app_metadata and can no
+    # longer be self-changed (so the UI can hide/disable the workspace switcher).
+    role_locked: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +64,8 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str
     description: Optional[str] = None
+    # Omitted (None) = leave aliases unchanged; [] = clear them.
+    aliases: Optional[List[str]] = None
 
 
 class ProductOut(BaseModel):

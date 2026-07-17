@@ -5,6 +5,7 @@ import Link from "next/link";
 import { addBrandKeyword, deleteBrandKeyword, brandDashboard, mediaUrl } from "@/lib/api";
 import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
+import { useRoleGuard } from "@/lib/useRoleGuard";
 import { AppShell } from "@/components/AppShell";
 import { ArrowRight, Box, Plus, Network } from "@/components/icons";
 
@@ -18,12 +19,19 @@ function GlassStat({ label, value, color = "#2383e2", isCount = false }: { label
 }
 
 export default function BrandDashboard() {
+  const guardOk = useRoleGuard(["business"]);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [kw, setKw] = useState("");
   const [deletingKeywordId, setDeletingKeywordId] = useState<string | null>(null);
 
-  function load() { brandDashboard().then(setData).catch((e) => setError(e.message)); }
+  function load() {
+    brandDashboard()
+      .then((d) => { setData(d); setError(""); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
   const refresh = useCallback(() => { load(); }, []);
   useEffect(() => { refresh(); }, [refresh]);
   useRefetchOnVisible(refresh);
@@ -49,6 +57,30 @@ export default function BrandDashboard() {
   }
 
   const sentiment = data?.brand_perception != null ? (data.brand_perception + 1) * 50 : null;
+
+  if (!guardOk) {
+    return (
+      <AppShell title="Brand overview" wide>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+      </AppShell>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <AppShell title="Brand overview" wide>
+        <div className="mb-4 grid gap-4 sm:grid-cols-3" aria-hidden="true">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="glass-tile h-24 animate-pulse" />)}
+        </div>
+        <div className="glass-tile mb-4 h-48 animate-pulse" aria-hidden="true" />
+        <div className="grid gap-4 lg:grid-cols-2" aria-hidden="true">
+          <div className="glass-tile h-52 animate-pulse" />
+          <div className="glass-tile h-52 animate-pulse" />
+        </div>
+        <span className="sr-only">Loading your brand overview…</span>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="Brand overview" wide>

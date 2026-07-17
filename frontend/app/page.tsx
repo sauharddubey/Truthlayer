@@ -140,14 +140,14 @@ function VerifierInfographic() {
 const tiers = [
   {
     id: "business",
-    badge: "Full Fleet · 6 Lenses",
+    badge: "Full Fleet · 8 Lenses",
     icon: <Box className="h-5 w-5" />,
     accentHex: "#2383e2",
     glowClass: "from-accent/10",
     label: "Business Workspace",
     lead: "Compliance & brand safety at scale",
     bullets: [
-      "All 6 AI lenses run in parallel per video",
+      "Up to 8 AI lenses run in parallel per video",
       "RAG: claims verified against your product docs",
       "FTC / FDA disclosure detection, every sentence",
       "Narrative clustering across your full library",
@@ -303,7 +303,7 @@ export default function Home() {
             </p>
           </Reveal>
           <div className="mt-16 grid gap-8 sm:grid-cols-3">
-            {[["60s", "video analyzed in under a minute"], ["6", "AI lenses, run in parallel"], ["100%", "conclusions backed by evidence"]].map(([n, l], i) => (
+            {[["60s", "video analyzed in under a minute"], ["8", "AI lenses, run in parallel"], ["100%", "conclusions backed by evidence"]].map(([n, l], i) => (
               <Reveal key={l} delay={(i + 1) as 1 | 2 | 3}>
                 <div className="font-heavy text-6xl text-accent">{n}</div>
                 <div className="mt-1.5 text-xs text-ink-light font-semibold uppercase tracking-wider">{l}</div>

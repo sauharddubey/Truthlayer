@@ -4,23 +4,36 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createProduct, deleteProduct, listProducts, mediaUrl } from "@/lib/api";
 import { formatMetric } from "@/lib/formatMetric";
+import { useRoleGuard } from "@/lib/useRoleGuard";
 import { AppShell } from "@/components/AppShell";
 import { Box, Plus, ArrowRight } from "@/components/icons";
 
 const C = (t?: number | null) => (t == null ? "#9b9a97" : t >= 70 ? "#0f7b6c" : t >= 40 ? "#cb912f" : "#e03e3e");
 
 export default function ProductsPage() {
+  const guardOk = useRoleGuard(["business"]);
   const [products, setProducts] = useState<any[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", description: "", aliases: "" });
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"recent" | "name" | "trust" | "videos">("recent");
 
-  function load() { listProducts().then(setProducts).catch((e) => setError(e.message)); }
-  useEffect(load, []);
+  function load() {
+    listProducts()
+      .then((p) => { setProducts(p); setError(""); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, []);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    setCreating(true);
+    setError("");
     try {
       await createProduct({
         name: form.name, description: form.description,
@@ -28,7 +41,7 @@ export default function ProductsPage() {
       });
       setForm({ name: "", description: "", aliases: "" });
       setOpen(false); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(e.message); } finally { setCreating(false); }
   }
 
   async function removeProduct(e: React.MouseEvent, productId: string) {
@@ -48,9 +61,50 @@ export default function ProductsPage() {
     }
   }
 
+  const q = query.trim().toLowerCase();
+  const visible = products
+    .filter((p) => !q || p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))
+    .sort((a, b) => {
+      if (sort === "name") return (a.name || "").localeCompare(b.name || "");
+      if (sort === "trust") return (b.trust_score ?? -1) - (a.trust_score ?? -1);
+      if (sort === "videos") return (b.video_count ?? 0) - (a.video_count ?? 0);
+      return 0; // "recent": keep server order (newest first)
+    });
+
+  if (!guardOk) {
+    return (
+      <AppShell title="Products" wide>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell title="Products" wide>
-      <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        {products.length > 0 ? (
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <input
+              className="input max-w-xs"
+              type="search"
+              placeholder="Search products…"
+              aria-label="Search products"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <select
+              className="input w-auto"
+              aria-label="Sort products"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+            >
+              <option value="recent">Newest</option>
+              <option value="name">Name (A–Z)</option>
+              <option value="trust">Trust score</option>
+              <option value="videos">Most videos</option>
+            </select>
+          </div>
+        ) : <span />}
         <button className="btn-accent" onClick={() => setOpen(!open)}><Plus className="h-4 w-4" /> New product</button>
       </div>
 
@@ -76,15 +130,21 @@ export default function ProductsPage() {
               value={form.aliases} onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
           </div>
           <div className="flex gap-2 border-t border-white/10 pt-3">
-            <button className="btn-accent" type="submit">Create product</button>
-            <button className="btn-ghost" type="button" onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn-accent" type="submit" disabled={creating}>{creating ? "Creating…" : "Create product"}</button>
+            <button className="btn-ghost" type="button" onClick={() => setOpen(false)} disabled={creating}>Cancel</button>
           </div>
         </form>
       )}
 
-      {products.length > 0 ? (
+      {products.length > 0 && visible.length === 0 ? (
+        <div className="glass-board flex h-[30vh] w-full flex-col items-center justify-center gap-2 text-center">
+          <Box className="h-7 w-7 text-white/30" />
+          <p className="text-sm font-semibold text-white/80">No products match “{query}”</p>
+          <button className="text-xs text-accent hover:underline" onClick={() => setQuery("")}>Clear search</button>
+        </div>
+      ) : products.length > 0 ? (
         <div className="grid auto-rows-[210px] grid-cols-2 gap-4 lg:grid-cols-4">
-          {products.map((p, i) => {
+          {visible.map((p, i) => {
             const featured = i === 0;
             return (
               <Link key={p.id} href={`/products/${p.id}`}

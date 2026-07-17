@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useId, useState } from "react";
 import { clearAuth, getRole } from "@/lib/api";
 import { Modal } from "@/components/Modal";
-import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check } from "@/components/icons";
+import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check, BookOpen } from "@/components/icons";
 
 type Item = { href: string; label: string; icon: ReactNode };
 
@@ -146,6 +146,19 @@ export function DynamicNav() {
           >
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+
+          {/* docs */}
+          <Link
+            href="/docs"
+            aria-label="Documentation"
+            aria-current={pathname === "/docs" ? "page" : undefined}
+            title="Documentation"
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+              pathname === "/docs" ? "bg-white text-ink" : "text-white/70 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+          </Link>
 
           {/* onboarding guide */}
           {role && (

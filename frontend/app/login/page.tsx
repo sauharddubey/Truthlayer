@@ -44,7 +44,7 @@ export default function LoginPage() {
           </p>
           <div className="mt-8 space-y-3">
             {[
-              { icon: <ShieldCheck className="h-4 w-4 text-good" />, label: "6 parallel AI lenses per analysis" },
+              { icon: <ShieldCheck className="h-4 w-4 text-good" />, label: "Up to 8 parallel AI lenses per analysis" },
               { icon: <Check className="h-4 w-4 text-good" />,       label: "Every claim linked to evidence" },
               { icon: <Eye className="h-4 w-4 text-good" />,         label: "Deepfake & manipulation detection" },
             ].map((f) => (
@@ -90,7 +90,10 @@ export default function LoginPage() {
                   value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="label" htmlFor="login-password">Password</label>
+                <div className="flex items-center justify-between">
+                  <label className="label" htmlFor="login-password">Password</label>
+                  <Link href="/reset" className="text-xs font-semibold text-accent hover:underline">Forgot password?</Link>
+                </div>
                 <input id="login-password" className="input" type="password" placeholder="••••••••"
                   autoComplete="current-password"
                   value={password} onChange={(e) => setPassword(e.target.value)} required />

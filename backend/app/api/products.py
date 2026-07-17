@@ -169,6 +169,17 @@ def update_product(
         raise HTTPException(status_code=400, detail="Product name is required")
     p.name = name
     p.description = (payload.description or "").strip() or None
+    if payload.aliases is not None:
+        # Normalize: trim, drop blanks, de-dupe (case-insensitive), keep order.
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for a in payload.aliases:
+            a = (a or "").strip()
+            key = a.lower()
+            if a and key not in seen:
+                seen.add(key)
+                cleaned.append(a)
+        p.aliases = cleaned
     db.commit()
     db.refresh(p)
 

@@ -139,6 +139,26 @@ export async function signInWithGoogle(meta?: Partial<SignupMeta>) {
   if (error) throw new Error(error.message);
 }
 
+/** Send a password-reset email. The link returns the user to /reset with a
+ *  short-lived recovery session so they can set a new password. */
+export async function requestPasswordReset(email: string) {
+  const redirectTo = `${window.location.origin}/reset`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw new Error(error.message);
+}
+
+/** Set a new password (used on /reset once the recovery session is active). */
+export async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
+}
+
+/** Re-send the sign-up confirmation email (rescues the register dead-end). */
+export async function resendSignupConfirmation(email: string) {
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  if (error) throw new Error(error.message);
+}
+
 /** Called by /auth/callback after Supabase establishes the session. */
 export async function completeOAuth(): Promise<{ role: string }> {
   let pending: Partial<SignupMeta> | null = null;
@@ -159,6 +179,18 @@ export function routeForRole(role: string) {
   if (role === "business") return "/dashboard/brand";
   if (role === "creator") return "/dashboard/creator";
   return "/dashboard/verifier";
+}
+
+/**
+ * Switch the signed-in user's workspace/role. Reuses /auth/bootstrap (which
+ * creates an organization when switching to business). The backend ignores the
+ * change when the role is pinned in app_metadata (role_locked), so callers
+ * should check the returned role actually changed.
+ */
+export async function switchRole(role: string, organizationName?: string) {
+  const me = await bootstrapProfile({ role, organization_name: organizationName });
+  localStorage.setItem(ROLE_KEY, me.role);
+  return me as { role: string; role_locked?: boolean };
 }
 
 export function getRights() {
@@ -222,7 +254,7 @@ export function createProduct(p: { name: string; description?: string; aliases?:
 export function getProduct(id: string) {
   return request<any>(`/products/${id}`);
 }
-export function updateProduct(id: string, p: { name: string; description?: string }) {
+export function updateProduct(id: string, p: { name: string; description?: string; aliases?: string[] }) {
   return request<any>(`/products/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -313,12 +345,69 @@ export function submitUrl(url: string, productId?: string, rightsAttested?: bool
   });
 }
 
-export async function uploadVideo(file: File, productId?: string, rightsAttested?: boolean) {
+/** Mirrors the backend's MAX_UPLOAD_MB so we can reject early, before the wire. */
+export const MAX_UPLOAD_MB = 200;
+
+export type UploadOptions = {
+  /** Called with 0-100 as the file streams up. */
+  onProgress?: (percent: number) => void;
+  /** Abort the in-flight upload. */
+  signal?: AbortSignal;
+};
+
+/**
+ * Upload a video for analysis.
+ *
+ * Uses XMLHttpRequest rather than fetch: fetch exposes no upload-progress
+ * events, and a 200 MB file with no progress bar is indistinguishable from a
+ * hang. Also supports cancellation via `signal`.
+ */
+export async function uploadVideo(
+  file: File,
+  productId?: string,
+  rightsAttested?: boolean,
+  opts: UploadOptions = {}
+): Promise<any> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
   const fd = new FormData();
   fd.append("file", file);
   if (productId) fd.append("product_id", productId);
   fd.append("rights_attested", rightsAttested ? "true" : "false");
-  return request<any>("/videos/upload", { method: "POST", body: fd });
+
+  return new Promise<any>((resolve, reject) => {
+    if (opts.signal?.aborted) {
+      reject(new DOMException("Upload cancelled", "AbortError"));
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/videos/upload`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) opts.onProgress?.(Math.round((e.loaded / e.total) * 100));
+    };
+
+    xhr.onload = () => {
+      let body: any = {};
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON response — fall through to the status check */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(new Error(body?.detail || `Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed — check your connection and try again."));
+    xhr.ontimeout = () => reject(new Error("Upload timed out."));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+
+    opts.signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+
+    xhr.send(fd);
+  });
 }
 
 export function getAnalysis(videoId: string) {
@@ -374,6 +463,29 @@ export async function downloadReportPdf(videoId: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = `truthlayer-${videoId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Download the full analysis as a JSON file (auth token attached). */
+export async function downloadReportJson(videoId: string) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(`${API_URL}/reports/${videoId}/json`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.detail || `JSON export failed (${res.status})`);
+  }
+  const data_ = await res.json();
+  const blob = new Blob([JSON.stringify(data_, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `truthlayer-${videoId}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
