@@ -349,8 +349,9 @@ export default function SettingsPage() {
   const tPricing = selectedTranscription?.pricing;
 
   return (
-    <AppShell title="Settings">
-      <div className="max-w-2xl space-y-8">
+    <AppShell>
+      <div className="mx-auto max-w-2xl space-y-8">
+        <h1 className="font-heavy text-4xl text-ink">Settings</h1>
 
         {/* ── Usage dashboard ─────────────────────────────────────────────── */}
         <section>
@@ -431,7 +432,7 @@ export default function SettingsPage() {
                             <span><b className="text-ink">{fmtTokens(m.prompt_tokens)}</b> prompt</span>
                             <span><b className="text-ink">{fmtTokens(m.completion_tokens)}</b> completion</span>
                             <span><b className="text-ink">{m.calls}</b> calls</span>
-                            <span className="ml-auto font-semibold" style={{ color: m.cost_usd > 0 ? "#cb912f" : "#0f7b6c" }}>
+                            <span className="ml-auto font-semibold" style={{ color: m.cost_usd > 0 ? "rgb(var(--warn))" : "rgb(var(--good))" }}>
                               {fmtCost(m.cost_usd)}
                             </span>
                           </div>
@@ -443,7 +444,7 @@ export default function SettingsPage() {
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">Total</span>
                     <div className="flex gap-6 text-xs">
                       <span className="text-ink-faint"><b className="text-ink">{fmtTokens(usage.total_tokens)}</b> tokens</span>
-                      <span className="font-bold" style={{ color: usage.total_cost_usd > 0 ? "#cb912f" : "#0f7b6c" }}>
+                      <span className="font-bold" style={{ color: usage.total_cost_usd > 0 ? "rgb(var(--warn))" : "rgb(var(--good))" }}>
                         {fmtCost(usage.total_cost_usd)}
                       </span>
                     </div>
@@ -736,7 +737,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2.5">
                         <span className="text-[10px] font-semibold text-ink-light">Combined (audio in + text out)</span>
-                        <span className="font-bold text-sm" style={{ color: tPricing.audio + tPricing.completion > 0 ? "#cb912f" : "#0f7b6c" }}>
+                        <span className="font-bold text-sm" style={{ color: tPricing.audio + tPricing.completion > 0 ? "rgb(var(--warn))" : "rgb(var(--good))" }}>
                           {fmtPerM(tPricing.audio + tPricing.completion)} <span className="text-[10px] font-normal text-ink-faint">/ 1M tok</span>
                         </span>
                       </div>

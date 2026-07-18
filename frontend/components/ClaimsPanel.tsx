@@ -122,6 +122,9 @@ export function ClaimsPanel({
                   {c.evidence_quality_score != null && ` · evidence ${formatMetricPercent(c.evidence_quality_score)}`}
                   {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
                 </div>
+                {c.reasoning && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-light">{c.reasoning}</p>
+                )}
                 {c.insufficient_evidence_reasons?.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.insufficient_evidence_reasons.slice(0, 3).map((reason: string) => (

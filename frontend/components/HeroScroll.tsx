@@ -4,21 +4,19 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { PhoneMock } from "@/components/PhoneMock";
 import {
-  ArrowRight, ShieldCheck, Check, AlertTriangle, Sparkle, Play, AudioLines, ChevronDown,
+  ArrowRight, ShieldCheck, Check, AlertTriangle, FileSearch, ChevronDown,
 } from "@/components/icons";
 
 /**
- * Pinned, scroll-driven hero. The giant headline sits behind the phone; as you
- * scroll, the phone rises and scales toward you, the headline recedes, and the
- * floating bubbles + stickers spread apart and fade — creating a premium storytelling reveal.
+ * Pinned, scroll-driven hero — centered stack: headline, subtitle and CTAs on
+ * top, the phone rising into place beneath them with floating liquid-glass
+ * claim bubbles at its sides. Nothing ever overlaps the copy.
  */
 export function HeroScroll() {
   const section = useRef<HTMLElement>(null);
-  const headline = useRef<HTMLHeadingElement>(null);
+  const headline = useRef<HTMLDivElement>(null);
   const phone = useRef<HTMLDivElement>(null);
-  const left = useRef<HTMLDivElement>(null);
-  const right = useRef<HTMLDivElement>(null);
-  const cta = useRef<HTMLDivElement>(null);
+  const bubbles = useRef<HTMLDivElement>(null);
   const hint = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,36 +29,22 @@ export function HeroScroll() {
     const apply = () => {
       const rect = sec.getBoundingClientRect();
       const total = sec.offsetHeight - window.innerHeight;
-      const p = reduce ? 0 : clamp(-rect.top / Math.max(1, total));
+      const p = reduce ? 1 : clamp(-rect.top / Math.max(1, total));
 
-      // Continuous scale: phone rises on scroll (reaches full state at p = 0.85)
+      // Phone rises on scroll (settled at p = 0.85); bubbles fade in behind it
       const rise = clamp(p / 0.85);
-      const appear = clamp((p - 0.2) / 0.6); // bubbles and CTA fade in between 20% and 80%
+      const appear = clamp((p - 0.25) / 0.55);
 
       if (headline.current) {
-        headline.current.style.transform = `translateY(${-rise * 40}px) scale(${1 + rise * 0.05})`;
-        headline.current.style.opacity = `${1 - rise * 0.25}`;
+        headline.current.style.transform = `translateY(${-rise * 14}px)`;
       }
-      
       if (phone.current) {
-        const y = (1 - rise) * 520;
-        const scale = 0.8 + rise * 0.05; // settle at 0.85 scale to ensure perfect spacing
-        phone.current.style.transform = `translate(-50%, ${y}px) scale(${scale})`;
-        phone.current.style.opacity = "1";
+        const y = (1 - rise) * 220;
+        const scale = 0.92 + rise * 0.08;
+        phone.current.style.transform = `translateY(${y}px) scale(${scale})`;
       }
-
-      const groupOpacity = `${appear}`;
-      if (left.current) {
-        left.current.style.transform = `translateX(${(1 - appear) * -120}px)`;
-        left.current.style.opacity = groupOpacity;
-      }
-      if (right.current) {
-        right.current.style.transform = `translateX(${(1 - appear) * 120}px)`;
-        right.current.style.opacity = groupOpacity;
-      }
-      if (cta.current) {
-        cta.current.style.transform = "translateY(0px)";
-        cta.current.style.opacity = groupOpacity;
+      if (bubbles.current) {
+        bubbles.current.style.opacity = `${appear}`;
       }
       if (hint.current) hint.current.style.opacity = `${1 - rise * 2}`;
     };
@@ -69,7 +53,7 @@ export function HeroScroll() {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(apply);
     };
-    
+
     apply();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -82,55 +66,40 @@ export function HeroScroll() {
 
   return (
     <>
-      {/* Desktop: pinned scroll stage - 120vh scroll height for smooth, gradual timing */}
-      <section ref={section} className="relative hidden md:block" style={{ height: "120vh" }}>
-        <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-          {/* soft tint */}
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-[40rem] w-[60rem] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
-            style={{ background: "radial-gradient(circle,#e7f3fb,transparent 70%)" }} />
+      {/* Desktop: pinned scroll stage */}
+      <section ref={section} className="relative hidden md:block" style={{ height: "135vh" }}>
+        <div className="sticky top-0 flex h-screen flex-col items-center overflow-hidden">
 
-          <div className="relative mx-auto h-[640px] w-full max-w-6xl px-6">
-            {/* giant headline (behind) — the page h1 on desktop */}
-            <h1 ref={headline} className="pointer-events-none absolute inset-x-0 top-[45px] z-0 text-center font-heavy uppercase leading-[0.8] tracking-tight text-ink will-change-transform">
-              <span className="block text-[7rem] lg:text-[9rem]">Truth in</span>
-              <span className="block text-[7rem] lg:text-[9rem]">every video</span>
+          {/* top: centered headline + copy + CTA */}
+          <div ref={headline} className="relative z-10 flex flex-col items-center pt-[92px] text-center will-change-transform">
+            <span className="mb-7 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-4 py-2 text-[13px] font-semibold uppercase tracking-wider text-accent">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(10,122,255,0.8)]" />
+              AI video fact-checking
+            </span>
+            <h1 className="font-heavy text-[5rem] leading-[0.98] tracking-[-0.04em] text-ink lg:text-[6.5rem]">
+              Truth in <span className="text-shine">every video.</span>
             </h1>
+            <p className="mt-6 max-w-xl text-xl leading-relaxed text-ink-light">
+              Calibrated trust, parallel analyses, and automated verification — before your audience ever presses play.
+            </p>
+            <div className="mt-9 flex gap-3">
+              <Link href="/register" className="btn-accent px-7 py-3.5 text-base">Start free <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/docs" className="btn-ghost px-7 py-3.5 text-base">See how we help</Link>
+            </div>
+          </div>
 
-            {/* phone (front) — starts below the fold - Slimmed w-[260px] wrapper */}
-            <div ref={phone} className="absolute left-1/2 top-[25px] z-20 w-[260px] will-change-transform" style={{ transform: "translate(-50%,520px) scale(0.8)" }}>
+          {/* below: phone rising into place, glass bubbles at its sides */}
+          <div className="relative mt-8 w-full max-w-4xl flex-1">
+            <div ref={phone} className="absolute left-1/2 top-0 z-20 ml-[-130px] w-[260px] will-change-transform" style={{ transform: "translateY(220px) scale(0.92)" }}>
               <PhoneMock />
             </div>
-
-            {/* left cluster */}
-            <div ref={left} className="absolute inset-0 z-30 opacity-0 will-change-transform pointer-events-none">
-              <Bubble className="left-[6%] top-[140px]" side="right" msg="Supported claim" name="Wyatt" seed="b1" />
-              <Bubble className="left-[2%] top-[330px]" side="right" msg="1 compliance risk" name="Miles" seed="b2" />
-              <Bubble className="left-[9%] top-[510px]" side="right" msg="Clean deepfake check" name="Emma" seed="b3" />
-              <Sticker className="left-[20%] top-[420px]" rot={-12} grad="linear-gradient(135deg,#2383e2,#5eb0f0)"><ShieldCheck className="h-7 w-7" /></Sticker>
-              <Sticker className="left-[8%] top-[560px]" rot={14} grad="linear-gradient(135deg,#e03e3e,#ff7a7a)"><AlertTriangle className="h-7 w-7" /></Sticker>
-              <Sticker className="left-[26%] top-[600px]" rot={-6} grad="linear-gradient(135deg,#9b59ff,#c79bff)"><Play className="h-6 w-6" /></Sticker>
-            </div>
-
-            {/* right cluster */}
-            <div ref={right} className="absolute inset-0 z-30 opacity-0 will-change-transform pointer-events-none">
-              <div className="absolute right-[12%] top-[40px] flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-ink">Sauhard</span>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-paper text-xs font-bold text-white shadow-card" style={{ background: "#37352f" }}>S</span>
-              </div>
-              <Bubble className="right-[5%] top-[270px]" side="left" msg="Factual evidence linked" name="Alina" seed="b4" />
-              <Bubble className="right-[2%] top-[470px]" side="left" msg="Product alias matched" name="Servan" seed="b5" />
-              <Sticker className="right-[18%] top-[130px]" rot={10} grad="linear-gradient(135deg,#0f7b6c,#3fbfa9)"><Check className="h-7 w-7" /></Sticker>
-              <Sticker className="right-[20%] top-[520px]" rot={-8} grad="linear-gradient(135deg,#cb912f,#f0c14b)"><Sparkle className="h-7 w-7" /></Sticker>
-              <Sticker className="right-[26%] top-[600px]" rot={9} grad="linear-gradient(135deg,#37352f,#6b6862)"><AudioLines className="h-7 w-7" /></Sticker>
-            </div>
-
-            {/* CTA — Positioned bottom-[10px] inside parent to prevent clipping */}
-            <div ref={cta} className="absolute inset-x-0 bottom-[10px] z-30 flex flex-col items-center gap-3 opacity-0 will-change-transform">
-              <p className="max-w-md text-center text-sm font-semibold text-ink-light">Calibrated trust, parallel analyses, and automated verification.</p>
-              <div className="flex gap-3">
-                <Link href="/register" className="btn px-6 py-2.5 text-sm font-bold uppercase tracking-wider">Start free <ArrowRight className="h-3.5 w-3.5" /></Link>
-                <Link href="/docs" className="btn-ghost px-6 py-2.5 text-sm font-bold uppercase tracking-wider">See how we help</Link>
-              </div>
+            <div ref={bubbles} className="pointer-events-none absolute inset-0 z-30 opacity-0 will-change-transform">
+              <GlassBubble className="right-[calc(50%_+_175px)] top-[60px] float-a" tone="good" icon={<Check className="h-3 w-3" />} msg="Supported claim" name="Wyatt" />
+              <GlassBubble className="right-[calc(50%_+_195px)] top-[240px] float-b" tone="warn" icon={<AlertTriangle className="h-3 w-3" />} msg="1 compliance risk" name="Miles" />
+              <GlassBubble className="right-[calc(50%_+_170px)] top-[420px] float-a" tone="accent" icon={<FileSearch className="h-3 w-3" />} msg="Product alias matched" name="Servan" />
+              <GlassBubble className="left-[calc(50%_+_175px)] top-[120px] float-b" tone="accent" icon={<FileSearch className="h-3 w-3" />} msg="Evidence linked" name="Alina" />
+              <GlassBubble className="left-[calc(50%_+_195px)] top-[300px] float-a" tone="good" icon={<ShieldCheck className="h-3 w-3" />} msg="Deepfake check" name="Emma" />
+              <GlassBubble className="left-[calc(50%_+_170px)] top-[470px] float-b" tone="good" icon={<Check className="h-3 w-3" />} msg="Calibrated confidence" name="Sauhard" />
             </div>
           </div>
 
@@ -144,43 +113,34 @@ export function HeroScroll() {
 
       {/* Mobile static hero */}
       <section className="px-6 py-12 text-center md:hidden">
-        <h1 className="font-heavy text-6xl uppercase leading-[0.85] tracking-tight text-ink">Truth in every video</h1>
+        <h1 className="font-heavy text-5xl leading-[1.02] tracking-[-0.03em] text-ink">
+          Truth in<br /><span className="text-shine">every video.</span>
+        </h1>
         <p className="mx-auto mt-4 max-w-xs text-sm text-ink-light">Calibrated trust, parallel analyses, and evidence verification.</p>
-        <div className="mt-6 flex justify-center"><PhoneMock /></div>
-        <Link href="/register" className="btn mt-8 px-5 py-3">Start free <ArrowRight className="h-4 w-4" /></Link>
+        <div className="mt-8 flex justify-center"><PhoneMock /></div>
+        <Link href="/register" className="btn-accent mt-8 px-6 py-3">Start free <ArrowRight className="h-4 w-4" /></Link>
       </section>
     </>
   );
 }
 
-const AV: Record<string, string> = { b1: "#2383e2", b2: "#0f7b6c", b3: "#cb912f", b4: "#9b59ff", b5: "#e03e3e", luke: "#37352f" };
+const TONE: Record<string, string> = {
+  good: "rgb(var(--good))",
+  warn: "rgb(var(--warn))",
+  accent: "rgb(var(--accent))",
+};
 
-function Avatar({ name, seed }: { name: string; seed: string }) {
+function GlassBubble({ className = "", tone, icon, msg, name }: {
+  className?: string; tone: "good" | "warn" | "accent"; icon: React.ReactNode; msg: string; name: string;
+}) {
   return (
-    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm" style={{ background: AV[seed] || "#2383e2" }}>
-      {name[0]}
-    </span>
-  );
-}
-
-function Bubble({ className = "", msg, name, seed, side }: { className?: string; msg: string; name: string; seed: string; side: "left" | "right" }) {
-  return (
-    <div className={`absolute ${side === "right" ? "float-a" : "float-b"} ${className}`}>
-      <div className="w-max rounded-xl border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink shadow-card">{msg}</div>
-      <div className={`mt-1 flex items-center gap-1.5 ${side === "right" ? "justify-end" : "justify-start"}`}>
-        {side === "left" && <Avatar name={name} seed={seed} />}
-        <span className="text-[10px] font-bold text-ink-light">{name}</span>
-        {side === "right" && <Avatar name={name} seed={seed} />}
-      </div>
-    </div>
-  );
-}
-
-function Sticker({ className = "", grad, rot = 0, children }: { className?: string; grad: string; rot?: number; children: React.ReactNode }) {
-  return (
-    <div className={`absolute ${rot % 2 ? "float-a" : "float-b"} ${className}`} style={{ ["--r" as any]: `${rot}deg` }}>
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-pop" style={{ background: grad, transform: `rotate(${rot}deg)` }}>
-        {children}
+    <div className={`absolute ${className}`}>
+      <div className="island flex w-max items-center gap-2.5 rounded-full py-2.5 pl-3 pr-4">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: TONE[tone] }}>
+          {icon}
+        </span>
+        <span className="text-sm font-semibold text-ink">{msg}</span>
+        <span className="text-xs font-bold text-ink-faint">{name}</span>
       </div>
     </div>
   );

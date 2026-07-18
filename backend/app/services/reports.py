@@ -44,17 +44,27 @@ def build_pdf(video: Video) -> bytes:
 
     report = video.report
     if report:
-        data = [
-            ["Metric", "Score"],
-            ["Trust", _fmt(report.trust_score)],
-            ["Risk", _fmt(report.risk_score)],
-            ["Compliance", _fmt(report.compliance_score)],
-            ["Bias", _fmt(report.bias_score)],
-            ["Sentiment", _fmt(report.sentiment_score)],
-            ["Authenticity", _fmt(report.authenticity_score)],
-            ["Narrative leaning", report.narrative_leaning or "n/a"],
-            ["Overall confidence", _fmt(report.overall_confidence, pct=False)],
-        ]
+        # Only list metrics the analysis actually assessed. Which AI lenses run
+        # depends on the tier (verifier = fact-check only; creator adds risk /
+        # bias / sentiment / perception; business adds compliance + media
+        # integrity), so printing every row would show "n/a" for dimensions that
+        # were never computed. Mirror the on-screen bento, which hides them.
+        agents = report.agent_results or {}
+        data = [["Metric", "Score"], ["Trust", _fmt(report.trust_score)]]
+        if report.risk_score is not None:
+            data.append(["Risk", _fmt(report.risk_score)])
+        if "compliance" in agents:
+            data.append(["Compliance", _fmt(report.compliance_score)])
+        if "bias" in agents:
+            data.append(["Bias", _fmt(report.bias_score)])
+        if "sentiment" in agents and report.sentiment_score is not None:
+            # Model emits sentiment on a -1..1 scale; present it 0..100 like the UI.
+            data.append(["Sentiment", _fmt((report.sentiment_score + 1) * 50)])
+        if "media_integrity" in agents:
+            data.append(["Authenticity", _fmt(report.authenticity_score)])
+        if report.narrative_leaning:
+            data.append(["Narrative leaning", report.narrative_leaning])
+        data.append(["Overall confidence", _fmt(report.overall_confidence, pct=False)])
         table = Table(data, colWidths=[2.5 * inch, 2.5 * inch])
         table.setStyle(
             TableStyle(

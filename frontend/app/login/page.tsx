@@ -36,8 +36,8 @@ export default function LoginPage() {
         </Link>
 
         <div>
-          <h1 className="font-heavy text-5xl uppercase leading-[0.9] tracking-tight text-paper">
-            Truth in<br />every video
+          <h1 className="font-heavy text-5xl leading-[1.02] text-paper">
+            Truth in<br /><span className="text-shine">every video</span>
           </h1>
           <p className="mt-4 max-w-xs text-sm text-paper/60 leading-relaxed">
             AI trust, compliance and media intelligence. Calibrated verdicts backed by evidence.
@@ -49,7 +49,7 @@ export default function LoginPage() {
               { icon: <Eye className="h-4 w-4 text-good" />,         label: "Deepfake & manipulation detection" },
             ].map((f) => (
               <div key={f.label} className="flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10">{f.icon}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink/5 border border-line">{f.icon}</span>
                 <span className="text-xs font-semibold text-paper/70">{f.label}</span>
               </div>
             ))}
@@ -71,7 +71,7 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <h2 className="font-heavy text-3xl uppercase tracking-tight text-ink">Welcome back</h2>
+            <h2 className="font-heavy text-3xl text-ink">Welcome back</h2>
             <p className="mt-1.5 text-sm text-ink-light">Sign in to your workspace.</p>
           </div>
 

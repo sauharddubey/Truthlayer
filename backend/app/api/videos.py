@@ -233,6 +233,16 @@ def start_analysis(
     video = _get_scoped(db, payload.video_id, user)
     video.processing_status = ProcessingStatus.PENDING
     video.error = None
+    # Re-analysis reflects the submitter's CURRENT workspace role, so switching
+    # role (e.g. Verifier -> Creator) and re-analyzing runs the new tier's lenses
+    # instead of replaying the tier captured when the video was first submitted.
+    # Both fields must stay in sync: the pipeline selects agents by the metadata
+    # tier, while the API/frontend/PDF read video.mode.
+    # Reassign the dict (not in-place mutate) so SQLAlchemy tracks the JSON change.
+    meta = dict(video.extra_metadata or {})
+    meta["tier"] = tier_for_role(user.role)
+    video.extra_metadata = meta
+    video.mode = _ROLE_MODE.get(user.role, AnalysisMode.VERIFIER)
     db.commit()
     _enqueue(video.id, background)
     return video

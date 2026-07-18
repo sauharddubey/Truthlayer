@@ -265,8 +265,8 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 border border-accent/20 animate-pulse mb-3">
                   <Sparkle className="h-5 w-5 text-accent" />
                 </div>
-                <h2 className="text-lg font-heavy uppercase tracking-tight text-white">Auditing Video Content</h2>
-                <p className="mt-1 text-xs text-white/70">Our multi-agent AI fleet is scanning your media...</p>
+                <h2 className="text-lg font-heavy text-ink">Auditing Video Content</h2>
+                <p className="mt-1 text-xs text-ink-light">Our multi-agent AI fleet is scanning your media...</p>
               </div>
 
               {/* Connection trouble — the run continues server-side either way. */}
@@ -293,14 +293,14 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
               <div
                 role="status"
                 aria-live="polite"
-                className="rounded-xl bg-white/5 border border-white/[0.03] p-4"
+                className="rounded-xl bg-ink/5 border border-line p-4"
               >
-                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/70">
+                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-ink-light">
                   <span>Audit Progress</span>
                   <span className="text-accent">{pct}%</span>
                 </div>
                 <div
-                  className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+                  className="h-2 w-full overflow-hidden rounded-full bg-ink/5"
                   role="progressbar"
                   aria-valuenow={pct}
                   aria-valuemin={0}
@@ -322,18 +322,18 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                   const isActive = idx === currentIdx;
                   const isUpcoming = idx > currentIdx;
 
-                  let borderCol = "border-white/5";
-                  let bgCol = "bg-white/[0.02]";
-                  let textCol = "text-white/70";
+                  let borderCol = "border-line";
+                  let bgCol = "bg-ink/5";
+                  let textCol = "text-ink-light";
                   
                   if (isActive) {
                     borderCol = "border-accent/30 bg-accent/5";
                     bgCol = "bg-accent/10";
-                    textCol = "text-white font-semibold";
+                    textCol = "text-ink font-semibold";
                   } else if (isCompleted) {
                     borderCol = "border-good/20 bg-good/[0.02]";
                     bgCol = "bg-good/5";
-                    textCol = "text-white/80";
+                    textCol = "text-ink";
                   }
 
                   return (
@@ -349,7 +349,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                               ? "border-good/30 bg-good/10 text-good"
                               : isActive
                               ? "border-accent/40 bg-accent/20 text-accent animate-pulse"
-                              : "border-white/10 bg-white/5 text-white/70"
+                              : "border-line bg-ink/5 text-ink-light"
                           }`}
                         >
                           {isCompleted ? (
@@ -373,10 +373,10 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                         <p
                           className={`mt-1 text-[11px] leading-relaxed transition-colors duration-300 ${
                             isActive
-                              ? "text-white/70 font-medium"
+                              ? "text-ink-light font-medium"
                               : isCompleted
-                              ? "text-white/70"
-                              : "text-white/70"
+                              ? "text-ink-light"
+                              : "text-ink-light"
                           }`}
                         >
                           {s.desc}
@@ -422,7 +422,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             </span>
             {isProduct && products.length > 0 && <span className="chip">{products.slice(0, 2).join(", ")}</span>}
           </div>
-          <h1 className="font-heavy text-2xl uppercase leading-tight tracking-tight text-ink">{video.title || "Analysis"}</h1>
+          <h1 className="font-heavy text-4xl leading-[1.08] text-ink">{video.title || "Analysis"}</h1>
           {safeExternalUrl(video.source_url) && (
             <a
               href={safeExternalUrl(video.source_url) as string}
@@ -436,7 +436,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
           )}
         </div>
         <div className="flex shrink-0 gap-2">
-          <button className="btn" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Re-analyzing…" : "Re-analyze"} <ArrowRight className="h-3.5 w-3.5" /></button>
+          <button className="btn-accent" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Re-analyzing…" : "Re-analyze"} <ArrowRight className="h-3.5 w-3.5" /></button>
           <button
             className="btn-ghost"
             disabled={downloadingPdf}

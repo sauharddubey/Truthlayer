@@ -8,7 +8,7 @@ import { useRoleGuard } from "@/lib/useRoleGuard";
 import { AppShell } from "@/components/AppShell";
 import { Box, Plus, ArrowRight } from "@/components/icons";
 
-const C = (t?: number | null) => (t == null ? "#9b9a97" : t >= 70 ? "#0f7b6c" : t >= 40 ? "#cb912f" : "#e03e3e");
+const C = (t?: number | null) => (t == null ? "rgb(var(--ink-faint))" : t >= 70 ? "rgb(var(--good))" : t >= 40 ? "rgb(var(--warn))" : "rgb(var(--bad))");
 
 export default function ProductsPage() {
   const guardOk = useRoleGuard(["business"]);
@@ -112,24 +112,24 @@ export default function ProductsPage() {
 
       {open && (
         <form onSubmit={create} className="glass-tile mb-5 space-y-4 p-5 n-fade">
-          <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">New product</div>
+          <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">New product</div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/50">Product name</label>
-            <input className="input border-white/10 bg-white/5 text-white placeholder-white/30" placeholder="Hydration Serum XL"
+            <label className="mb-1.5 block text-xs font-medium text-ink-light">Product name</label>
+            <input className="input border-line bg-ink/5 text-ink placeholder-ink-faint" placeholder="Hydration Serum XL"
               value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/50">Product details</label>
-            <textarea className="input border-white/10 bg-white/5 text-white placeholder-white/30" rows={3}
+            <label className="mb-1.5 block text-xs font-medium text-ink-light">Product details</label>
+            <textarea className="input border-line bg-ink/5 text-ink placeholder-ink-faint" rows={3}
               placeholder="What it is, key specs, approved claims, restrictions…"
               value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/50">Aliases <span className="font-normal text-white/30">(comma-separated)</span></label>
-            <input className="input border-white/10 bg-white/5 text-white placeholder-white/30" placeholder="Other names used in creator videos"
+            <label className="mb-1.5 block text-xs font-medium text-ink-light">Aliases <span className="font-normal text-ink-faint">(comma-separated)</span></label>
+            <input className="input border-line bg-ink/5 text-ink placeholder-ink-faint" placeholder="Other names used in creator videos"
               value={form.aliases} onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
           </div>
-          <div className="flex gap-2 border-t border-white/10 pt-3">
+          <div className="flex gap-2 border-t border-line pt-3">
             <button className="btn-accent" type="submit" disabled={creating}>{creating ? "Creating…" : "Create product"}</button>
             <button className="btn-ghost" type="button" onClick={() => setOpen(false)} disabled={creating}>Cancel</button>
           </div>
@@ -138,8 +138,8 @@ export default function ProductsPage() {
 
       {products.length > 0 && visible.length === 0 ? (
         <div className="glass-board flex h-[30vh] w-full flex-col items-center justify-center gap-2 text-center">
-          <Box className="h-7 w-7 text-white/30" />
-          <p className="text-sm font-semibold text-white/80">No products match “{query}”</p>
+          <Box className="h-7 w-7 text-ink-faint" />
+          <p className="text-sm font-semibold text-ink">No products match “{query}”</p>
           <button className="text-xs text-accent hover:underline" onClick={() => setQuery("")}>Clear search</button>
         </div>
       ) : products.length > 0 ? (
@@ -148,18 +148,18 @@ export default function ProductsPage() {
             const featured = i === 0;
             return (
               <Link key={p.id} href={`/products/${p.id}`}
-                className={`group relative overflow-hidden rounded-[20px] border border-white/5 shadow-2xl ${featured ? "col-span-2 row-span-2" : "col-span-2 lg:col-span-1"}`}>
+                className={`group relative overflow-hidden rounded-[20px] border border-line shadow-2xl ${featured ? "col-span-2 row-span-2" : "col-span-2 lg:col-span-1"}`}>
                 {/* image / fallback */}
                 {p.image_url ? (
                   <img src={mediaUrl(p.image_url)!} alt={p.name} className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a1f]"><Box className="h-10 w-10 text-white/15" /></div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a1f]"><Box className="h-10 w-10 text-ink-faint" /></div>
                 )}
                 {/* dark gradient for legibility */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                 <button
                   type="button"
-                  className="absolute left-3 top-3 z-10 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-bad backdrop-blur transition hover:bg-black/60"
+                  className="absolute left-3 top-3 z-10 rounded-full border border-line bg-black/40 px-2.5 py-1 text-[11px] font-bold text-bad backdrop-blur transition hover:bg-black/60"
                   onClick={(e) => removeProduct(e, p.id)}
                   disabled={deletingId === p.id}
                 >
@@ -167,18 +167,18 @@ export default function ProductsPage() {
                 </button>
                 {/* trust badge */}
                 {p.trust_score != null && (
-                  <span className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white backdrop-blur"
+                  <span className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-ink backdrop-blur"
                     style={{ background: C(p.trust_score) + "cc" }}>
                     {formatMetric(p.trust_score)}
                   </span>
                 )}
                 {/* meta */}
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className={`font-bold text-white ${featured ? "text-xl" : "text-sm"}`}>{p.name}</div>
-                  {featured && p.description && <p className="mt-1 line-clamp-2 max-w-md text-xs text-white/60">{p.description}</p>}
-                  <div className="mt-2 flex items-center gap-2 text-[11px] font-bold text-white/50">
+                  <div className={`font-bold text-ink ${featured ? "text-xl" : "text-sm"}`}>{p.name}</div>
+                  {featured && p.description && <p className="mt-1 line-clamp-2 max-w-md text-xs text-ink-light">{p.description}</p>}
+                  <div className="mt-2 flex items-center gap-2 text-[11px] font-bold text-ink-light">
                     <span>{p.video_count ?? 0} videos</span>
-                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:text-white" />
+                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:text-ink" />
                   </div>
                 </div>
               </Link>
@@ -188,9 +188,9 @@ export default function ProductsPage() {
       ) : (
         !open && (
           <div className="glass-board flex h-[44vh] w-full flex-col items-center justify-center gap-2 text-center">
-            <Box className="h-8 w-8 text-white/30" />
-            <p className="text-sm font-semibold text-white/80">No products yet</p>
-            <p className="max-w-xs text-xs text-white/40">Use <span className="font-semibold text-white/60">New product</span> above to create your first one.</p>
+            <Box className="h-8 w-8 text-ink-faint" />
+            <p className="text-sm font-semibold text-ink">No products yet</p>
+            <p className="max-w-xs text-xs text-ink-faint">Use <span className="font-semibold text-ink-light">New product</span> above to create your first one.</p>
           </div>
         )
       )}

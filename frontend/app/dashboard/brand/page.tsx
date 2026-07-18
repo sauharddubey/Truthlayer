@@ -9,10 +9,10 @@ import { useRoleGuard } from "@/lib/useRoleGuard";
 import { AppShell } from "@/components/AppShell";
 import { ArrowRight, Box, Plus, Network } from "@/components/icons";
 
-function GlassStat({ label, value, color = "#2383e2", isCount = false }: { label: string; value: any; color?: string; isCount?: boolean }) {
+function GlassStat({ label, value, color = "rgb(var(--accent))", isCount = false }: { label: string; value: any; color?: string; isCount?: boolean }) {
   return (
     <div className="glass-tile p-5">
-      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">{label}</div>
+      <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">{label}</div>
       <div className="mt-1 font-heavy text-4xl" style={{ color }}>{formatStatDisplay(value, isCount)}</div>
     </div>
   );
@@ -88,17 +88,17 @@ export default function BrandDashboard() {
 
       {/* Stat row */}
       <div className="mb-4 grid gap-4 sm:grid-cols-3">
-        <GlassStat label="Brand perception" value={sentiment} color="#2383e2" />
-        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="#0f7b6c" isCount />
-        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="#cb912f" isCount />
+        <GlassStat label="Brand perception" value={sentiment} color="rgb(var(--accent))" />
+        <GlassStat label="Products" value={data?.products?.length ?? "—"} color="rgb(var(--good))" isCount />
+        <GlassStat label="Narrative clusters" value={data?.narrative_clusters?.length ?? "—"} color="rgb(var(--warn))" isCount />
       </div>
 
       {/* Brand identity */}
       <div className="glass-tile mb-4 p-6">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-40" />
         <div className="relative z-10">
-          <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40 mb-3">Brand identity</div>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint mb-3">Brand identity</div>
+          <p className="text-sm text-ink-light leading-relaxed">
             {data?.brand_identity || "Add products and analyze videos to build your brand profile."}
           </p>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -106,22 +106,22 @@ export default function BrandDashboard() {
               <div className="text-[9px] font-extrabold uppercase tracking-widest text-good mb-2">Strengths</div>
               <ul className="space-y-1.5">
                 {(data?.strengths || []).map((s: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-white/60">
+                  <li key={i} className="flex items-start gap-2 text-sm text-ink-light">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-good" /> {s}
                   </li>
                 ))}
-                {!data?.strengths?.length && <li className="text-sm text-white/30">—</li>}
+                {!data?.strengths?.length && <li className="text-sm text-ink-faint">—</li>}
               </ul>
             </div>
             <div>
               <div className="text-[9px] font-extrabold uppercase tracking-widest text-bad mb-2">Weaknesses</div>
               <ul className="space-y-1.5">
                 {(data?.weaknesses || []).map((s: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-white/60">
+                  <li key={i} className="flex items-start gap-2 text-sm text-ink-light">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-bad" /> {s}
                   </li>
                 ))}
-                {!data?.weaknesses?.length && <li className="text-sm text-white/30">—</li>}
+                {!data?.weaknesses?.length && <li className="text-sm text-ink-faint">—</li>}
               </ul>
             </div>
           </div>
@@ -167,15 +167,15 @@ export default function BrandDashboard() {
       {/* Hashtags + narratives */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="glass-tile p-5">
-          <div className="text-base font-bold text-white mb-1">Brand hashtags</div>
-          <p className="text-sm text-white/50 mb-4">Monitor general brand perception across these tags.</p>
+          <div className="text-base font-bold text-ink mb-1">Brand hashtags</div>
+          <p className="text-sm text-ink-light mb-4">Monitor general brand perception across these tags.</p>
           <form onSubmit={addKw} className="flex gap-2">
-            <input className="input border-white/10 bg-white/5 text-white placeholder-white/30" placeholder="#yourbrand" value={kw} onChange={(e) => setKw(e.target.value)} required />
+            <input className="input border-line bg-ink/5 text-ink placeholder-ink-faint" placeholder="#yourbrand" value={kw} onChange={(e) => setKw(e.target.value)} required />
             <button className="btn-accent shrink-0"><Plus className="h-4 w-4" /></button>
           </form>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(data?.brand_keywords || []).map((k: any) => (
-              <span key={k.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-white/70">
+              <span key={k.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-ink/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-ink-light">
                 {k.keyword}
                 <button
                   type="button"
@@ -190,14 +190,14 @@ export default function BrandDashboard() {
             ))}
           </div>
           {(data?.brand_hashtag_video_matches || []).length > 0 && (
-            <div className="mt-4 border-t border-white/10 pt-4">
-              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">Recent video hashtag status</div>
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">Recent video hashtag status</div>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {data.brand_hashtag_video_matches.slice(0, 8).map((v: any) => (
-                  <div key={v.video_id} className="rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-xs">
-                    <Link href={`/analysis/${v.video_id}`} className="font-semibold text-white hover:underline">{v.title}</Link>
+                  <div key={v.video_id} className="rounded-lg border border-line bg-ink/5 px-3 py-2 text-xs">
+                    <Link href={`/analysis/${v.video_id}`} className="font-semibold text-ink hover:underline">{v.title}</Link>
                     {!v.description_available ? (
-                      <p className="mt-1 text-white/40">No description available</p>
+                      <p className="mt-1 text-ink-faint">No description available</p>
                     ) : (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {(v.present_keywords || []).map((tag: string) => (
@@ -216,17 +216,17 @@ export default function BrandDashboard() {
         </div>
 
         <div className="glass-tile p-5">
-          <div className="flex items-center gap-2 text-base font-bold text-white mb-3">
+          <div className="flex items-center gap-2 text-base font-bold text-ink mb-3">
             <Network className="h-4 w-4 text-warn" /> Narratives
           </div>
           <div className="space-y-0.5">
             {(data?.narrative_clusters || []).slice(0, 5).map((c: any) => (
-              <div key={c.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition hover:bg-white/5">
-                <span className="text-white/80">{c.topic}</span>
+              <div key={c.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition hover:bg-hover">
+                <span className="text-ink">{c.topic}</span>
                 <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">risk {formatMetric(c.risk_score)}</span>
               </div>
             ))}
-            {!data?.narrative_clusters?.length && <p className="py-2 text-sm text-white/30">No narratives yet — analyze more videos.</p>}
+            {!data?.narrative_clusters?.length && <p className="py-2 text-sm text-ink-faint">No narratives yet — analyze more videos.</p>}
           </div>
         </div>
       </div>

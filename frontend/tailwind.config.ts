@@ -6,7 +6,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Notion-style palette
+        // Apple system palette (light/dark values live in globals.css :root vars)
         ink: "rgb(var(--ink) / <alpha-value>)",
         "ink-light": "rgb(var(--ink-light) / <alpha-value>)",
         "ink-faint": "rgb(var(--ink-faint) / <alpha-value>)",
@@ -22,18 +22,28 @@ const config: Config = {
         bad: "rgb(var(--bad) / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica", "Arial", "sans-serif"],
-        display: ["Fraunces", "Georgia", "Cambria", "Times New Roman", "serif"],
-        heavy: ["Anton", "Inter", "Impact", "sans-serif"],
+        // SF Pro everywhere — graceful fallbacks off-Apple platforms
+        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Inter", "Segoe UI", "Arial", "sans-serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Helvetica Neue", "Inter", "sans-serif"],
+        heavy: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Helvetica Neue", "Inter", "sans-serif"],
+      },
+      fontSize: {
+        // Slightly larger reading sizes (iOS-style) than Tailwind defaults
+        xs: ["13px", { lineHeight: "1.4" }],
+        sm: ["15px", { lineHeight: "1.5" }],
+        base: ["16px", { lineHeight: "1.55" }],
       },
       borderRadius: {
-        DEFAULT: "6px",
-        md: "8px",
-        lg: "12px",
+        DEFAULT: "10px",
+        md: "12px",
+        lg: "16px",
+        xl: "20px",
+        "2xl": "26px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(15,15,15,0.04), 0 2px 8px rgba(15,15,15,0.03)",
-        pop: "0 8px 28px rgba(15,15,15,0.10)",
+        card: "inset 0 1px 1px rgba(255,255,255,0.5), 0 1px 2px rgba(15,20,40,0.04), 0 6px 24px rgba(15,20,40,0.06)",
+        pop: "0 12px 40px rgba(15,20,40,0.16)",
+        glass: "inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 1px rgba(255,255,255,0.2), 0 12px 40px rgba(31,38,66,0.12)",
       },
     },
   },

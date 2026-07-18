@@ -72,7 +72,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
         }`}>
           <div className="font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{
-              backgroundColor: ocr.ocr_analysis.relationship_verdict === "unrelated" ? "#e03e3e" : ocr.ocr_analysis.relationship_verdict === "partially_related" ? "#cb912f" : "#0f7b6c"
+              backgroundColor: ocr.ocr_analysis.relationship_verdict === "unrelated" ? "rgb(var(--bad))" : ocr.ocr_analysis.relationship_verdict === "partially_related" ? "rgb(var(--warn))" : "rgb(var(--good))"
             }} />
             Speech Relationship: {(ocr.ocr_analysis.relationship_verdict || "unknown").replace(/_/g, " ")}
           </div>
@@ -93,7 +93,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
           return (
             <div key={i} className={`rounded-r-md py-2 pl-3 pr-2 ${st.row}`}>
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-ink-faint">{fmt(s.start)}</span>
+                <span className="mt-0.5 shrink-0 font-mono text-xs font-bold tabular-nums text-accent">{fmt(s.start)}</span>
                 <p className="flex-1 text-sm text-ink">{segmentText(s.text)}</p>
                 {label !== "safe" && (
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${st.tag}`}>{st.label}</span>
@@ -113,7 +113,7 @@ export function TranscriptPanel({ segments, ocr }: { segments: Segment[]; ocr?: 
           </div>
         )}
       </div>
-      <div className="mt-2 text-[10px] font-bold text-white/40">
+      <div className="mt-2 text-[10px] font-bold text-ink-faint">
         {rows.length} segments · {ocr ? "OCR on-screen text" : "speech transcript"}
       </div>
     </div>
