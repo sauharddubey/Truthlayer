@@ -13,9 +13,10 @@ const DEFAULT_LLM_MODELS = [
   { id: "meta-llama/llama-3.1-8b-instruct:free", name: "Llama 3.1 8B Instruct (Free)" },
 ];
 
+// Only 1536-dimension models: the pgvector column is fixed at EMBEDDINGS_DIM
+// (1536) on first run, so text-embedding-3-large (3072-dim) would fail.
 const DEFAULT_EMBEDDING_MODELS = [
-  { id: "openai/text-embedding-3-small", name: "Text Embedding 3 Small (Default)" },
-  { id: "openai/text-embedding-3-large", name: "Text Embedding 3 Large" },
+  { id: "openai/text-embedding-3-small", name: "Text Embedding 3 Small (1536-dim · Default)" },
 ];
 
 /** Per-token USD pricing pulled from OpenRouter. */
@@ -175,12 +176,19 @@ export default function SettingsPage() {
         if (data && Array.isArray(data.data)) {
           const all: any[] = data.data;
 
+          // Chat LLM must accept text in and produce text out. This excludes
+          // embedding models, audio-only transcription models, and image
+          // generation models — none of which can run the reasoning agents.
           const llms = all
-            .filter((m) => !m.id.includes("embed"))
-            .map((m) => ({ id: m.id, name: m.name || m.id }));
-
-          const embeds = all
-            .filter((m) => m.id.includes("embed"))
+            .filter((m) => {
+              const inMod: string[] = m.architecture?.input_modalities || [];
+              const outMod: string[] = m.architecture?.output_modalities || [];
+              return (
+                inMod.includes("text") &&
+                (outMod.length === 0 || outMod.includes("text")) &&
+                !m.id.includes("embed")
+              );
+            })
             .map((m) => ({ id: m.id, name: m.name || m.id }));
 
           // Only models that accept audio as an input modality can transcribe.
@@ -213,7 +221,11 @@ export default function SettingsPage() {
           };
 
           setLlmModels(mergeModels(DEFAULT_LLM_MODELS, llms));
-          setEmbedModels(mergeModels(DEFAULT_EMBEDDING_MODELS, embeds));
+          // Embeddings are intentionally NOT populated from the live list: the
+          // pgvector column width is fixed at EMBEDDINGS_DIM (1536) on first run,
+          // so only dimension-1536 models work. DEFAULT_EMBEDDING_MODELS holds
+          // the compatible option; offering arbitrary embed models would let a
+          // user pick a mismatched dimension that fails at ingestion time.
           if (transcriptions.length) setTranscriptionModels(transcriptions);
         }
       })
@@ -509,7 +521,7 @@ export default function SettingsPage() {
                 <div className="flex gap-3">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-good/10 text-good font-bold">2</div>
                   <div>
-                    <strong className="text-ink">Multimodal Transcription &amp; OCR (Vision):</strong> Gemini audio/vision models transcribe the speech track, perform optical character recognition (OCR) on video frames, check text-to-speech alignment, and power the Video Segment Analysis.
+                    <strong className="text-ink">Audio Transcription (Speech-to-Text):</strong> Your selected audio model transcribes the spoken track. Only models that accept audio input are offered. On-screen text OCR, text-to-speech alignment, and Video Segment Analysis run automatically on a dedicated vision model — no configuration needed.
                   </div>
                 </div>
                 <div className="flex gap-3">

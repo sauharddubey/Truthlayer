@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteVideo, getAnalysis, getRole, reportPdfUrl, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
+import { deleteVideo, downloadReportPdf, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
 import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, ArrowUpRight, AlertTriangle } from "@/components/icons";
@@ -49,6 +49,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   const [nonce, setNonce]     = useState(0);
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [role, setRole]       = useState<string | null>(null);
   const timer = useRef<any>(null);
 
@@ -268,7 +269,23 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         </div>
         <div className="flex shrink-0 gap-2">
           <button className="btn" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Re-analyzing…" : "Re-analyze"} <ArrowRight className="h-3.5 w-3.5" /></button>
-          <a className="btn-ghost" href={reportPdfUrl(video.id)} target="_blank" rel="noreferrer">PDF</a>
+          <button
+            className="btn-ghost"
+            disabled={downloadingPdf}
+            onClick={async () => {
+              setDownloadingPdf(true);
+              setError("");
+              try {
+                await downloadReportPdf(video.id);
+              } catch (e: any) {
+                setError(e.message || "PDF download failed.");
+              } finally {
+                setDownloadingPdf(false);
+              }
+            }}
+          >
+            {downloadingPdf ? "Preparing…" : "PDF"}
+          </button>
           <button className="btn-ghost text-bad" disabled={deleting} onClick={removeAnalysis}>{deleting ? "Deleting…" : "Delete"}</button>
         </div>
       </div>

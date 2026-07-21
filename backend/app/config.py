@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     TRANSCRIPTION_PROVIDER: str = "openrouter"
     TRANSCRIPTION_MODEL: str = "google/gemini-2.5-flash-lite"
 
+    # ── Vision / OCR ──────────────────────────────────────────────────────
+    # OCR reads video keyframes (image input), so this MUST be a vision-capable
+    # model — kept separate from TRANSCRIPTION_MODEL, which only needs audio
+    # input. Using an audio-only transcription model here (e.g. gpt-audio-mini)
+    # makes OpenRouter reject the request with "No endpoints found that support
+    # image input". Not "-lite": the lite tier degenerates into repetition loops
+    # (finish_reason=error) on dense multi-frame OCR; the full Flash model returns
+    # clean JSON. gpt-4o-mini is an equally reliable alternative.
+    VISION_MODEL: str = "google/gemini-2.5-flash"
+
     # ── Media integrity ───────────────────────────────────────────────────
     # Provider adapter: "hive" enables Hive deepfake detection (business tier).
     # The API key is per-user in Settings; only non-secret config lives here.

@@ -318,6 +318,32 @@ export function reportPdfUrl(videoId: string) {
   return `${API_URL}/reports/${videoId}/pdf`;
 }
 
+/**
+ * Download the PDF report with the user's auth token attached.
+ * A plain <a href> can't send the Authorization header, so the endpoint would
+ * reject it with 401 — fetch it as a blob and trigger the download instead.
+ */
+export async function downloadReportPdf(videoId: string) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(reportPdfUrl(videoId), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.detail || `PDF download failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `truthlayer-${videoId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Resolve a stored media path (/media/...) to an absolute URL. */
 export function mediaUrl(path?: string | null) {
   if (!path) return null;

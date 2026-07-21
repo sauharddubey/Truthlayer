@@ -109,6 +109,15 @@ def effective_transcription_model() -> str:
     return _runtime_transcription_model.get() or settings.TRANSCRIPTION_MODEL
 
 
+def effective_vision_model() -> str:
+    """Model used for image/vision work (frame OCR, video segment analysis).
+
+    Distinct from the transcription model: OCR sends images, so this must be a
+    vision-capable model regardless of which audio model transcription uses.
+    """
+    return settings.VISION_MODEL
+
+
 _DEFAULT_HEADERS = {
     "HTTP-Referer": settings.LLM_HTTP_REFERER,
     "X-Title": settings.LLM_APP_TITLE,
