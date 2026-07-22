@@ -17,7 +17,7 @@ from typing import Optional
 
 from app.config import settings
 from app.services.ffmpeg_utils import ffmpeg_exe
-from app.urlguard import validate_ingest_url
+from app.urlguard import guarded_resolution, validate_ingest_url
 
 logger = logging.getLogger("truthlayer.ingestion")
 
@@ -154,7 +154,7 @@ def _download_url_video(url: str, out_dir: Path, vid_id: str) -> Optional[str]:
             "ffmpeg_location": ffmpeg_exe(),
             **_safety_ydl_opts(),
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl, guarded_resolution():
             ydl.extract_info(url, download=True)
         if os.path.exists(video_path):
             raw_path = video_path
@@ -223,7 +223,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
             "keepvideo": True,
             **_safety_ydl_opts(),
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl, guarded_resolution():
             info = ydl.extract_info(url, download=True)
             vid_id = info.get("id")
             audio_path = str(out_dir / f"{vid_id}.mp3")
