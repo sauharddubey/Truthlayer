@@ -16,6 +16,8 @@ these helpers add two defences used by the upload endpoints:
 
 from __future__ import annotations
 
+import zipfile
+from io import BytesIO
 from typing import Optional
 
 import filetype
@@ -24,13 +26,30 @@ from fastapi import HTTPException, UploadFile
 # `filetype` extension tokens, grouped by what each endpoint accepts.
 VIDEO_KINDS = {"mp4", "mov", "m4v", "webm", "mkv", "avi", "flv", "3gp"}
 IMAGE_KINDS = {"jpg", "jpeg", "png", "webp", "gif"}
-# DOCX is a zip container; `filetype` reports either "docx" or "zip".
+# DOCX is a zip container; `filetype` reports either "docx" or "zip". A bare
+# zip that isn't actually an OOXML/docx package is rejected below by
+# `_is_docx_zip` even though "zip" is in this allow-set.
 DOCUMENT_KINDS = {"pdf", "docx", "doc", "zip"}
 
 
 def sniff_extension(head: bytes) -> Optional[str]:
     kind = filetype.guess(head)
     return kind.extension if kind else None
+
+
+def _is_docx_zip(data: bytes) -> bool:
+    """True when a zip-signature payload is actually an OOXML/docx package.
+
+    `filetype` can't always distinguish DOCX from a generic zip (DOCX *is* a
+    zip container), so a bare zip renamed ``.docx`` would otherwise pass
+    ``enforce_content_type`` unchallenged. Peek the central directory for the
+    file OOXML always contains.
+    """
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as zf:
+            return "word/document.xml" in zf.namelist()
+    except zipfile.BadZipFile:
+        return False
 
 
 def enforce_content_type(data: bytes, allowed: set[str], *, label: str) -> None:
@@ -40,6 +59,11 @@ def enforce_content_type(data: bytes, allowed: set[str], *, label: str) -> None:
         raise HTTPException(
             status_code=400,
             detail=f"File content ('{ext}') does not match an allowed {label} type.",
+        )
+    if ext == "zip" and "docx" in allowed and not _is_docx_zip(data):
+        raise HTTPException(
+            status_code=400,
+            detail=f"File content ('zip') does not match an allowed {label} type.",
         )
 
 
