@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteVideo, downloadReportPdf, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
+import { ApiError, deleteVideo, downloadReportPdf, downloadReportJson, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
+import { safeExternalUrl } from "@/lib/safeUrl";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
 import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, ArrowUpRight, AlertTriangle } from "@/components/icons";
@@ -42,61 +43,212 @@ const STAGES = [
 
 const TERMINAL = ["completed", "failed"];
 
+const POLL_INTERVAL_MS = 3000;
+/** Consecutive poll failures tolerated before we stop retrying by ourselves. */
+const MAX_POLL_FAILURES = 5;
+
+/** Exponential backoff, capped — a blip retries fast, an outage backs off. */
+function pollBackoffMs(consecutiveFailures: number) {
+  return Math.min(POLL_INTERVAL_MS * Math.pow(1.6, consecutiveFailures - 1), 30_000);
+}
+
+type Degradation = { key: string; message: string };
+
+/**
+ * Reasons this run is less trustworthy than a full one.
+ *
+ * When a key is missing the agents still return numbers — a neutral 0 or 50 that
+ * is indistinguishable from a real finding. Anything that silently weakened the
+ * run has to be said out loud, in one place, in the user's terms.
+ */
+function degradationsFor(diagnostics: any, isBusiness: boolean): Degradation[] {
+  const out: Degradation[] = [];
+  if (!diagnostics) return out;
+
+  if (diagnostics.llm_configured === false) {
+    out.push({
+      key: "llm",
+      message:
+        "No AI model key was available, so the bias, sentiment, perception and compliance scores are neutral placeholders — not real analysis. Add an OpenRouter key in Settings and re-analyze.",
+    });
+  }
+  if (diagnostics.used_transcription_stub) {
+    out.push({
+      key: "transcription",
+      message:
+        "Speech was not really transcribed (placeholder transcript used), so everything derived from the words is unreliable.",
+    });
+  }
+  if (diagnostics.no_claims_extracted) {
+    out.push({
+      key: "claims",
+      message: "No factual claims were found to check, so the trust score reflects insufficient evidence rather than a verdict.",
+    });
+  } else if (diagnostics.no_retrieved_evidence) {
+    out.push({
+      key: "evidence",
+      message: diagnostics.tavily_configured
+        ? "No external evidence was found for this video's claims, so verdicts rest on the model alone."
+        : "No web-search key is set, so claims were checked without live external evidence. Add a Tavily key in Settings for citation-backed verdicts.",
+    });
+  }
+  if (isBusiness && diagnostics.media_integrity_used_stub) {
+    const reason = diagnostics.media_integrity_stub_reason
+      ? ` (${String(diagnostics.media_integrity_stub_reason).replace(/_/g, " ")})`
+      : "";
+    out.push({
+      key: "media_integrity",
+      message: `Authenticity and deepfake detection did not really run${reason} — the figure shown is a placeholder, not a measurement.`,
+    });
+  }
+  return out;
+}
+
 export default function AnalysisPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [data, setData]       = useState<any>(null);
-  const [error, setError]     = useState("");
+  /** Fatal: the analysis could never be loaded at all. Replaces the page. */
+  const [loadError, setLoadError] = useState("");
+  /** Non-fatal: a button (PDF/review/delete) failed. Shown inline, page intact. */
+  const [actionError, setActionError] = useState("");
+  /** Live updates gave up after repeated failures; last good data still shown. */
+  const [pollStalled, setPollStalled] = useState(false);
+  /** A poll failed but we're still retrying. */
+  const [reconnecting, setReconnecting] = useState(false);
+  /** A poll failed with a status that will never succeed on retry (404/401/403). */
+  const [pollFatal, setPollFatal] = useState<string | null>(null);
   const [nonce, setNonce]     = useState(0);
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingJson, setDownloadingJson] = useState(false);
   const [role, setRole]       = useState<string | null>(null);
   const timer = useRef<any>(null);
+  const failures = useRef(0);
+  const cancelled = useRef(false);
+  /** Whether a good response has ever landed — decides stalled-banner vs fatal. */
+  const hasData = useRef(false);
 
   useEffect(() => setRole(getRole()), []);
 
+  /**
+   * Poll until the run reaches a terminal state.
+   *
+   * A transient network blip must never destroy a running analysis: we retry
+   * with backoff, keep the last good data on screen, and only fall back to a
+   * full-page error when there is nothing to show (the very first load failed).
+   */
   useEffect(() => {
+    cancelled.current = false;
+    failures.current = 0;
+
     async function poll() {
+      if (cancelled.current) return;
       try {
         const d = await getAnalysis(params.id);
+        if (cancelled.current) return;
+        failures.current = 0;
+        hasData.current = true;
+        setReconnecting(false);
+        setPollStalled(false);
+        setPollFatal(null);
+        setLoadError("");
         setData(d);
-        if (!TERMINAL.includes(d.video.processing_status)) timer.current = setTimeout(poll, 3000);
-      } catch (e: any) { setError(e.message); }
+        if (!TERMINAL.includes(d.video.processing_status)) {
+          timer.current = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      } catch (e: any) {
+        if (cancelled.current) return;
+        const message = e?.message || "Couldn't reach the server.";
+
+        // A 404/401/403 will never succeed on retry — surface it immediately
+        // instead of backing off for a status that can't change.
+        if (e instanceof ApiError && (e.status === 404 || e.status === 401 || e.status === 403)) {
+          setReconnecting(false);
+          const fatalMessage =
+            e.status === 404
+              ? "This analysis no longer exists."
+              : e.status === 401
+              ? "Your session expired — sign in again to keep viewing this analysis."
+              : "You no longer have access to this analysis.";
+          setPollFatal(fatalMessage);
+          return;
+        }
+
+        failures.current += 1;
+
+        if (failures.current < MAX_POLL_FAILURES) {
+          // Still trying. Keep whatever is on screen.
+          setReconnecting(true);
+          timer.current = setTimeout(poll, pollBackoffMs(failures.current));
+          return;
+        }
+
+        // Given up automatically — hand the user a manual retry. Data we already
+        // have stays on screen; only a failed first load takes over the page.
+        setReconnecting(false);
+        if (hasData.current) setPollStalled(true);
+        else setLoadError(message);
+      }
     }
+
     poll();
-    return () => clearTimeout(timer.current);
+    return () => {
+      cancelled.current = true;
+      clearTimeout(timer.current);
+    };
   }, [params.id, nonce]);
 
+  /** Manual "try again" after auto-retry gave up. */
+  function retryNow() {
+    setLoadError("");
+    setPollStalled(false);
+    setPollFatal(null);
+    setReconnecting(false);
+    setNonce((n) => n + 1);
+  }
+
   async function reanalyze() {
-    setRerunning(true); setError("");
+    setRerunning(true); setActionError("");
     try {
       await startAnalysis(params.id);
       setData((d: any) => (d ? { ...d, video: { ...d.video, processing_status: "pending" } } : d));
       setNonce((n) => n + 1);
-    } catch (e: any) { setError(e.message); } finally { setRerunning(false); }
+    } catch (e: any) { setActionError(e.message); } finally { setRerunning(false); }
   }
 
   async function onReview(claimId: string, status: "approved" | "rejected") {
-    try { await reviewClaim(claimId, status); setNonce((n) => n + 1); } catch (e: any) { setError(e.message); }
+    setActionError("");
+    try { await reviewClaim(claimId, status); setNonce((n) => n + 1); } catch (e: any) { setActionError(e.message); }
   }
 
   async function removeAnalysis() {
     const ok = window.confirm("Delete this analysis? This cannot be undone.");
     if (!ok) return;
     setDeleting(true);
-    setError("");
+    setActionError("");
     try {
       await deleteVideo(params.id);
       router.push(role ? routeForRole(role) : "/dashboard/verifier");
     } catch (e: any) {
-      setError(e.message);
+      setActionError(e.message);
     } finally {
       setDeleting(false);
     }
   }
 
-  if (error) return (
-    <AppShell><div className="card py-8 text-center"><p className="font-semibold text-bad">{error}</p></div></AppShell>
+  // Only a failed *first* load takes over the page — never an action error.
+  if (loadError && !data) return (
+    <AppShell>
+      <div className="card mx-auto max-w-lg space-y-3 py-8 text-center">
+        <div className="flex items-center justify-center gap-2 text-bad">
+          <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          <h1 className="text-lg font-bold">Couldn&apos;t load this analysis</h1>
+        </div>
+        <p className="text-sm text-ink-light">{loadError}</p>
+        <button className="btn-accent" onClick={retryNow}>Try again <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
+      </div>
+    </AppShell>
   );
   if (!data) return (
     <AppShell><div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div></AppShell>
@@ -110,12 +262,14 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   const isProduct = !!content.is_about_product;
   const products: string[] = content.products || [];
   const isBusiness = role === "business";
+  const degradations = degradationsFor(diagnostics, video.mode === "business");
 
   /* ── Processing ── */
   if (!TERMINAL.includes(status)) {
     const stages = ["pending", "ingesting", "transcribing", "structuring", "analyzing"];
     const currentIdx = stages.indexOf(status);
     const pct = currentIdx >= 0 ? Math.round(((currentIdx + 1) / stages.length) * 100) : 10;
+    const currentStageLabel = currentIdx >= 0 ? STAGES[currentIdx]?.label ?? "Preparing" : "Preparing";
     return (
       <AppShell>
         <div className="mx-auto max-w-lg">
@@ -131,21 +285,64 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                   <Sparkle className="h-5 w-5 text-accent" />
                 </div>
                 <h2 className="text-lg font-heavy uppercase tracking-tight text-white">Auditing Video Content</h2>
-                <p className="mt-1 text-xs text-white/40">Our multi-agent AI fleet is scanning your media...</p>
+                <p className="mt-1 text-xs text-white/70">Our multi-agent AI fleet is scanning your media...</p>
               </div>
 
+              {/* Terminal failure — retrying won't help, no "reconnect" offered. */}
+              {pollFatal && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-xl border border-bad/20 bg-bad/5 px-3 py-2 text-xs text-bad"
+                >
+                  {pollFatal}
+                </div>
+              )}
+
+              {/* Connection trouble — the run continues server-side either way. */}
+              {!pollFatal && (reconnecting || pollStalled) && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn"
+                >
+                  <span>
+                    {pollStalled
+                      ? "Live updates paused — your analysis is still running, we just lost contact."
+                      : "Reconnecting…"}
+                  </span>
+                  {pollStalled && (
+                    <button className="shrink-0 font-bold underline" onClick={retryNow}>
+                      Reconnect
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Progress bar */}
-              <div className="rounded-xl bg-white/5 border border-white/[0.03] p-4">
-                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <div
+                role="status"
+                aria-live="polite"
+                className="rounded-xl bg-white/5 border border-white/[0.03] p-4"
+              >
+                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/70">
                   <span>Audit Progress</span>
                   <span className="text-accent">{pct}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Audit progress"
+                >
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-accent to-good transition-all duration-700 ease-out"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+                <span className="sr-only">{currentStageLabel} — {pct}% complete</span>
               </div>
 
               {/* Stage Checklist */}
@@ -157,7 +354,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
                   let borderCol = "border-white/5";
                   let bgCol = "bg-white/[0.02]";
-                  let textCol = "text-white/30";
+                  let textCol = "text-white/70";
                   
                   if (isActive) {
                     borderCol = "border-accent/30 bg-accent/5";
@@ -182,7 +379,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                               ? "border-good/30 bg-good/10 text-good"
                               : isActive
                               ? "border-accent/40 bg-accent/20 text-accent animate-pulse"
-                              : "border-white/10 bg-white/5 text-white/30"
+                              : "border-white/10 bg-white/5 text-white/70"
                           }`}
                         >
                           {isCompleted ? (
@@ -206,10 +403,10 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                         <p
                           className={`mt-1 text-[11px] leading-relaxed transition-colors duration-300 ${
                             isActive
-                              ? "text-white/60 font-medium"
+                              ? "text-white/70 font-medium"
                               : isCompleted
-                              ? "text-white/45"
-                              : "text-white/20"
+                              ? "text-white/70"
+                              : "text-white/70"
                           }`}
                         >
                           {s.desc}
@@ -231,8 +428,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     return (
       <AppShell>
         <div className="card mx-auto max-w-lg space-y-3 py-8 text-center">
-          <div className="flex items-center justify-center gap-2 text-bad"><AlertTriangle className="h-5 w-5" /><h1 className="text-lg font-bold">Analysis failed</h1></div>
+          <div className="flex items-center justify-center gap-2 text-bad"><AlertTriangle className="h-5 w-5" aria-hidden="true" /><h1 className="text-lg font-bold">Analysis failed</h1></div>
           <p className="text-sm text-ink-light">{video.error}</p>
+          {actionError && <p className="text-sm text-bad">{actionError}</p>}
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button className="btn-accent" disabled={rerunning} onClick={reanalyze}>{rerunning ? "Retrying…" : "Try again"} <ArrowRight className="h-3.5 w-3.5" /></button>
             <button className="btn-ghost text-bad" disabled={deleting} onClick={removeAnalysis}>{deleting ? "Deleting…" : "Delete"}</button>
@@ -255,9 +453,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             {isProduct && products.length > 0 && <span className="chip">{products.slice(0, 2).join(", ")}</span>}
           </div>
           <h1 className="font-heavy text-2xl uppercase leading-tight tracking-tight text-ink">{video.title || "Analysis"}</h1>
-          {video.source_url && (
+          {safeExternalUrl(video.source_url) && (
             <a
-              href={video.source_url}
+              href={safeExternalUrl(video.source_url) as string}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-light transition hover:text-ink hover:underline"
@@ -274,11 +472,11 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             disabled={downloadingPdf}
             onClick={async () => {
               setDownloadingPdf(true);
-              setError("");
+              setActionError("");
               try {
                 await downloadReportPdf(video.id);
               } catch (e: any) {
-                setError(e.message || "PDF download failed.");
+                setActionError(e.message || "PDF download failed.");
               } finally {
                 setDownloadingPdf(false);
               }
@@ -286,33 +484,49 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
           >
             {downloadingPdf ? "Preparing…" : "PDF"}
           </button>
+          <button
+            className="btn-ghost"
+            disabled={downloadingJson}
+            onClick={async () => {
+              setDownloadingJson(true);
+              setActionError("");
+              try {
+                await downloadReportJson(video.id);
+              } catch (e: any) {
+                setActionError(e.message || "JSON export failed.");
+              } finally {
+                setDownloadingJson(false);
+              }
+            }}
+          >
+            {downloadingJson ? "Preparing…" : "JSON"}
+          </button>
           <button className="btn-ghost text-bad" disabled={deleting} onClick={removeAnalysis}>{deleting ? "Deleting…" : "Delete"}</button>
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</div>}
-      {diagnostics?.used_transcription_stub && (
-        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
-          This analysis used stub transcription data. Scores may be less reliable.
+      {actionError && <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{actionError}</div>}
+      {pollFatal && (
+        <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{pollFatal}</div>
+      )}
+      {!pollFatal && pollStalled && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
+          <span>Live updates paused — we couldn&apos;t reach the server. This report may be out of date.</span>
+          <button className="btn-ghost shrink-0 text-warn" onClick={retryNow}>Reconnect</button>
         </div>
       )}
-      {diagnostics?.no_claims_extracted && (
-        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
-          No factual claims were extracted. Trust score is shown as insufficient evidence.
-        </div>
-      )}
-      {diagnostics?.no_retrieved_evidence && !diagnostics?.no_claims_extracted && (
-        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
-          No external evidence was retrieved for this run. Verdict confidence may be lower.
-        </div>
-      )}
-      {diagnostics?.media_integrity_used_stub && video.mode === "business" && (
-        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
-          Authenticity used a heuristic stub
-          {diagnostics?.media_integrity_stub_reason
-            ? ` (${String(diagnostics.media_integrity_stub_reason).replace(/_/g, " ")})`
-            : ""}
-          . Add a Hive API token, set BACKEND_PUBLIC_URL, and re-analyze for real deepfake detection.
+      {degradations.length > 0 && (
+        <div className="mb-4 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2.5 text-sm text-warn">
+          <p className="font-semibold">
+            {degradations.length === 1
+              ? "This analysis ran with reduced accuracy."
+              : `This analysis ran with reduced accuracy (${degradations.length} reasons).`}
+          </p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5">
+            {degradations.map((d) => (
+              <li key={d.key}>{d.message}</li>
+            ))}
+          </ul>
         </div>
       )}
 

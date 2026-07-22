@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { register, routeForRole } from "@/lib/api";
+import { register, routeForRole, resendSignupConfirmation } from "@/lib/api";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Layers, ArrowRight, Box, Eye, Scale, Check } from "@/components/icons";
 
@@ -43,6 +43,10 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [consented, setConsented] = useState(false);
+  // Set once sign-up succeeds but email confirmation is still pending.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [resending, setResending] = useState(false);
   const isBusiness = form.role === "business";
 
   async function submit(e: React.FormEvent) {
@@ -53,11 +57,23 @@ export default function RegisterPage() {
       if (!isBusiness) delete payload.organization_name;
       const data = await register(payload);
       if ("needsConfirmation" in data) {
-        setNotice("Check your inbox to confirm your email, then sign in.");
+        setAwaitingConfirmation(true);
         return;
       }
       router.push(routeForRole(data.role));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+  }
+
+  async function resendConfirmation() {
+    setResending(true); setError(""); setNotice("");
+    try {
+      await resendSignupConfirmation(form.email);
+      setNotice("Confirmation email re-sent. Check your inbox and spam folder.");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setResending(false);
+    }
   }
 
   const googleMeta = {
@@ -158,11 +174,42 @@ export default function RegisterPage() {
             })}
           </div>
 
+          {awaitingConfirmation ? (
+            <div className="card space-y-4 text-center">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-good/10 text-good">
+                <Check className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-ink">Confirm your email</h3>
+                <p className="mt-1 text-sm text-ink-light">
+                  We sent a confirmation link to <strong className="text-ink">{form.email}</strong>. Open it, then sign in.
+                </p>
+              </div>
+              {notice && <p className="text-sm text-good" role="status">{notice}</p>}
+              {error && <p className="text-sm text-bad" role="alert">{error}</p>}
+              <div className="space-y-2 pt-1">
+                <Link href="/login" className="btn-accent w-full justify-center py-2.5 text-sm">
+                  Go to sign in <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <button type="button" className="btn-ghost w-full justify-center py-2.5 text-sm" onClick={resendConfirmation} disabled={resending}>
+                  {resending ? "Resending…" : "Resend confirmation email"}
+                </button>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-ink-light hover:text-ink hover:underline"
+                onClick={() => { setAwaitingConfirmation(false); setNotice(""); setError(""); }}
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
           <div className="card space-y-4">
             {isBusiness && (
               <div>
-                <label className="label">Company / brand name</label>
-                <input className="input" placeholder="Acme Inc."
+                <label className="label" htmlFor="register-org">Company / brand name</label>
+                <input id="register-org" className="input" placeholder="Acme Inc."
+                  autoComplete="organization"
                   value={form.organization_name}
                   onChange={(e) => setForm({ ...form, organization_name: e.target.value })} />
               </div>
@@ -176,27 +223,47 @@ export default function RegisterPage() {
 
             <form onSubmit={submit} className="space-y-3">
               <div>
-                <label className="label">Full name</label>
-                <input className="input" placeholder="Jane Smith"
+                <label className="label" htmlFor="register-name">Full name</label>
+                <input id="register-name" className="input" placeholder="Jane Smith"
+                  autoComplete="name"
                   value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
               </div>
               <div>
-                <label className="label">Email</label>
-                <input className="input" type="email" placeholder="you@example.com"
+                <label className="label" htmlFor="register-email">Email</label>
+                <input id="register-email" className="input" type="email" placeholder="you@example.com"
+                  autoComplete="email"
                   value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
               <div>
-                <label className="label">Password</label>
-                <input className="input" type="password" placeholder="8+ characters" minLength={8}
+                <label className="label" htmlFor="register-password">Password</label>
+                <input id="register-password" className="input" type="password" placeholder="8+ characters" minLength={8}
+                  autoComplete="new-password"
                   value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
               </div>
-              {error && <p className="text-sm text-bad">{error}</p>}
-              {notice && <p className="text-sm text-good">{notice}</p>}
-              <button className="btn-accent w-full py-2.5 text-sm" disabled={loading}>
+              {error && <p className="text-sm text-bad" role="alert">{error}</p>}
+              {notice && <p className="text-sm text-good" role="status">{notice}</p>}
+              <label htmlFor="consent" className="flex items-start gap-2 text-xs text-ink-light">
+                <input
+                  id="consent"
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={consented}
+                  onChange={(e) => setConsented(e.target.checked)}
+                  required
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link href="/terms" className="text-accent hover:underline" target="_blank">Terms of Service</Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-accent hover:underline" target="_blank">Privacy Policy</Link>.
+                </span>
+              </label>
+              <button className="btn-accent w-full py-2.5 text-sm" disabled={loading || !consented}>
                 {loading ? "Creating…" : `Create ${activeRole.label} account`} <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </form>
           </div>
+          )}
 
           <p className="mt-5 text-center text-sm text-ink-light">
             Already have an account?{" "}

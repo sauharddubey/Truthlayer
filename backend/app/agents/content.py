@@ -15,7 +15,7 @@ non-product → fact-check + perception).
 
 from __future__ import annotations
 
-from app.agents.base import AgentContext
+from app.agents.base import AgentContext, wrap_untrusted
 from app.llm import chat_json
 
 NAME = "content"
@@ -64,7 +64,7 @@ def run(ctx: AgentContext) -> dict:
             "Give a short reason for every non-safe segment. Return one entry per "
             "segment index."
         ),
-        user=f"Segments:\n{indexed}",
+        user=wrap_untrusted("video segment list", indexed),
         schema_hint=_SCHEMA,
     )
 

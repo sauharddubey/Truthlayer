@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useId, useState } from "react";
 import { clearAuth, getRole } from "@/lib/api";
-import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check } from "@/components/icons";
+import { Modal } from "@/components/Modal";
+import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check, BookOpen } from "@/components/icons";
 
 type Item = { href: string; label: string; icon: ReactNode };
 
@@ -37,6 +38,7 @@ export function DynamicNav() {
   const [darkMode, setDarkMode] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
+  const guideTitleId = useId();
 
   useEffect(() => {
     setRole(getRole());
@@ -109,7 +111,7 @@ export function DynamicNav() {
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <div className="island flex items-center gap-1 rounded-full px-2 py-1.5 text-paper">
           {/* brand dot */}
-          <Link href="/" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20">
+          <Link href="/" aria-label="TruthLayer home" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20">
             <Layers className="h-4 w-4" />
           </Link>
           <span className="mx-0.5 h-5 w-px bg-white/10" />
@@ -121,6 +123,8 @@ export function DynamicNav() {
               <Link
                 key={it.href}
                 href={it.href}
+                aria-label={it.label}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                   active ? "bg-white text-ink shadow" : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
@@ -136,16 +140,31 @@ export function DynamicNav() {
           {/* theme toggle */}
           <button
             onClick={toggleTheme}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
           >
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
+          {/* docs */}
+          <Link
+            href="/docs"
+            aria-label="Documentation"
+            aria-current={pathname === "/docs" ? "page" : undefined}
+            title="Documentation"
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+              pathname === "/docs" ? "bg-white text-ink" : "text-white/70 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+          </Link>
+
           {/* onboarding guide */}
           {role && (
             <button
               onClick={() => { setGuideStep(0); setShowGuide(true); }}
+              aria-label="Show guide"
               title="Show guide"
               className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
             >
@@ -160,6 +179,8 @@ export function DynamicNav() {
               {/* utility settings */}
               <Link
                 href="/settings"
+                aria-label="Settings"
+                aria-current={pathname === "/settings" ? "page" : undefined}
                 title="Settings"
                 className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
                   pathname === "/settings" ? "bg-white text-ink" : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -167,8 +188,9 @@ export function DynamicNav() {
               >
                 <Settings className="h-4 w-4" />
               </Link>
-              
+
               <button
+                aria-label="Sign out"
                 title="Sign out"
                 onClick={async () => { await clearAuth(); router.push("/"); }}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-bad/20 hover:text-bad"
@@ -192,9 +214,14 @@ export function DynamicNav() {
 
       {/* Onboarding Guide Modal */}
       {showGuide && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-pop text-ink">
-            <h3 className="font-display text-lg font-bold text-ink mb-3">{guideSteps[guideStep].title}</h3>
+        <Modal
+          onClose={closeGuide}
+          closeOnBackdrop={false}
+          ariaLabelledby={guideTitleId}
+          backdropClassName="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          panelClassName="relative w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-pop text-ink"
+        >
+          <h3 id={guideTitleId} className="font-display text-lg font-bold text-ink mb-3">{guideSteps[guideStep].title}</h3>
             
             <p className="text-sm text-ink-light leading-relaxed whitespace-pre-line min-h-[120px]">
               {guideSteps[guideStep].content}
@@ -240,8 +267,7 @@ export function DynamicNav() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   );

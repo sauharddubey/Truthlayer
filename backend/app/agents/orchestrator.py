@@ -11,12 +11,17 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    TimeoutError as FuturesTimeoutError,
+    as_completed,
+)
 from typing import Any, Callable, Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.agents.base import clamp_score
 from app.agents import (
     bias,
     compliance,
@@ -145,13 +150,26 @@ def run_pipeline(db: Session, video: Video) -> AnalysisReport:
         for n in agent_names:
             snapshot = contextvars.copy_context()
             futures[pool.submit(snapshot.run, AGENT_FUNCS[n], ctx)] = n
-        for fut in as_completed(futures):
-            name = futures[fut]
-            try:
-                results[name] = fut.result()
-            except Exception as exc:  # pragma: no cover
-                logger.exception("Agent %s failed: %s", name, exc)
-                results[name] = {"error": str(exc), "confidence": 0.0}
+        try:
+            for fut in as_completed(futures, timeout=settings.AGENT_FANOUT_TIMEOUT_SECONDS):
+                name = futures[fut]
+                try:
+                    results[name] = fut.result()
+                except Exception as exc:  # pragma: no cover
+                    logger.exception("Agent %s failed: %s", name, exc)
+                    results[name] = {"error": str(exc), "confidence": 0.0}
+        except FuturesTimeoutError:
+            # A stuck agent shouldn't block fusion indefinitely. Per-call client
+            # timeouts (app.llm) bound each request; here we stop waiting on the
+            # fan-out and record any not-yet-returned agent as failed.
+            for pending, name in futures.items():
+                if name not in results:
+                    logger.error(
+                        "Agent %s did not finish within %ss fan-out timeout",
+                        name,
+                        settings.AGENT_FANOUT_TIMEOUT_SECONDS,
+                    )
+                    results[name] = {"error": "timeout", "confidence": 0.0}
 
     # Merge deterministic hashtag compliance issues after the compliance agent runs.
     if results.get("hashtag_check"):
@@ -256,12 +274,15 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
 
     # Verifier mode is strictly claim/evidence focused; broader dimensions are
     # meaningful only when their agents run for the current tier.
-    bias_score = _as_float(bias_r.get("bias_score"))
-    sentiment_score = _as_float(sent.get("sentiment_score"))
-    compliance_score = _as_float(comp.get("compliance_score"))
-    risk_score = _as_float(risk.get("creator_risk_score"))
-    perception_harm = _as_float(perc.get("sentiment_harm_score"))
-    authenticity = _as_float((mi.get("deepfake") or {}).get("authenticity_score"))
+    # Clamp every model-emitted score to its documented range at the fusion
+    # boundary so a hallucinated / injected out-of-range value (e.g. bias_score
+    # 999 or negative) can't corrupt overall_risk, the stored report, or the PDF.
+    bias_score = clamp_score(bias_r.get("bias_score"), 0, 100)
+    sentiment_score = clamp_score(sent.get("sentiment_score"), -1, 1)
+    compliance_score = clamp_score(comp.get("compliance_score"), 0, 100)
+    risk_score = clamp_score(risk.get("creator_risk_score"), 0, 100)
+    perception_harm = clamp_score(perc.get("sentiment_harm_score"), 0, 100)
+    authenticity = clamp_score((mi.get("deepfake") or {}).get("authenticity_score"), 0, 1)
 
     # Risky segments also raise overall risk.
     segs = cont.get("segments") or []
@@ -626,7 +647,7 @@ def _generate_summary_and_reasonings(
 
 
 def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
-    from app.llm import effective_media_integrity_key, effective_tavily_key
+    from app.llm import effective_media_integrity_key, effective_tavily_key, has_chat_key
 
     claims = fact.get("claims", []) or []
     claim_evidence_count = sum(1 for c in claims if c.get("evidence"))
@@ -646,6 +667,9 @@ def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
         "retrieved_evidence_count": len(fact_retrieved),
         "no_retrieved_evidence": len(fact_retrieved) == 0,
         "tavily_configured": bool(effective_tavily_key()),
+        # Without a chat key every agent falls back to neutral defaults, which
+        # render as real 0/50 scores — the UI needs to be able to say so.
+        "llm_configured": has_chat_key(),
         "transcription_provider": metadata.get("transcription_provider"),
         "used_transcription_stub": bool(metadata.get("transcription_stub")),
         "agent_keys": sorted(k for k in results.keys() if k != "diagnostics"),

@@ -44,7 +44,7 @@ export default function LoginPage() {
           </p>
           <div className="mt-8 space-y-3">
             {[
-              { icon: <ShieldCheck className="h-4 w-4 text-good" />, label: "6 parallel AI lenses per analysis" },
+              { icon: <ShieldCheck className="h-4 w-4 text-good" />, label: "Up to 8 parallel AI lenses per analysis" },
               { icon: <Check className="h-4 w-4 text-good" />,       label: "Every claim linked to evidence" },
               { icon: <Eye className="h-4 w-4 text-good" />,         label: "Deepfake & manipulation detection" },
             ].map((f) => (
@@ -84,16 +84,21 @@ export default function LoginPage() {
 
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label className="label">Email</label>
-                <input className="input" type="email" placeholder="you@example.com"
+                <label className="label" htmlFor="login-email">Email</label>
+                <input id="login-email" className="input" type="email" placeholder="you@example.com"
+                  autoComplete="email"
                   value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="label">Password</label>
-                <input className="input" type="password" placeholder="••••••••"
+                <div className="flex items-center justify-between">
+                  <label className="label" htmlFor="login-password">Password</label>
+                  <Link href="/reset" className="text-xs font-semibold text-accent hover:underline">Forgot password?</Link>
+                </div>
+                <input id="login-password" className="input" type="password" placeholder="••••••••"
+                  autoComplete="current-password"
                   value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              {error && <p className="text-sm text-bad">{error}</p>}
+              {error && <p className="text-sm text-bad" role="alert">{error}</p>}
               <button className="btn-accent w-full py-2.5 text-sm" disabled={loading}>
                 {loading ? "Signing in…" : "Sign in"} <ArrowRight className="h-3.5 w-3.5" />
               </button>

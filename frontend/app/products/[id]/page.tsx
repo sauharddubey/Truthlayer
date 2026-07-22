@@ -24,6 +24,7 @@ import {
   mediaUrl,
 } from "@/lib/api";
 import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
+import { useRoleGuard } from "@/lib/useRoleGuard";
 import { formatMetric, formatStatDisplay } from "@/lib/formatMetric";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
@@ -47,6 +48,7 @@ const TABS = [
   "Narratives",
   "Contradictions",
 ];
+const tabSlug = (t: string) => t.toLowerCase().replace(/\s+/g, "-");
 const C = (t?: number | null, invert = false) => {
   if (t == null) return "#9b9a97";
   const v = invert ? 100 - t : t;
@@ -66,7 +68,7 @@ function GlassStat({
 }) {
   return (
     <div className="glass-tile p-4">
-      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">
         {label}
       </div>
       <div
@@ -82,6 +84,7 @@ function GlassStat({
 export default function ProductPage({ params }: { params: { id: string } }) {
   const id = params.id;
   const router = useRouter();
+  const guardOk = useRoleGuard(["business"]);
   const [tab, setTab] = useState("Overview");
   const [product, setProduct] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
@@ -102,14 +105,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [url, setUrl] = useState("");
   const [kw, setKw] = useState("");
   const [msg, setMsg] = useState("");
+  /** So success and failure don't share one accent-colored line. */
+  const [msgKind, setMsgKind] = useState<"success" | "error">("success");
+  /** A core fetch (the product itself) failed — show a banner + retry. */
+  const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editAliases, setEditAliases] = useState("");
   const [savingDetails, setSavingDetails] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+
+  function showOk(m: string) { setMsgKind("success"); setMsg(m); }
+  function showError(m: string) { setMsgKind("error"); setMsg(m); }
 
   function loadKeywords() {
     productKeywords(id)
@@ -121,9 +132,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
 
   const loadAll = useCallback(() => {
+    // The product itself is the page — if it can't load, say so and offer retry.
     getProduct(id)
-      .then(setProduct)
-      .catch(() => {});
+      .then((p) => { setProduct(p); setLoadError(""); })
+      .catch((e: any) => setLoadError(e?.message || "Couldn't load this product."));
     productOverview(id)
       .then(setOverview)
       .catch(() => {});
@@ -149,7 +161,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         setNarrativesLoaded(true);
       })
       .catch((e: any) => {
-        setMsg(e.message);
+        showError(e.message);
         setNarrativesLoaded(true);
       });
   }, [tab, id, narrativesLoaded]);
@@ -162,7 +174,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         setContradictionsLoaded(true);
       })
       .catch((e: any) => {
-        setMsg(e.message);
+        showError(e.message);
         setContradictionsLoaded(true);
       });
   }, [tab, id, contradictionsLoaded]);
@@ -174,7 +186,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const rows = await recomputeProductNarratives(id);
       setNarratives(rows || []);
       setNarrativesLoaded(true);
-      setMsg(
+      showOk(
         rows?.length
           ? `Narrative report ready — ${rows.length} cluster${
               rows.length === 1 ? "" : "s"
@@ -182,7 +194,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           : "Narrative report ready — no clusters (analyze more videos first)."
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setGeneratingNarratives(false);
     }
@@ -196,7 +208,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setContradictions(report);
       setContradictionsLoaded(true);
       const count = report?.contradictions?.length ?? 0;
-      setMsg(
+      showOk(
         count
           ? `Contradiction report ready — ${count} pair${
               count === 1 ? "" : "s"
@@ -204,7 +216,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           : "Contradiction report ready — no contradictions found."
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setGeneratingContradictions(false);
     }
@@ -219,7 +231,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setUrl("");
       window.location.href = `/analysis/${v.id}`;
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setBusy(false);
     }
@@ -235,11 +247,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     try {
       const doc = await uploadProductDocument(id, f, type);
       if (doc.status === "failed") {
-        setMsg(
+        showError(
           `Could not extract text from "${f.name}". Try a text-based PDF or DOCX.`
         );
       } else {
-        setMsg(
+        showOk(
           `Indexed "${f.name}" — used in compliance and claim verification.`
         );
       }
@@ -248,7 +260,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         .then(setOverview)
         .catch(() => {});
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setUploadingType(null);
       e.target.value = "";
@@ -265,11 +277,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       productOverview(id)
         .then(setOverview)
         .catch(() => {});
-      setMsg(
+      showOk(
         `Removed "${filename}". Re-analyze videos to refresh claim checks.`
       );
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeletingDocId(null);
     }
@@ -281,7 +293,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       setKw("");
       loadKeywords();
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     }
   }
   async function removeKeyword(keywordId: string) {
@@ -292,7 +304,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       await deleteProductKeyword(id, keywordId);
       loadKeywords();
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeletingKeywordId(null);
     }
@@ -305,7 +317,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const p = await uploadProductImage(id, f);
       setProduct(p);
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setBusy(false);
     }
@@ -322,7 +334,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       await deleteProduct(id);
       router.push("/products");
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setDeleting(false);
     }
@@ -331,6 +343,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   function startEditing() {
     setEditName(product?.name || "");
     setEditDescription(product?.description || "");
+    setEditAliases((product?.aliases || []).join(", "));
     setEditing(true);
     setMsg("");
   }
@@ -339,13 +352,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     setEditing(false);
     setEditName("");
     setEditDescription("");
+    setEditAliases("");
   }
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
     const name = editName.trim();
     if (!name) {
-      setMsg("Product name is required.");
+      showError("Product name is required.");
       return;
     }
     setSavingDetails(true);
@@ -354,15 +368,59 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       const p = await updateProduct(id, {
         name,
         description: editDescription.trim() || undefined,
+        aliases: editAliases.split(",").map((s) => s.trim()).filter(Boolean),
       });
       setProduct(p);
       setEditing(false);
-      setMsg("Product details saved.");
+      showOk("Product details saved.");
     } catch (e: any) {
-      setMsg(e.message);
+      showError(e.message);
     } finally {
       setSavingDetails(false);
     }
+  }
+
+  function onTabsKeyDown(e: React.KeyboardEvent) {
+    const idx = TABS.indexOf(tab);
+    if (idx < 0) return;
+    let next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % TABS.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = TABS.length - 1;
+    else return;
+    e.preventDefault();
+    const nextTab = TABS[next];
+    setTab(nextTab);
+    document.getElementById(`product-tab-${tabSlug(nextTab)}`)?.focus();
+  }
+
+  if (!guardOk) {
+    return (
+      <AppShell wide>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+      </AppShell>
+    );
+  }
+
+  if (loadError && !product) {
+    return (
+      <AppShell wide>
+        <div className="card mx-auto max-w-lg space-y-3 py-8 text-center">
+          <div className="flex items-center justify-center gap-2 text-bad">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            <h1 className="text-lg font-bold">Couldn&apos;t load this product</h1>
+          </div>
+          <p className="text-sm text-ink-light">{loadError}</p>
+          <div className="flex items-center justify-center gap-2">
+            <button className="btn-accent" onClick={() => { setLoadError(""); loadAll(); }}>
+              Try again <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <Link href="/products" className="btn-ghost">Back to products</Link>
+          </div>
+        </div>
+      </AppShell>
+    );
   }
 
   return (
@@ -372,7 +430,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           Products
         </Link>{" "}
         <span className="mx-1">/</span>{" "}
-        <span className="text-ink">{product?.name}</span>
+        <span className="text-ink">{product?.name || "…"}</span>
       </div>
 
       {/* ── Glass hero header ── */}
@@ -386,7 +444,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-full items-center justify-center text-white/30">
+            <span className="flex h-full items-center justify-center text-white/70">
               <Box className="h-8 w-8" />
             </span>
           )}
@@ -397,6 +455,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             type="file"
             accept="image/*"
             className="hidden"
+            aria-label="Upload product image"
             onChange={onImage}
           />
         </label>
@@ -406,10 +465,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               {editing ? (
                 <form onSubmit={saveDetails} className="space-y-3">
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+                    <label htmlFor="product-edit-name" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                       Product name
                     </label>
                     <input
+                      id="product-edit-name"
                       className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
@@ -418,15 +478,28 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+                    <label htmlFor="product-edit-description" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                       Description
                     </label>
                     <textarea
+                      id="product-edit-description"
                       className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
                       rows={3}
                       placeholder="What it is, key specs, approved claims, restrictions…"
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="product-edit-aliases" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+                      Aliases <span className="font-normal normal-case tracking-normal text-white/40">(comma-separated — other names used in videos)</span>
+                    </label>
+                    <input
+                      id="product-edit-aliases"
+                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      placeholder="e.g. Serum XL, HydraMax"
+                      value={editAliases}
+                      onChange={(e) => setEditAliases(e.target.value)}
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -464,13 +537,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </button>
                   </div>
                   {product?.description ? (
-                    <p className="mt-1 max-w-xl text-sm text-white/50">
+                    <p className="mt-1 max-w-xl text-sm text-white/70">
                       {product.description}
                     </p>
                   ) : (
-                    <p className="mt-1 max-w-xl text-sm italic text-white/30">
+                    <p className="mt-1 max-w-xl text-sm italic text-white/70">
                       Add description…
                     </p>
+                  )}
+                  {(product?.aliases?.length ?? 0) > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">Also known as</span>
+                      {product.aliases.map((a: string) => (
+                        <span key={a} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-white/70">{a}</span>
+                      ))}
+                    </div>
                   )}
                 </>
               )}
@@ -492,6 +573,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           >
             <input
               className="input flex-1 border-white/10 bg-white/5 text-white placeholder-white/30"
+              aria-label="Video URL to analyze for this product"
               placeholder="Paste a video URL to analyze for this product…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -501,15 +583,28 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               Analyze <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </form>
-          {msg && <p className="mt-2 text-sm text-accent">{msg}</p>}
+          {msg && (
+            <p
+              className={`mt-2 text-sm ${msgKind === "error" ? "text-bad" : "text-good"}`}
+              role={msgKind === "error" ? "alert" : "status"}
+            >
+              {msg}
+            </p>
+          )}
         </div>
       </div>
 
       {/* ── Pill tabs ── */}
-      <div className="mb-5 flex flex-wrap gap-1 rounded-full border border-line bg-sidebar p-1">
+      <div role="tablist" aria-label="Product sections" onKeyDown={onTabsKeyDown} className="mb-5 flex flex-wrap gap-1 rounded-full border border-line bg-sidebar p-1">
         {TABS.map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            id={`product-tab-${tabSlug(t)}`}
+            aria-selected={tab === t}
+            aria-controls={`product-panel-${tabSlug(t)}`}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               tab === t
@@ -523,7 +618,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       </div>
 
       {tab === "Overview" && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" id="product-panel-overview" aria-labelledby="product-tab-overview">
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
             <GlassStat label="Trust" value={overview?.trust_score} />
             <GlassStat
@@ -548,7 +643,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               <div className="text-base font-bold text-white">
                 Knowledge base
               </div>
-              <p className="mt-1 text-sm text-white/50">
+              <p className="mt-1 text-sm text-white/70">
                 Product details and marketing policies are indexed and used
                 during video analysis for claim verification and compliance
                 checks.
@@ -590,7 +685,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       {c.claim_text}
                     </Link>
                     {c.note && (
-                      <p className="mt-0.5 text-xs text-white/50">{c.note}</p>
+                      <p className="mt-0.5 text-xs text-white/70">{c.note}</p>
                     )}
                   </li>
                 ))}
@@ -600,15 +695,23 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {tab === "Videos" && <VideoBoard videos={vids} emptyHref="#" />}
+      {tab === "Videos" && (
+        <div role="tabpanel" id="product-panel-videos" aria-labelledby="product-tab-videos">
+          <VideoBoard
+            videos={vids}
+            emptyHref={`/analyze?product=${id}`}
+            onDeleted={(vid) => setVids((cur) => cur.filter((v) => v.video_id !== vid))}
+          />
+        </div>
+      )}
 
       {tab === "Knowledge base" && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2" role="tabpanel" id="product-panel-knowledge-base" aria-labelledby="product-tab-knowledge-base">
           <div className="glass-tile p-5">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <FileSearch className="h-4 w-4 text-accent" /> Product details
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Specs and approved facts. Matching claims are auto-verified during
               analysis.
             </p>
@@ -633,7 +736,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <Scale className="h-4 w-4 text-warn" /> Marketing policies
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Disclosure rules, restricted claims, and brand guidelines. Used by
               the compliance agent.
             </p>
@@ -655,7 +758,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </label>
           </div>
           <div className="glass-tile p-5 sm:col-span-2">
-            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
               Indexed documents
             </div>
             {docs.length ? (
@@ -665,7 +768,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 text-sm text-white/80 last:border-0"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/70" />
                     <span className="truncate">{d.filename}</span>
                     {d.status === "failed" && (
                       <span className="shrink-0 rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-bold text-bad">
@@ -674,7 +777,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     )}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/60">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/70">
                       {d.document_type.replace(/_/g, " ")}
                     </span>
                     <button
@@ -690,7 +793,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-white/30">
+              <p className="text-sm text-white/70">
                 No documents yet — upload spec sheets and policies above. They
                 are embedded and searched during each video analysis.
               </p>
@@ -700,21 +803,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Hashtags" && (
-        <div className="glass-tile max-w-3xl p-5">
+        <div className="glass-tile max-w-3xl p-5" role="tabpanel" id="product-panel-hashtags" aria-labelledby="product-tab-hashtags">
           <div className="text-base font-bold text-white">Product hashtags</div>
-          <p className="mt-1 text-sm text-white/50">
+          <p className="mt-1 text-sm text-white/70">
             Required tags are checked against each video&apos;s platform
             description during analysis.
           </p>
           <form onSubmit={addKw} className="mt-3 flex gap-2">
             <input
               className="input border-white/10 bg-white/5 text-white placeholder-white/30"
+              aria-label="Add a product hashtag"
               placeholder="#product"
               value={kw}
               onChange={(e) => setKw(e.target.value)}
               required
             />
-            <button className="btn-accent shrink-0">
+            <button className="btn-accent shrink-0" aria-label="Add hashtag">
               <Plus className="h-4 w-4" />
             </button>
           </form>
@@ -737,14 +841,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </span>
             ))}
             {!keywords.length && (
-              <p className="text-sm text-white/30">
+              <p className="text-sm text-white/70">
                 No hashtags monitored yet.
               </p>
             )}
           </div>
           {videoMatches.length > 0 && (
             <div className="mt-5 border-t border-white/10 pt-4">
-              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                 Video hashtag status
               </div>
               <div className="space-y-2">
@@ -760,7 +864,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       {v.title}
                     </Link>
                     {!v.description_available ? (
-                      <p className="mt-1 text-xs text-white/40">
+                      <p className="mt-1 text-xs text-white/70">
                         No description available
                       </p>
                     ) : (
@@ -783,7 +887,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         ))}
                         {!v.present_keywords?.length &&
                           !v.missing_keywords?.length && (
-                            <span className="text-xs text-white/40">
+                            <span className="text-xs text-white/70">
                               Not analyzed yet
                             </span>
                           )}
@@ -798,7 +902,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Narratives" && (
-        <div>
+        <div role="tabpanel" id="product-panel-narratives" aria-labelledby="product-tab-narratives">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-light">
               Cluster this product&apos;s analyzed videos into shared narrative
@@ -827,13 +931,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     risk {formatMetric(c.risk_score)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm text-white/50">{c.summary}</p>
-                {c.video_count != null && (
-                  <p className="mt-2 text-xs text-white/40">
-                    {c.video_count} video{c.video_count === 1 ? "" : "s"} in
-                    cluster
-                  </p>
-                )}
+                <p className="mt-1.5 text-sm text-white/70">{c.summary}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+                  {c.video_count != null && (
+                    <span>{c.video_count} video{c.video_count === 1 ? "" : "s"} in cluster</span>
+                  )}
+                  {c.propagation_risk != null && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-white/40">Spread risk</span>
+                      <span className="font-bold" style={{ color: c.propagation_risk >= 70 ? "#e03e3e" : c.propagation_risk >= 40 ? "#cb912f" : "#0f7b6c" }}>
+                        {formatMetric(c.propagation_risk)}
+                      </span>
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
             {!narratives.length && !generatingNarratives && (
@@ -853,7 +964,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Contradictions" && (
-        <div>
+        <div role="tabpanel" id="product-panel-contradictions" aria-labelledby="product-tab-contradictions">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-light">
               Compare claims across all videos for this product and flag
@@ -904,7 +1015,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     <p className="mt-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">
                       &ldquo;{c.claim_b}&rdquo;
                     </p>
-                    <p className="mt-2 text-xs text-white/40">
+                    <p className="mt-2 text-xs text-white/70">
                       {c.explanation}
                     </p>
                   </div>
