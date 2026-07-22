@@ -83,7 +83,16 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
             os.path.join(tmpdir, "frame_%04d.jpg")
         ]
         try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                timeout=settings.FFMPEG_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("FFmpeg frame extraction timed out after %ss", settings.FFMPEG_TIMEOUT_SECONDS)
+            return _empty_result("Frame extraction timed out.")
         except subprocess.CalledProcessError as e:
             logger.error("FFmpeg frame extraction failed: %s", e.stderr.decode() if e.stderr else str(e))
             return _empty_result(f"Frame extraction failed: {str(e)}")
@@ -169,7 +178,8 @@ def run_ocr(video_path: str, duration: Optional[float], speech_transcript: str) 
 
         result = _extract_json(content)
         if not isinstance(result, dict) or "ocr_segments" not in result:
-            logger.warning("Model response is not in correct JSON structure: %s", content)
+            # Log only a short prefix — the body contains on-screen text (possible PII).
+            logger.warning("Model OCR response not in expected JSON structure (len=%d): %.200s", len(content), content)
             return _empty_result("Invalid JSON response structure.")
 
         # Ensure values are normalized

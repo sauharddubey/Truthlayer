@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMetricPercent, formatUnitPercent } from "@/lib/formatMetric";
+import { safeExternalUrl } from "@/lib/safeUrl";
 
 const verdictStyle: Record<string, string> = {
   supported: "bg-good/10 text-good",
@@ -121,6 +122,9 @@ export function ClaimsPanel({
                   {c.evidence_quality_score != null && ` · evidence ${formatMetricPercent(c.evidence_quality_score)}`}
                   {c.timestamp_start != null && ` · @${Math.round(c.timestamp_start)}s`}
                 </div>
+                {c.reasoning && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-light">{c.reasoning}</p>
+                )}
                 {c.insufficient_evidence_reasons?.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.insufficient_evidence_reasons.slice(0, 3).map((reason: string) => (
@@ -137,8 +141,8 @@ export function ClaimsPanel({
                   <ul className="mt-1.5 space-y-0.5">
                     {c.evidence.slice(0, 3).map((e: any, j: number) => (
                       <li key={j} className="text-xs text-ink-light">
-                        {e.url ? (
-                          <a href={e.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
+                        {safeExternalUrl(e.url) ? (
+                          <a href={safeExternalUrl(e.url) as string} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
                         ) : (<span className="font-medium">{e.source || "evidence"}</span>)}
                         {e.text && <span> — {e.text}</span>}
                       </li>

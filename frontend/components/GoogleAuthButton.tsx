@@ -51,7 +51,7 @@ export function GoogleAuthButton({
       <button
         type="button"
         onClick={go}
-        className="flex w-full items-center justify-center gap-2.5 rounded-pill border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+        className="flex w-full items-center justify-center gap-2.5 rounded-full border border-[#dadce0] bg-white px-4 py-2.5 text-sm font-semibold text-[#1d1d1f] transition-colors hover:bg-[#f4f5f8]"
       >
         <GoogleG /> {label}
       </button>

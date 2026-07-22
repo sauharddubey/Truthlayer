@@ -11,6 +11,11 @@ const base = {
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
   viewBox: "0 0 24 24",
+  // Icons are decorative by default: they sit next to visible text or inside a
+  // labelled control, so hide them from assistive tech (the accessible name
+  // comes from that text / the control's aria-label).
+  "aria-hidden": true,
+  focusable: false,
 };
 
 export const ArrowRight = ({ className }: P) => (
@@ -190,6 +195,13 @@ export const Lock = ({ className }: P) => (
   <svg {...base} className={className} width="1em" height="1em">
     <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+export const BookOpen = ({ className }: P) => (
+  <svg {...base} className={className} width="1em" height="1em">
+    <path d="M12 7v14" />
+    <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
   </svg>
 );
 

@@ -17,6 +17,7 @@ from typing import Optional
 
 from app.config import settings
 from app.services.ffmpeg_utils import ffmpeg_exe
+from app.urlguard import validate_ingest_url
 
 logger = logging.getLogger("truthlayer.ingestion")
 
@@ -55,6 +56,29 @@ def _storage_dir() -> Path:
     p = Path(settings.MEDIA_STORAGE_DIR)
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _safety_ydl_opts() -> dict:
+    """yt-dlp options that bound resource use and block non-web URLs.
+
+    Applied to every download so a very long / very large / ``file://`` URL is
+    rejected before it can exhaust disk or reach the local filesystem. These are
+    safety limits only — normal short social videos are well within them.
+    """
+    opts: dict = {
+        "enable_file_urls": False,
+        "max_filesize": settings.MAX_DOWNLOAD_MB * 1024 * 1024,
+    }
+    max_dur = settings.MAX_VIDEO_DURATION_SECONDS
+    if max_dur:
+        def _reject_too_long(info, *, incomplete=False):
+            duration = info.get("duration")
+            if duration and duration > max_dur:
+                return f"video exceeds the {max_dur}s duration limit"
+            return None
+
+        opts["match_filter"] = _reject_too_long
+    return opts
 
 
 def _hash_file(path: str) -> Optional[str]:
@@ -128,6 +152,7 @@ def _download_url_video(url: str, out_dir: Path, vid_id: str) -> Optional[str]:
             "no_warnings": True,
             "noplaylist": True,
             "ffmpeg_location": ffmpeg_exe(),
+            **_safety_ydl_opts(),
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info(url, download=True)
@@ -162,7 +187,11 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
 
     When ``include_video`` is True (business tier), also persist a local mp4
     for media-integrity / deepfake analysis.
+
+    Raises :class:`app.urlguard.UrlValidationError` if the URL is not a supported
+    public platform or resolves to a private/internal address (SSRF guard).
     """
+    url = validate_ingest_url(url)
     platform = detect_platform(url)
     out_dir = _storage_dir()
     audio_path: Optional[str] = None
@@ -192,6 +221,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
                 }
             ],
             "keepvideo": True,
+            **_safety_ydl_opts(),
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -214,10 +244,27 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
                 "upload_date": info.get("upload_date"),
                 "description": info.get("description"),
             }
-        if include_video and vid_id:
-            video_path = _download_url_video(url, out_dir, vid_id)
-            if video_path:
+            # Record the actual on-disk files so cleanup_video_media can remove
+            # them on delete / retention purge (previously the mp3 + 360p mp4
+            # were orphaned because they were never referenced in extra_metadata).
+            media_paths = [
+                p for p in (audio_path, video_path)
+                if p and os.path.exists(p)
+            ]
+            if audio_path and os.path.exists(audio_path):
+                meta["audio_path"] = audio_path
+            if video_path and os.path.exists(video_path):
                 meta["video_path"] = video_path
+        if include_video and vid_id:
+            hive_video_path = _download_url_video(url, out_dir, vid_id)
+            if hive_video_path:
+                meta["video_path"] = hive_video_path
+                video_path = hive_video_path
+                if hive_video_path not in media_paths:
+                    media_paths.append(hive_video_path)
+        if media_paths:
+            # De-duplicate while preserving order; consumed by video_cleanup.
+            meta["media_paths"] = list(dict.fromkeys(media_paths))
     except Exception as exc:
         logger.warning("yt-dlp ingestion failed for %s: %s", url, exc)
         meta = {"title": f"Video from {platform}", "ingest_error": str(exc)}

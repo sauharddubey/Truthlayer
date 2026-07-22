@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useId, useState } from "react";
 import { clearAuth, getRole } from "@/lib/api";
-import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check } from "@/components/icons";
+import { Modal } from "@/components/Modal";
+import { Layers, FileSearch, Eye, Scale, Sparkle, Settings, LogOut, Home, Box, Sun, Moon, HelpCircle, ArrowRight, Check, BookOpen } from "@/components/icons";
 
 type Item = { href: string; label: string; icon: ReactNode };
 
@@ -28,7 +29,7 @@ function navFor(role: string | null): Item[] {
   return [];
 }
 
-const ROLE_COLOR: Record<string, string> = { business: "#2383e2", creator: "#0f7b6c", verifier: "#cb912f" };
+const ROLE_COLOR: Record<string, string> = { business: "#0A7AFF", creator: "#218E42", verifier: "#AC5A00" };
 
 export function DynamicNav() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export function DynamicNav() {
   const [darkMode, setDarkMode] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
+  const guideTitleId = useId();
 
   useEffect(() => {
     setRole(getRole());
@@ -79,7 +81,7 @@ export function DynamicNav() {
   };
 
   const items = navFor(role);
-  const dot = role ? ROLE_COLOR[role] : "#2383e2";
+  const dot = role ? ROLE_COLOR[role] : "#0A7AFF";
 
   const guideSteps = [
     {
@@ -107,12 +109,12 @@ export function DynamicNav() {
   return (
     <>
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-        <div className="island flex items-center gap-1 rounded-full px-2 py-1.5 text-paper">
+        <div className="island flex items-center gap-1 rounded-full px-2 py-1.5 text-ink">
           {/* brand dot */}
-          <Link href="/" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20">
+          <Link href="/" aria-label="TruthLayer home" className="flex h-9 w-9 items-center justify-center rounded-full text-accent transition hover:bg-ink/5">
             <Layers className="h-4 w-4" />
           </Link>
-          <span className="mx-0.5 h-5 w-px bg-white/10" />
+          <span className="mx-0.5 h-5 w-px bg-ink/10" />
 
           {/* primary links */}
           {items.map((it) => {
@@ -121,8 +123,10 @@ export function DynamicNav() {
               <Link
                 key={it.href}
                 href={it.href}
+                aria-label={it.label}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                  active ? "bg-white text-ink shadow" : "text-white/70 hover:bg-white/10 hover:text-white"
+                  active ? "bg-ink/10 text-ink" : "text-ink-light hover:bg-ink/5 hover:text-ink"
                 }`}
               >
                 {it.icon}
@@ -131,47 +135,65 @@ export function DynamicNav() {
             );
           })}
 
-          <span className="mx-0.5 h-5 w-px bg-white/10" />
+          <span className="mx-0.5 h-5 w-px bg-ink/10" />
 
           {/* theme toggle */}
           <button
             onClick={toggleTheme}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-light transition hover:bg-ink/5 hover:text-ink"
           >
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+
+          {/* docs */}
+          <Link
+            href="/docs"
+            aria-label="Documentation"
+            aria-current={pathname === "/docs" ? "page" : undefined}
+            title="Documentation"
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+              pathname === "/docs" ? "bg-ink/10 text-ink" : "text-ink-light hover:bg-ink/5 hover:text-ink"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+          </Link>
 
           {/* onboarding guide */}
           {role && (
             <button
               onClick={() => { setGuideStep(0); setShowGuide(true); }}
+              aria-label="Show guide"
               title="Show guide"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-light transition hover:bg-ink/5 hover:text-ink"
             >
               <HelpCircle className="h-4 w-4" />
             </button>
           )}
 
-          <span className="mx-0.5 h-5 w-px bg-white/10" />
+          <span className="mx-0.5 h-5 w-px bg-ink/10" />
 
           {role ? (
             <>
               {/* utility settings */}
               <Link
                 href="/settings"
+                aria-label="Settings"
+                aria-current={pathname === "/settings" ? "page" : undefined}
                 title="Settings"
                 className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
-                  pathname === "/settings" ? "bg-white text-ink" : "text-white/70 hover:bg-white/10 hover:text-white"
+                  pathname === "/settings" ? "bg-ink/10 text-ink" : "text-ink-light hover:bg-ink/5 hover:text-ink"
                 }`}
               >
                 <Settings className="h-4 w-4" />
               </Link>
-              
+
               <button
+                aria-label="Sign out"
                 title="Sign out"
                 onClick={async () => { await clearAuth(); router.push("/"); }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-bad/20 hover:text-bad"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-ink-light transition hover:bg-bad/15 hover:text-bad"
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -182,7 +204,7 @@ export function DynamicNav() {
           ) : (
             <Link
               href="/login"
-              className="flex h-9 items-center justify-center rounded-full px-3 text-xs font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="flex h-9 items-center justify-center rounded-full px-3 text-xs font-semibold text-ink-light transition hover:bg-ink/5 hover:text-ink"
             >
               Sign in
             </Link>
@@ -192,9 +214,14 @@ export function DynamicNav() {
 
       {/* Onboarding Guide Modal */}
       {showGuide && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-pop text-ink">
-            <h3 className="font-display text-lg font-bold text-ink mb-3">{guideSteps[guideStep].title}</h3>
+        <Modal
+          onClose={closeGuide}
+          closeOnBackdrop={false}
+          ariaLabelledby={guideTitleId}
+          backdropClassName="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          panelClassName="relative w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-pop text-ink"
+        >
+          <h3 id={guideTitleId} className="font-display text-lg font-bold text-ink mb-3">{guideSteps[guideStep].title}</h3>
             
             <p className="text-sm text-ink-light leading-relaxed whitespace-pre-line min-h-[120px]">
               {guideSteps[guideStep].content}
@@ -240,8 +267,7 @@ export function DynamicNav() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   );

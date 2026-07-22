@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     # row keyed by the Supabase user id.
     SUPABASE_URL: str = ""           # e.g. https://<ref>.supabase.co
     SUPABASE_JWT_AUDIENCE: str = "authenticated"
+    # OPTIONAL server-side admin key, used ONLY to delete the Supabase auth
+    # identity during account erasure (GDPR). Leave empty to erase local data only
+    # and remove the auth user via the Supabase dashboard. This is a privileged
+    # secret — scope it tightly and never expose it to clients.
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    # Verify the JWT `iss` claim equals "<SUPABASE_URL>/auth/v1" (defense-in-depth
+    # on top of the pinned-JWKS + audience check). Disable only if your project's
+    # issuer differs from the standard GoTrue format.
+    SUPABASE_VERIFY_ISS: bool = True
 
     # ── Database ──────────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/truthlayer"
@@ -89,11 +98,63 @@ class Settings(BaseSettings):
 
     # ── Storage ───────────────────────────────────────────────────────────
     MEDIA_STORAGE_DIR: str = "/tmp/truthlayer/media"
-    MAX_UPLOAD_MB: int = 200
+    MAX_UPLOAD_MB: int = 200          # streamed video-upload cap
+    MAX_DOCUMENT_MB: int = 25         # RAG document / product-image upload cap
+
+    # ── Ingestion safety (SSRF + resource limits) ─────────────────────────
+    # yt-dlp fetches user-supplied URLs server-side. Only the platforms the
+    # product actually supports are allowed, and (by default) URLs that resolve
+    # to private / loopback / link-local / cloud-metadata addresses are rejected
+    # so a submitted URL can't reach internal services. Comma-separated list of
+    # registrable domains (sub-domains are matched by suffix). See app.urlguard.
+    INGEST_ALLOWED_HOSTS: str = (
+        "youtube.com,youtu.be,m.youtube.com,tiktok.com,vm.tiktok.com,"
+        "instagram.com,instagr.am"
+    )
+    INGEST_BLOCK_PRIVATE_IPS: bool = True
+    # Download DoS caps (a 10-hour or multi-GB URL is rejected up front).
+    MAX_VIDEO_DURATION_SECONDS: int = 3600
+    MAX_DOWNLOAD_MB: int = 500
+    # Hang guard for the OCR keyframe-extraction ffmpeg call.
+    FFMPEG_TIMEOUT_SECONDS: int = 600
+
+    # ── LLM guardrails (cost / DoS / latency) ─────────────────────────────
+    # Generous default so normal structured outputs (claim lists, contradiction
+    # reports, summaries) are never truncated, while still bounding a runaway
+    # generation to a fraction of the model's context window. Callers that need
+    # more can pass an explicit max_tokens.
+    LLM_MAX_TOKENS: int = 4096              # per-call completion cap
+    LLM_REQUEST_TIMEOUT_SECONDS: float = 60.0
+    AGENT_FANOUT_TIMEOUT_SECONDS: float = 180.0
+    MAX_CLAIMS_FOR_EVIDENCE: int = 40       # cap external evidence fan-out per video
+
+    # ── Rate limiting (slowapi) ───────────────────────────────────────────
+    # In-memory by default; uses REDIS_URL automatically when set. Empty string
+    # disables limiting entirely (useful for tests / single-user local runs).
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_DEFAULT: str = "120/minute"
+    RATE_LIMIT_EXPENSIVE: str = "10/minute"  # upload / url-submit / analysis / recompute
+
+    # ── Response security headers ─────────────────────────────────────────
+    # HSTS is only meaningful over HTTPS; disable for plain-http local dev.
+    SECURITY_HEADERS_ENABLED: bool = True
+    SECURITY_HEADERS_HSTS: bool = True
+
+    # ── Data retention (compliance) ───────────────────────────────────────
+    # Age (days) after which videos + derived data and media files are purged by
+    # the retention job. 0 disables purging (opt-in; default keeps everything).
+    DATA_RETENTION_DAYS: int = 0
 
     @property
     def cors_origins(self) -> List[str]:
-        return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]
+        origins = [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]
+        # Never combine a wildcard with credentialed CORS: it would reflect any
+        # origin. Drop "*" so a mis-set env fails closed to the safe default.
+        return [o for o in origins if o != "*"]
+
+    @property
+    def ingest_allowed_hosts(self) -> List[str]:
+        return [h.strip().lower() for h in self.INGEST_ALLOWED_HOSTS.split(",") if h.strip()]
 
     @property
     def celery_enabled(self) -> bool:

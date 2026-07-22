@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, EmailStr, field_serializer
+from pydantic import BaseModel, EmailStr, field_serializer, field_validator
 
 from app.models import UserRole
 
@@ -25,6 +25,9 @@ class UserOut(BaseModel):
     llm_model: Optional[str] = None
     embeddings_model: Optional[str] = None
     transcription_model: Optional[str] = None
+    # True when the role is pinned in server-controlled app_metadata and can no
+    # longer be self-changed (so the UI can hide/disable the workspace switcher).
+    role_locked: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -35,6 +38,8 @@ class BootstrapRequest(BaseModel):
     role: Optional[UserRole] = None
     organization_name: Optional[str] = None
     full_name: Optional[str] = None
+    # Compliance: the privacy/ToS version the user accepted at sign-up.
+    consent_version: Optional[str] = None
 
 
 class SettingsRequest(BaseModel):
@@ -59,6 +64,8 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str
     description: Optional[str] = None
+    # Omitted (None) = leave aliases unchanged; [] = clear them.
+    aliases: Optional[List[str]] = None
 
 
 class ProductOut(BaseModel):
@@ -87,6 +94,9 @@ class ProductOut(BaseModel):
 class VideoUrlRequest(BaseModel):
     url: str
     product_id: Optional[str] = None
+    # Compliance: submitter confirms they have the rights / lawful basis to submit
+    # this content for processing (see api.videos). Optional for backward compat.
+    rights_attested: Optional[bool] = None
 
 
 class AnalysisStartRequest(BaseModel):
@@ -145,6 +155,27 @@ class ReportOut(BaseModel):
     score_reasonings: dict = {}
 
     model_config = {"from_attributes": True}
+
+    # Defence-in-depth: even if an out-of-range value were ever persisted, the API
+    # never emits a score outside its documented range. Percentages are 0–100,
+    # sentiment is −1..1, confidence is 0–1.
+    @field_validator(
+        "trust_score", "risk_score", "compliance_score", "bias_score", "authenticity_score",
+        mode="after",
+    )
+    @classmethod
+    def _clamp_percent(cls, v: Optional[float]) -> Optional[float]:
+        return None if v is None else max(0.0, min(100.0, float(v)))
+
+    @field_validator("sentiment_score", mode="after")
+    @classmethod
+    def _clamp_sentiment(cls, v: Optional[float]) -> Optional[float]:
+        return None if v is None else max(-1.0, min(1.0, float(v)))
+
+    @field_validator("overall_confidence", mode="after")
+    @classmethod
+    def _clamp_confidence(cls, v: Optional[float]) -> Optional[float]:
+        return None if v is None else max(0.0, min(1.0, float(v)))
 
 
 class AnalysisOut(BaseModel):

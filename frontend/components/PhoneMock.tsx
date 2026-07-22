@@ -5,7 +5,7 @@ import { Check, AlertTriangle, ShieldCheck, Sparkle, Layers, FileSearch } from "
 /* Same score→color mapping the live dashboard (AnalysisBento) uses. */
 const C = (t: number, invert = false) => {
   const v = invert ? 100 - t : t;
-  return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
+  return v >= 70 ? "#30D158" : v >= 40 ? "#FFB340" : "#FF6961";
 };
 
 /** Compact dashboard ring — mirrors the bento <Ring /> on the analyze page. */
@@ -57,38 +57,38 @@ export function PhoneMock() {
   const trust = 92;
 
   return (
-    <div className="relative w-[260px] h-[530px] rounded-[40px] border-[7px] border-ink bg-white shadow-pop select-none flex flex-col overflow-hidden">
+    <div className="relative w-[260px] h-[530px] rounded-[44px] border-[7px] border-[#232428] bg-[#101116] shadow-pop select-none flex flex-col overflow-hidden">
       {/* Ambient dashboard glow */}
       <div className="pointer-events-none absolute -top-10 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-good/10 blur-3xl" />
       <div className="pointer-events-none absolute bottom-10 -right-10 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
 
       {/* Notch */}
-      <div className="absolute left-1/2 top-0 z-20 h-4 w-28 -translate-x-1/2 rounded-b-xl bg-ink" />
+      <div className="absolute left-1/2 top-2.5 z-20 h-[22px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
 
       {/* Status Bar */}
-      <div className="relative z-10 flex items-center justify-between px-5 pb-1 pt-3.5 text-[9.5px] font-semibold text-ink/40">
+      <div className="relative z-10 flex items-center justify-between px-5 pb-1 pt-3.5 text-[9.5px] font-semibold text-white/40">
         <span>9:41</span>
-        <span className="h-1.5 w-4 rounded-sm bg-ink/20" />
+        <span className="h-1.5 w-4 rounded-sm bg-white/25" />
       </div>
 
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-2">
         <div className="flex items-center gap-1.5">
-          <Layers className="h-3.5 w-3.5 text-ink" />
-          <span className="text-xs font-black tracking-tight text-ink">TruthLayer</span>
+          <Layers className="h-3.5 w-3.5 text-[#409CFF]" />
+          <span className="text-xs font-bold tracking-tight text-white">TruthLayer</span>
         </div>
-        <span className="text-[7px] font-extrabold text-good bg-good/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Calibrated</span>
+        <span className="text-[7px] font-extrabold text-good bg-good/20 px-2 py-0.5 rounded-full uppercase tracking-wider">Calibrated</span>
       </div>
 
       {/* Bento grid */}
       <div className="relative z-10 flex-1 flex flex-col gap-2 px-4 py-3 overflow-hidden">
 
         {/* TRUST HERO tile */}
-        <div className="glass-tile p-3">
+        <div className="glass-tile-dark p-3">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br opacity-40"
-            style={{ backgroundImage: "linear-gradient(135deg,#0f7b6c1f,transparent 60%)" }} />
+            style={{ backgroundImage: "linear-gradient(135deg,#30D1581f,transparent 60%)" }} />
           <div className="relative z-10">
-            <TileLabel icon={<ShieldCheck className="h-3 w-3" />} color="#0f7b6c">Trust</TileLabel>
+            <TileLabel icon={<ShieldCheck className="h-3 w-3" />} color="#30D158">Trust</TileLabel>
             <div className="flex items-center gap-3">
               <Ring value={trust} color={C(trust)} label="trust" />
               <div className="flex-1 space-y-1.5">
@@ -102,26 +102,26 @@ export function PhoneMock() {
 
         {/* Two stat tiles */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="glass-tile p-2.5">
-            <TileLabel icon={<Sparkle className="h-3 w-3" />} color="#2383e2">Compliance</TileLabel>
+          <div className="glass-tile-dark p-2.5">
+            <TileLabel icon={<Sparkle className="h-3 w-3" />} color="#409CFF">Compliance</TileLabel>
             <div className="font-heavy text-2xl leading-none" style={{ color: C(88) }}>88</div>
             <div className="mt-1 text-[8px] text-white/40">guidelines pass</div>
           </div>
-          <div className="glass-tile p-2.5">
-            <TileLabel icon={<ShieldCheck className="h-3 w-3" />} color="#0f7b6c">Integrity</TileLabel>
+          <div className="glass-tile-dark p-2.5">
+            <TileLabel icon={<ShieldCheck className="h-3 w-3" />} color="#30D158">Integrity</TileLabel>
             <div className="font-heavy text-2xl leading-none" style={{ color: C(96) }}>96%</div>
             <div className="mt-1 text-[8px] text-white/40">authenticity</div>
           </div>
         </div>
 
         {/* FACT-CHECK CLAIMS tile */}
-        <div className="glass-tile flex-1 p-3">
+        <div className="glass-tile-dark flex-1 p-3">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br opacity-40"
-            style={{ backgroundImage: "linear-gradient(135deg,#2383e21f,transparent 60%)" }} />
+            style={{ backgroundImage: "linear-gradient(135deg,#409CFF1f,transparent 60%)" }} />
           <div className="relative z-10 flex h-full flex-col">
-            <TileLabel icon={<FileSearch className="h-3 w-3" />} color="#2383e2">Fact-check claims</TileLabel>
+            <TileLabel icon={<FileSearch className="h-3 w-3" />} color="#409CFF">Fact-check claims</TileLabel>
             <div className="mb-2 flex gap-1.5">
-              <span className="rounded-full bg-good/15 px-1.5 py-0.5 text-[7.5px] font-extrabold text-good">2 verified</span>
+              <span className="rounded-full bg-good/20 px-1.5 py-0.5 text-[7.5px] font-extrabold text-good">2 verified</span>
               <span className="rounded-full bg-bad/15 px-1.5 py-0.5 text-[7.5px] font-extrabold text-bad">1 flagged</span>
             </div>
             <div className="space-y-1.5">
@@ -143,9 +143,9 @@ export function PhoneMock() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="relative z-10 mt-auto flex h-12 items-center justify-between border-t border-line px-8 text-ink/30 bg-white">
+      <div className="relative z-10 mt-auto flex h-12 items-center justify-between border-t border-white/10 px-8 text-white/35 bg-[#16171d]">
         <span className="flex flex-col items-center gap-0.5 text-accent"><Layers className="h-4 w-4" /><span className="text-[7px] font-bold uppercase tracking-wider">Audit</span></span>
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-paper shadow-pop"><Check className="h-4 w-4" /></span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#101116] shadow-pop"><Check className="h-4 w-4" /></span>
         <span className="flex flex-col items-center gap-0.5"><Layers className="h-4 w-4 rotate-180" /><span className="text-[7px] font-bold uppercase tracking-wider">History</span></span>
       </div>
     </div>

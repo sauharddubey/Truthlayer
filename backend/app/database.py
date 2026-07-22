@@ -90,6 +90,21 @@ def init_db() -> None:
         "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_text TEXT",
         "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_segments JSON DEFAULT '[]'",
         "ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS ocr_analysis JSON DEFAULT '{}'",
+        # Compliance: consent capture + upload rights attestation.
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ",
+        "ALTER TABLE videos ADD COLUMN IF NOT EXISTS rights_attested BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE videos ADD COLUMN IF NOT EXISTS rights_attested_at TIMESTAMPTZ",
+        # Compliance: audit log (table itself is created by create_all).
+        "CREATE INDEX IF NOT EXISTS ix_audit_logs_actor_id ON audit_logs(actor_id)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_logs_object_id ON audit_logs(object_id)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_logs_created_at ON audit_logs(created_at)",
+        # DB-level erasure backstop so deletions hold outside the ORM path too.
+        # Best-effort: uses Postgres default constraint names and is wrapped in the
+        # per-statement try/except below, so a name mismatch is a harmless no-op.
+        "ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_submitted_by_fkey",
+        "ALTER TABLE videos ADD CONSTRAINT videos_submitted_by_fkey "
+        "FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL",
     ]
     with engine.connect() as conn:
         for stmt in _additive_migrations:

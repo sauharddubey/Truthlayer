@@ -110,6 +110,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
+    # Consent capture (compliance): the policy version the user accepted at
+    # sign-up and when. Populated via /auth/bootstrap; surfaced for accountability.
+    consent_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     organization: Mapped[Optional[Organization]] = relationship(back_populates="users")
 
 
@@ -164,6 +169,10 @@ class Video(Base):
     )
     mode: Mapped[AnalysisMode] = mapped_column(Enum(AnalysisMode), default=AnalysisMode.VERIFIER)
     error: Mapped[Optional[str]] = mapped_column(Text)
+    # Rights attestation (compliance): the submitter confirmed they own / have the
+    # rights + a lawful basis to submit this third-party content for processing.
+    rights_attested: Mapped[bool] = mapped_column(Boolean, default=False)
+    rights_attested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     product: Mapped[Optional[Product]] = relationship(back_populates="videos")
@@ -398,3 +407,26 @@ class UsageRecord(Base):
     @property
     def cost_usd(self) -> float:
         return self.cost_microdollars / 1_000_000
+
+
+# ── Audit log (compliance / accountability) ──────────────────────────────────
+
+
+class AuditLog(Base):
+    """Append-only record of security/privacy-relevant actions.
+
+    Captures who did what to which object and when (e.g. exporting a report,
+    deleting an account). ``actor_id`` is intentionally NOT a foreign key so the
+    trail survives erasure of the actor — an audit log that is cascade-deleted
+    with its subject provides no accountability.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    actor_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    object_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    object_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
