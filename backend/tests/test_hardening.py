@@ -8,7 +8,7 @@ from app.agents.base import clamp_score, sanitize_transcript, wrap_untrusted
 from app.llm import _extract_json
 from app.schemas import ReportOut
 from app.security import _authoritative_role, role_is_locked
-from app.models import UserRole
+from app.models import User, UserRole
 from app.services.ingestion import _safety_ydl_opts
 from app.services.video_cleanup import collect_media_paths
 from app.uploads import DOCUMENT_KINDS, IMAGE_KINDS, enforce_content_type
@@ -141,6 +141,56 @@ def test_self_service_role_used_when_not_locked():
     claims = {"user_metadata": {"role": "creator"}}
     assert role_is_locked(claims) is False
     assert _authoritative_role(claims) == UserRole.CREATOR
+
+
+def _fake_user(role=UserRole.VERIFIER, organization_id=None):
+    return User(
+        id="user-1",
+        email="test@example.com",
+        full_name=None,
+        role=role,
+        organization_id=organization_id,
+        openrouter_api_key=None,
+        tavily_api_key=None,
+        media_integrity_api_key=None,
+        llm_model=None,
+        embeddings_model=None,
+        transcription_model=None,
+    )
+
+
+def test_bootstrap_refuses_role_change_when_locked():
+    from unittest.mock import MagicMock
+
+    from app.api.auth import bootstrap
+    from app.schemas import BootstrapRequest
+
+    user = _fake_user(role=UserRole.VERIFIER)
+    payload = BootstrapRequest(role=UserRole.BUSINESS)
+    claims = {"app_metadata": {"role": "verifier"}}  # role_is_locked -> True
+
+    out = bootstrap(payload, db=MagicMock(), user=user, claims=claims)
+
+    assert user.role == UserRole.VERIFIER  # unchanged despite the requested BUSINESS role
+    assert out.role == UserRole.VERIFIER
+    assert out.role_locked is True
+
+
+def test_bootstrap_allows_role_change_when_not_locked():
+    from unittest.mock import MagicMock
+
+    from app.api.auth import bootstrap
+    from app.schemas import BootstrapRequest
+
+    user = _fake_user(role=UserRole.VERIFIER)
+    payload = BootstrapRequest(role=UserRole.CREATOR)
+    claims = {"user_metadata": {"role": "verifier"}}  # role_is_locked -> False
+
+    out = bootstrap(payload, db=MagicMock(), user=user, claims=claims)
+
+    assert user.role == UserRole.CREATOR
+    assert out.role == UserRole.CREATOR
+    assert out.role_locked is False
 
 
 # ── Ingestion resource caps ───────────────────────────────────────────────────
