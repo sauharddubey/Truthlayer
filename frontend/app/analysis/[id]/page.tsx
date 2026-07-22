@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteVideo, downloadReportPdf, downloadReportJson, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
+import { ApiError, deleteVideo, downloadReportPdf, downloadReportJson, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
 import { safeExternalUrl } from "@/lib/safeUrl";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
@@ -115,6 +115,8 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   const [pollStalled, setPollStalled] = useState(false);
   /** A poll failed but we're still retrying. */
   const [reconnecting, setReconnecting] = useState(false);
+  /** A poll failed with a status that will never succeed on retry (404/401/403). */
+  const [pollFatal, setPollFatal] = useState<string | null>(null);
   const [nonce, setNonce]     = useState(0);
   const [rerunning, setRerunning] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -149,6 +151,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         hasData.current = true;
         setReconnecting(false);
         setPollStalled(false);
+        setPollFatal(null);
         setLoadError("");
         setData(d);
         if (!TERMINAL.includes(d.video.processing_status)) {
@@ -156,8 +159,23 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         }
       } catch (e: any) {
         if (cancelled.current) return;
-        failures.current += 1;
         const message = e?.message || "Couldn't reach the server.";
+
+        // A 404/401/403 will never succeed on retry — surface it immediately
+        // instead of backing off for a status that can't change.
+        if (e instanceof ApiError && (e.status === 404 || e.status === 401 || e.status === 403)) {
+          setReconnecting(false);
+          const fatalMessage =
+            e.status === 404
+              ? "This analysis no longer exists."
+              : e.status === 401
+              ? "Your session expired — sign in again to keep viewing this analysis."
+              : "You no longer have access to this analysis.";
+          setPollFatal(fatalMessage);
+          return;
+        }
+
+        failures.current += 1;
 
         if (failures.current < MAX_POLL_FAILURES) {
           // Still trying. Keep whatever is on screen.
@@ -185,6 +203,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   function retryNow() {
     setLoadError("");
     setPollStalled(false);
+    setPollFatal(null);
     setReconnecting(false);
     setNonce((n) => n + 1);
   }
@@ -269,8 +288,19 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                 <p className="mt-1 text-xs text-white/70">Our multi-agent AI fleet is scanning your media...</p>
               </div>
 
+              {/* Terminal failure — retrying won't help, no "reconnect" offered. */}
+              {pollFatal && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-xl border border-bad/20 bg-bad/5 px-3 py-2 text-xs text-bad"
+                >
+                  {pollFatal}
+                </div>
+              )}
+
               {/* Connection trouble — the run continues server-side either way. */}
-              {(reconnecting || pollStalled) && (
+              {!pollFatal && (reconnecting || pollStalled) && (
                 <div
                   role="status"
                   aria-live="polite"
@@ -476,7 +506,10 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
       </div>
 
       {actionError && <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{actionError}</div>}
-      {pollStalled && (
+      {pollFatal && (
+        <div className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{pollFatal}</div>
+      )}
+      {!pollFatal && pollStalled && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warn/20 bg-warn/5 px-3 py-2 text-sm text-warn">
           <span>Live updates paused — we couldn&apos;t reach the server. This report may be out of date.</span>
           <button className="btn-ghost shrink-0 text-warn" onClick={retryNow}>Reconnect</button>
