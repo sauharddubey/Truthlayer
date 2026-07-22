@@ -476,13 +476,15 @@ def _compute_contradictions(db: Session, pid: str, user: User) -> dict:
     listing = "\n".join(
         f"[{i}] (video {r[1][:8]} – {r[2] or ''}) {r[0]}" for i, r in enumerate(rows[:60])
     )
+    from app.agents.base import wrap_untrusted
+
     result = chat_json(
         system=(
             "You are given claims made across multiple videos about the same product. "
             "Identify pairs of claims that CONTRADICT each other (different numbers, "
             "opposite statements, incompatible facts). Return only genuine contradictions."
         ),
-        user=f"Claims:\n{listing}",
+        user=wrap_untrusted("claims", listing),
         schema_hint='{"contradictions":[{"claim_a":"string","claim_b":"string","explanation":"string"}]}',
     )
     from datetime import datetime, timezone
