@@ -38,6 +38,17 @@ export async function clearAuth() {
   }
 }
 
+/** An API error that carries the HTTP status, so callers (e.g. polling loops)
+ * can distinguish a terminal failure (404/401/403) from a transient one. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -49,7 +60,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(detail.detail || `Request failed (${res.status})`);
+    throw new ApiError(detail.detail || `Request failed (${res.status})`, res.status);
   }
   if (res.headers.get("content-type")?.includes("application/json")) {
     return res.json();
