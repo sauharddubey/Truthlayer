@@ -52,7 +52,7 @@ def build_pdf(video: Video) -> bytes:
             ["Bias", _fmt(report.bias_score)],
             ["Sentiment", _fmt(report.sentiment_score)],
             ["Authenticity", _fmt(report.authenticity_score)],
-            ["Narrative leaning", report.narrative_leaning or "n/a"],
+            ["Narrative leaning", _esc(report.narrative_leaning) if report.narrative_leaning else "n/a"],
             ["Overall confidence", _fmt(report.overall_confidence, pct=False)],
         ]
         table = Table(data, colWidths=[2.5 * inch, 2.5 * inch])
