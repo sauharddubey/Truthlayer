@@ -5,15 +5,21 @@ marketing policies), hashtag monitoring, narrative intelligence, an overview, an
 cross-transcript contradiction detection.
 """
 
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.agents.narrative import cluster_narratives
+from app.config import settings
 from app.database import get_db
 from app.llm import chat_json
+from app.ratelimit import EXPENSIVE, limiter
+from app.uploads import (
+    DOCUMENT_KINDS,
+    IMAGE_KINDS,
+    enforce_content_type,
+    read_upload_capped,
+)
 from app.models import (
     BusinessDocument,
     Claim,
@@ -107,7 +113,9 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db), user: 
 
 
 @router.post("/{pid}/image", response_model=ProductOut)
+@limiter.limit(EXPENSIVE)
 async def upload_product_image(
+    request: Request,
     pid: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -116,16 +124,16 @@ async def upload_product_image(
     import os
     import uuid as _uuid
 
-    from app.config import settings
-
     p = _get_product(db, pid, user)
     os.makedirs(settings.MEDIA_STORAGE_DIR, exist_ok=True)
     ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
     if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
         raise HTTPException(status_code=400, detail="Image must be jpg/png/webp/gif")
+    data = await read_upload_capped(file, settings.MAX_DOCUMENT_MB)
+    enforce_content_type(data, IMAGE_KINDS, label="image")
     fname = f"product_{pid}_{_uuid.uuid4().hex[:8]}{ext}"
     with open(os.path.join(settings.MEDIA_STORAGE_DIR, fname), "wb") as f:
-        f.write(await file.read())
+        f.write(data)
     p.image_url = f"/media/{fname}"
     db.commit()
     db.refresh(p)
@@ -135,7 +143,10 @@ async def upload_product_image(
 @router.get("", response_model=list[ProductOut])
 def list_products(db: Session = Depends(get_db), user: User = Depends(business_only)):
     products = db.execute(
-        select(Product).where(Product.organization_id == _org(user)).order_by(Product.created_at.desc())
+        select(Product)
+        .where(Product.organization_id == _org(user))
+        .order_by(Product.created_at.desc())
+        .limit(500)
     ).scalars().all()
     return [_product_out(db, p) for p in products]
 
@@ -198,7 +209,9 @@ def delete_product(pid: str, db: Session = Depends(get_db), user: User = Depends
 
 
 @router.post("/{pid}/documents", response_model=DocumentOut)
+@limiter.limit(EXPENSIVE)
 async def upload_document(
+    request: Request,
     pid: str,
     file: UploadFile = File(...),
     document_type: str = Form("product_details"),
@@ -218,7 +231,10 @@ async def upload_document(
             status_code=400,
             detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
-    raw = await file.read()
+    raw = await read_upload_capped(file, settings.MAX_DOCUMENT_MB)
+    # Reject a payload whose real signature is a disallowed type (e.g. an
+    # executable/HTML renamed to .pdf). Plain text has no signature and passes.
+    enforce_content_type(raw, DOCUMENT_KINDS, label="document")
     from app.crypto import decrypt_secret
     from app.llm import set_runtime_api_key, set_runtime_user_id
 
@@ -250,7 +266,7 @@ def list_documents(pid: str, db: Session = Depends(get_db), user: User = Depends
         select(BusinessDocument).where(
             BusinessDocument.product_id == pid,
             BusinessDocument.organization_id == _org(user),
-        ).order_by(BusinessDocument.created_at.desc())
+        ).order_by(BusinessDocument.created_at.desc()).limit(500)
     ).scalars().all()
 
 
@@ -357,7 +373,7 @@ def _video_card(v: Video) -> dict:
 def product_videos(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
     _get_product(db, pid, user)
     vids = db.execute(
-        select(Video).where(Video.product_id == pid).order_by(Video.created_at.desc())
+        select(Video).where(Video.product_id == pid).order_by(Video.created_at.desc()).limit(500)
     ).scalars().all()
     return {"videos": [_video_card(v) for v in vids]}
 
@@ -420,12 +436,16 @@ def list_narratives(pid: str, db: Session = Depends(get_db), user: User = Depend
             NarrativeCluster.product_id == pid,
         )
         .order_by(NarrativeCluster.risk_score.desc())
+        .limit(500)
     ).scalars().all()
     return _narrative_cards(clusters)
 
 
 @router.post("/{pid}/narratives/recompute")
-def recompute_narratives(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+@limiter.limit(EXPENSIVE)
+def recompute_narratives(
+    request: Request, pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)
+):
     _get_product(db, pid, user)
     clusters = cluster_narratives(db, _org(user), product_id=pid)
     return _narrative_cards(clusters)
@@ -456,13 +476,15 @@ def _compute_contradictions(db: Session, pid: str, user: User) -> dict:
     listing = "\n".join(
         f"[{i}] (video {r[1][:8]} – {r[2] or ''}) {r[0]}" for i, r in enumerate(rows[:60])
     )
+    from app.agents.base import wrap_untrusted
+
     result = chat_json(
         system=(
             "You are given claims made across multiple videos about the same product. "
             "Identify pairs of claims that CONTRADICT each other (different numbers, "
             "opposite statements, incompatible facts). Return only genuine contradictions."
         ),
-        user=f"Claims:\n{listing}",
+        user=wrap_untrusted("claims", listing),
         schema_hint='{"contradictions":[{"claim_a":"string","claim_b":"string","explanation":"string"}]}',
     )
     from datetime import datetime, timezone
@@ -494,7 +516,10 @@ def get_contradictions(pid: str, db: Session = Depends(get_db), user: User = Dep
 
 
 @router.post("/{pid}/contradictions/recompute")
-def recompute_contradictions(pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)):
+@limiter.limit(EXPENSIVE)
+def recompute_contradictions(
+    request: Request, pid: str, db: Session = Depends(get_db), user: User = Depends(business_only)
+):
     _get_product(db, pid, user)
     report = _compute_contradictions(db, pid, user)
     try:

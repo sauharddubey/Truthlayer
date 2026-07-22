@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useId } from "react";
+import { Modal as BaseModal } from "@/components/Modal";
 import { ClaimsPanel } from "@/components/ClaimsPanel";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
@@ -90,21 +91,38 @@ function HashtagCheckPanel({ hashtagCheck }: { hashtagCheck: any }) {
 function Block({ label, icon, color, span = "", onClick, children }: {
   label: string; icon: ReactNode; color: string; span?: string; onClick?: () => void; children: ReactNode;
 }) {
+  const interactive = !!onClick;
   return (
-    <button
+    // A div (not a button) so nested interactive controls stay valid HTML.
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
       onClick={onClick}
-      disabled={!onClick}
-      className={`glass-tile group relative flex flex-col p-4 text-left ${span} ${onClick ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"}`}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              // Only act on the tile itself, never on keystrokes bubbling up
+              // from nested controls (e.g. the sentiment source toggle).
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      aria-label={interactive ? label : undefined}
+      className={`glass-tile group relative flex flex-col p-4 text-left ${span} ${interactive ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"}`}
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br opacity-40"
         style={{ backgroundImage: `linear-gradient(135deg, ${color}1f, transparent 60%)` }} />
       <div className="relative z-10 mb-2 flex items-center gap-1.5">
         <span style={{ color }}>{icon}</span>
-        <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">{label}</span>
+        <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">{label}</span>
         {onClick && <ArrowRight className="ml-auto h-3 w-3 text-white/20 transition group-hover:text-white/50" />}
       </div>
       <div className="relative z-10 flex flex-1 flex-col">{children}</div>
-    </button>
+    </div>
   );
 }
 
@@ -121,7 +139,7 @@ function Ring({ value, color, size = 92, label }: { value?: number | null; color
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={`font-heavy leading-none text-white ${display === "N/A" ? "text-lg" : "text-2xl"}`}>{display}</span>
-        {label && <span className="text-[7px] font-bold uppercase tracking-widest text-white/40 mt-0.5">{label}</span>}
+        {label && <span className="text-[7px] font-bold uppercase tracking-widest text-white/70 mt-0.5">{label}</span>}
       </div>
     </div>
   );
@@ -132,7 +150,7 @@ function MiniBar({ label, value, invert = false }: { label: string; value?: numb
   return (
     <div>
       <div className="mb-1 flex justify-between text-[9px] font-bold">
-        <span className="uppercase tracking-wider text-white/40">{label}</span>
+        <span className="uppercase tracking-wider text-white/70">{label}</span>
         <span style={{ color: C(n, invert) }}>{n == null ? "—" : formatMetric(n)}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
@@ -229,18 +247,20 @@ function MediaIntegrityDetails({ mi }: { mi: any }) {
 
 /* ── Light modal that hosts the full section ── */
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const titleId = useId();
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" />
-      <div className="relative z-10 max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-line bg-paper p-5 shadow-pop n-fade"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-heavy text-lg uppercase tracking-tight text-ink">{title}</h3>
-          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-light hover:bg-hover">✕</button>
-        </div>
-        {children}
+    <BaseModal
+      onClose={onClose}
+      ariaLabelledby={titleId}
+      backdropClassName="fixed inset-0 z-[60] flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+      panelClassName="relative z-10 max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-line bg-paper p-5 shadow-pop n-fade"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 id={titleId} className="font-heavy text-lg uppercase tracking-tight text-ink">{title}</h3>
+        <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-light hover:bg-hover">✕</button>
       </div>
-    </div>
+      {children}
+    </BaseModal>
   );
 }
 
@@ -411,7 +431,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
               {isVerifier && <MiniBar label="Confidence factor" value={scoring?.confidence_factor} />}
             </div>
           </div>
-          <div className="mt-2 text-[10px] font-medium text-white/40">
+          <div className="mt-2 text-[10px] font-medium text-white/70">
             {content.is_about_product ? "Product video" : (content.content_type || "video")}
             {report?.overall_confidence != null && ` · ${formatUnitPercent(report.overall_confidence)} confidence`}
             {(isVerifier || diagnostics?.no_claims_extracted) && diagnostics?.no_claims_extracted && " · insufficient claims"}
@@ -432,9 +452,9 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           <div className="mb-3 flex flex-wrap gap-2">
             <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} verified</span>
             <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
-            <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/50">{claims.length} total</span>
+            <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/70">{claims.length} total</span>
             {skippedClaims.length > 0 && (
-              <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/40">{skippedClaims.length} filtered</span>
+              <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/70">{skippedClaims.length} filtered</span>
             )}
           </div>
           <div className="space-y-2 flex-1 overflow-hidden">
@@ -455,7 +475,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                 </div>
               );
             })}
-            {!claims.length && <span className="text-[11px] text-white/30">No claims extracted.</span>}
+            {!claims.length && <span className="text-[11px] text-white/70">No claims extracted.</span>}
           </div>
         </Block>
 
@@ -467,13 +487,13 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
               const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
               return (
                 <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
-                  <span className="text-[11px] leading-snug text-white/60 line-clamp-1">{s.text}</span>
+                  <span className="text-[11px] leading-snug text-white/70 line-clamp-1">{s.text}</span>
                 </div>
               );
             })}
-            {!segs.length && <span className="text-[11px] text-white/30">No transcript.</span>}
+            {!segs.length && <span className="text-[11px] text-white/70">No transcript.</span>}
           </div>
-          <div className="mt-2 text-[10px] font-bold text-white/40">{segs.length} segments · tap to read</div>
+          <div className="mt-2 text-[10px] font-bold text-white/70">{segs.length} segments · tap to read</div>
         </Block>
 
         {/* ON-SCREEN TEXT (OCR) */}
@@ -503,15 +523,15 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                 const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
                 return (
                   <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
-                    <span className="text-[11px] leading-snug text-white/60 line-clamp-1">
-                      <span className="font-mono text-[9px] text-white/30 mr-1">{fmt(s.start)}</span>
+                    <span className="text-[11px] leading-snug text-white/70 line-clamp-1">
+                      <span className="font-mono text-[9px] text-white/70 mr-1">{fmt(s.start)}</span>
                       {s.text}
                     </span>
                   </div>
                 );
               })}
             </div>
-            <div className="mt-2 text-[10px] font-bold text-white/40">{ocr.ocr_segments.length} segments · tap to read</div>
+            <div className="mt-2 text-[10px] font-bold text-white/70">{ocr.ocr_segments.length} segments · tap to read</div>
           </Block>
         )}
 
@@ -526,7 +546,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             span="col-span-2 row-span-2"
             onClick={() => setActiveModal("Video Segment Analysis")}
           >
-            <div className="text-[10px] text-white/50 mb-3 leading-relaxed">
+            <div className="text-[10px] text-white/70 mb-3 leading-relaxed">
               Visual action summary for overlay text segments (only music/unrelated speech detected).
             </div>
             <div className="flex-1 space-y-2 overflow-hidden">
@@ -541,14 +561,14 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                         "{item.text_appeared}"
                       </span>
                     )}
-                    <span className="text-[11px] leading-snug text-white/50 line-clamp-1 block">
+                    <span className="text-[11px] leading-snug text-white/70 line-clamp-1 block">
                       {item.visual_description}
                     </span>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-2 text-[10px] font-bold text-white/40">
+            <div className="mt-2 text-[10px] font-bold text-white/70">
               {ocr.ocr_analysis.video_segment_analysis.length} segments analyzed · tap to inspect
             </div>
           </Block>
@@ -560,11 +580,11 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Perception check")}>
             <div className="flex items-center gap-3">
               <Ring value={100 - (perc.sentiment_harm_score ?? 0)} color={C(100 - (perc.sentiment_harm_score ?? 0))} size={56} />
-              <div className="text-[11px] text-white/60">
+              <div className="text-[11px] text-white/70">
                 {(perc.flags?.length || 0) > 0
                   ? <span className="font-bold text-warn">{perc.flags.length} sensitivity flag(s)</span>
                   : <span className="font-bold text-good">Unlikely to offend</span>}
-                <div className="mt-0.5 text-white/40 line-clamp-2">{perc.audience_perception}</div>
+                <div className="mt-0.5 text-white/70 line-clamp-2">{perc.audience_perception}</div>
               </div>
             </div>
           </Block>
@@ -576,7 +596,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Bias analysis")}>
             <div className="flex-1 space-y-2">
               <MiniBar label="Bias" value={report?.bias_score} invert />
-              <div className="text-[10px] text-white/40 line-clamp-2">{bias.reasoning}</div>
+              <div className="text-[10px] text-white/70 line-clamp-2">{bias.reasoning}</div>
             </div>
           </Block>
         )}
@@ -600,13 +620,13 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                   <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5 text-[9px] relative z-20" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSentimentSource("speech")}
-                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}
                     >
                       Speech
                     </button>
                     <button
                       onClick={() => setSentimentSource("video")}
-                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-white text-ink shadow-sm" : "text-white/60 hover:text-white"}`}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}
                     >
                       Video
                     </button>
@@ -626,7 +646,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Product & compliance")}>
             <div className="flex-1">
               <div className="font-heavy text-3xl" style={{ color: C(report?.compliance_score) }}>{formatMetric(report?.compliance_score)}</div>
-              <div className="mt-1 text-[10px] text-white/40">{(comp.issues?.length || 0)} issue(s) flagged</div>
+              <div className="mt-1 text-[10px] text-white/70">{(comp.issues?.length || 0)} issue(s) flagged</div>
             </div>
           </Block>
         )}
@@ -639,7 +659,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
               <ShieldCheck className="h-6 w-6 text-good" />
               <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{formatMetricPercent(report?.authenticity_score)}</span>
             </div>
-            <div className="mt-1 text-[10px] text-white/40">
+            <div className="mt-1 text-[10px] text-white/70">
               authenticity
               {mi.dominant_signal && mi.method === "hive" && (
                 <> · {SIGNAL_LABELS[mi.dominant_signal] || mi.dominant_signal}</>
@@ -653,7 +673,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
         {cr && (
           <Block label="Creator risk" icon={<AlertTriangle className="h-3.5 w-3.5" />} color="#cb912f"
             onClick={() => setActiveModal("Creator risk")}>
-            <div className="text-[10px] text-white/40 line-clamp-3">{cr.reasoning || `${cr.risks?.length || 0} risk signal(s)`}</div>
+            <div className="text-[10px] text-white/70 line-clamp-3">{cr.reasoning || `${cr.risks?.length || 0} risk signal(s)`}</div>
           </Block>
         )}
       </div>
@@ -914,15 +934,37 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
 
   const activeItem = items.find((i) => i.label === activeScore) || items[0];
 
+  function onScoreKeyDown(e: React.KeyboardEvent) {
+    const labels = items.map((i) => i.label);
+    const idx = labels.indexOf(activeScore);
+    if (idx < 0) return;
+    let next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % labels.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + labels.length) % labels.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = labels.length - 1;
+    else return;
+    e.preventDefault();
+    const nextLabel = labels[next];
+    setActiveScore(nextLabel);
+    document.getElementById(`score-tab-${nextLabel.toLowerCase()}`)?.focus();
+  }
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-3">
+      <div role="tablist" aria-label="Score breakdown" onKeyDown={onScoreKeyDown} className="grid grid-cols-3 gap-3">
         {items.map((item) => {
           const n = metricValue(item.value);
           const active = item.label === activeScore;
           return (
             <button
               key={item.label}
+              type="button"
+              role="tab"
+              id={`score-tab-${item.label.toLowerCase()}`}
+              aria-selected={active}
+              aria-controls="score-panel"
+              tabIndex={active ? 0 : -1}
               onClick={() => setActiveScore(item.label)}
               className={`rounded-xl border p-3 text-center transition-all duration-200 ${
                 active
@@ -939,7 +981,7 @@ function ScoresModal({ report, isBusiness, mode }: { report: any; isBusiness: bo
         })}
       </div>
 
-      <div className="rounded-xl border border-line bg-paper p-4 shadow-sm text-left space-y-4">
+      <div role="tabpanel" id="score-panel" aria-labelledby={`score-tab-${activeItem.label.toLowerCase()}`} tabIndex={0} className="rounded-xl border border-line bg-paper p-4 shadow-sm text-left space-y-4">
         <h4 className="font-heavy text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           {activeItem.label} Score Details

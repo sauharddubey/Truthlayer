@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMetricPercent, formatUnitPercent } from "@/lib/formatMetric";
+import { safeExternalUrl } from "@/lib/safeUrl";
 
 const verdictStyle: Record<string, string> = {
   supported: "bg-good/10 text-good",
@@ -137,8 +138,8 @@ export function ClaimsPanel({
                   <ul className="mt-1.5 space-y-0.5">
                     {c.evidence.slice(0, 3).map((e: any, j: number) => (
                       <li key={j} className="text-xs text-ink-light">
-                        {e.url ? (
-                          <a href={e.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
+                        {safeExternalUrl(e.url) ? (
+                          <a href={safeExternalUrl(e.url) as string} target="_blank" rel="noreferrer" className="text-accent hover:underline">{e.source || e.url}</a>
                         ) : (<span className="font-medium">{e.source || "evidence"}</span>)}
                         {e.text && <span> — {e.text}</span>}
                       </li>

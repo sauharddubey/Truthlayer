@@ -1,0 +1,34 @@
+{
+  "last_updated": "2026-07-17",
+  "note": "PLACEHOLDER — review and confirm this list (and each processor's DPA / data-residency) before launch. These are the third parties that may process content submitted to TruthLayer.",
+  "subprocessors": [
+    {
+      "name": "OpenRouter (and the upstream model provider you select)",
+      "purpose": "LLM inference, embeddings, and audio transcription",
+      "data_processed": "video transcript text, extracted claims, on-screen OCR text",
+      "credential": "per-user API key",
+      "region": "US"
+    },
+    {
+      "name": "Tavily",
+      "purpose": "Web evidence retrieval for fact-checking",
+      "data_processed": "rewritten claim search queries",
+      "credential": "per-user API key",
+      "region": "US"
+    },
+    {
+      "name": "Supabase",
+      "purpose": "Authentication and PostgreSQL database hosting",
+      "data_processed": "account identity and all stored application data",
+      "credential": "project keys",
+      "region": "operator-configured"
+    },
+    {
+      "name": "Hive",
+      "purpose": "Deepfake / media-integrity detection (business tier)",
+      "data_processed": "video media (fetched via a short-lived signed URL)",
+      "credential": "per-user API key",
+      "region": "US"
+    }
+  ]
+}

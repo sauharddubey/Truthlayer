@@ -21,14 +21,23 @@ def collect_media_paths(extra_metadata: dict | None) -> list[str]:
     keys = ("upload_path", "video_path", "audio_path")
     seen: set[str] = set()
     paths: list[str] = []
-    for key in keys:
-        value = metadata.get(key)
+
+    def _add(value: object) -> None:
         if not isinstance(value, str) or not value.strip():
-            continue
+            return
         if value in seen:
-            continue
+            return
         seen.add(value)
         paths.append(value)
+
+    for key in keys:
+        _add(metadata.get(key))
+    # `media_paths` is a list recorded by URL ingestion so every downloaded file
+    # (mp3 + 360p mp4 + any hive mp4) is cleaned up, not just the single-key ones.
+    media_list = metadata.get("media_paths")
+    if isinstance(media_list, (list, tuple)):
+        for value in media_list:
+            _add(value)
     return paths
 
 

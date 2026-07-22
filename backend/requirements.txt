@@ -16,6 +16,13 @@ pgvector==0.3.6
 # Auth: Supabase-issued JWTs verified via JWKS (ES256/RS256).
 python-jose[cryptography]==3.3.0
 
+# Rate limiting (abuse / cost / DoS protection). In-memory by default; uses
+# REDIS_URL automatically when set.
+slowapi==0.1.9
+
+# Upload content-type validation via magic bytes (pure-Python, no libmagic).
+filetype==1.2.0
+
 # Async jobs
 celery==5.4.0
 redis==5.2.1
