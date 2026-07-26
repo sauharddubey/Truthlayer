@@ -13,7 +13,7 @@ export default function TermsPage() {
         ← Back to TruthLayer
       </Link>
 
-      <h1 className="mt-6 font-heavy text-3xl uppercase tracking-tight">Terms of Service</h1>
+      <h1 className="mt-6 font-heavy text-3xl">Terms of Service</h1>
       <p className="mt-2 text-sm text-ink-light">Last updated: [DATE]</p>
 
       <div

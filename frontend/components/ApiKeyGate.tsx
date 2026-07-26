@@ -73,7 +73,7 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
           </div>
 
           <div>
-            <h2 id={titleId} className="font-heavy text-2xl uppercase tracking-tight text-ink">
+            <h2 id={titleId} className="font-heavy text-2xl text-ink">
               Connect OpenRouter
             </h2>
             <p className="mt-1.5 text-sm text-ink-light leading-relaxed">

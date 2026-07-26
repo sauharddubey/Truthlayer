@@ -96,11 +96,11 @@ export function PipelineTimeline() {
   return (
     <section ref={containerRef} className="relative mx-auto max-w-4xl px-6 py-24">
       <div className="mb-20 text-center">
-        <span className="text-xs font-semibold uppercase tracking-widest text-accent">The Pipeline Engine</span>
-        <h2 className="mt-3 font-heavy text-5xl uppercase leading-[0.92] tracking-tight sm:text-6xl text-ink">
-          HOW WE VERIFY
+        <span className="text-sm font-semibold uppercase tracking-widest text-accent">The Pipeline Engine</span>
+        <h2 className="mt-3 font-heavy text-5xl leading-[1.02] sm:text-6xl text-ink">
+          How we verify
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-sm text-ink-light">
+        <p className="mx-auto mt-4 max-w-xl text-lg text-ink-light leading-relaxed">
           TruthLayer processes video through a rigorous multi-stage pipeline, orchestrating parallel agents and factual databases to produce an explainable trust score.
         </p>
       </div>

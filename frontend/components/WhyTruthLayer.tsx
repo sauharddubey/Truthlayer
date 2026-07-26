@@ -113,7 +113,7 @@ export function WhyTruthLayer() {
         
         {/* Background glow effects */}
         <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#cb912f]/5 blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] rounded-full bg-warn/5 blur-[100px] pointer-events-none" />
 
         {/* Inline styles for custom animations */}
         <style jsx global>{`
@@ -165,11 +165,11 @@ export function WhyTruthLayer() {
           
           {/* Section Header */}
           <div className="mb-4 text-center shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Platform Utility</span>
-            <h2 className="mt-2 font-heavy text-4xl uppercase tracking-tight sm:text-5xl text-ink leading-none">
+            <span className="text-sm font-semibold uppercase tracking-widest text-accent">Platform Utility</span>
+            <h2 className="mt-3 font-heavy text-5xl sm:text-6xl text-ink leading-[1.02]">
               Why TruthLayer?
             </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-ink-light leading-relaxed">
+            <p className="mx-auto mt-3 max-w-xl text-lg text-ink-light leading-relaxed">
               TruthLayer addresses the integrity crisis across three key profiles.
             </p>
           </div>
@@ -232,13 +232,13 @@ export function WhyTruthLayer() {
                 {/* Card 1: Compliance Registry Status (App Library Style) */}
                 <div 
                   style={{ animationDelay: "0ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent pointer-events-none opacity-40" />
                   <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
                       <Box className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Compliance Registry</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Compliance Registry</span>
                     </div>
                     <span className="flex items-center gap-1.5 text-[9px] font-extrabold text-good uppercase bg-good/15 px-2 py-0.5 rounded-full">
                       <span className="h-1.5 w-1.5 rounded-full bg-good animate-pulse" /> Live Audit Engine
@@ -246,25 +246,25 @@ export function WhyTruthLayer() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 my-2.5 relative z-10">
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/70 font-medium truncate">FTC Disclosure</span>
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center justify-between text-xs hover:border-ink/20 transition-all">
+                      <span className="text-ink-light font-medium truncate">FTC Disclosure</span>
                       <span className="text-[10px] text-good font-extrabold bg-good/10 px-2 py-0.5 rounded">PASSED</span>
                     </div>
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/70 font-medium truncate">FDA Restrictions</span>
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center justify-between text-xs hover:border-ink/20 transition-all">
+                      <span className="text-ink-light font-medium truncate">FDA Restrictions</span>
                       <span className="text-[10px] text-good font-extrabold bg-good/10 px-2 py-0.5 rounded">0 FLAGS</span>
                     </div>
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/70 font-medium truncate">Medical Claims</span>
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center justify-between text-xs hover:border-ink/20 transition-all">
+                      <span className="text-ink-light font-medium truncate">Medical Claims</span>
                       <span className="text-[10px] text-warn font-extrabold bg-warn/10 px-2 py-0.5 rounded">1 ALERT</span>
                     </div>
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/70 font-medium truncate">Competitor mentions</span>
-                      <span className="text-[10px] text-white/70 font-extrabold bg-white/5 px-2 py-0.5 rounded">CLEARED</span>
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center justify-between text-xs hover:border-ink/20 transition-all">
+                      <span className="text-ink-light font-medium truncate">Competitor mentions</span>
+                      <span className="text-[10px] text-ink-light font-extrabold bg-ink/5 px-2 py-0.5 rounded">CLEARED</span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium relative z-10">
+                  <span className="text-[10px] text-ink-light font-medium relative z-10">
                     Reviews influencer uploads in parallel, flags legal risks and omissions.
                   </span>
                 </div>
@@ -272,28 +272,28 @@ export function WhyTruthLayer() {
                 {/* Card 2: Spoken Claims (Apple Messages Style) */}
                 <div 
                   style={{ animationDelay: "60ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">FTC Speech Audit</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">FTC Speech Audit</span>
                   </div>
                   
                   <div className="space-y-2.5 my-2 text-xs">
                     <div className="flex justify-end">
-                      <div className="bg-accent text-white px-3.5 py-1.5 rounded-2xl rounded-tr-sm max-w-[85%] font-medium leading-tight shadow-md">
+                      <div className="bg-accent text-ink px-3.5 py-1.5 rounded-2xl rounded-tr-sm max-w-[85%] font-medium leading-tight shadow-md">
                         "Our organic serum cures acne in three days."
                       </div>
                     </div>
                     <div className="flex justify-start">
-                      <div className="bg-[#2a2a2e]/90 text-white/95 px-3.5 py-1.5 rounded-2xl rounded-tl-sm max-w-[90%] font-medium leading-tight border border-white/5 shadow-sm">
+                      <div className="bg-surface text-ink px-3.5 py-1.5 rounded-2xl rounded-tl-sm max-w-[90%] font-medium leading-tight border border-line shadow-sm">
                         <span className="text-warn font-extrabold flex items-center gap-1 mb-0.5 text-[9px] uppercase"><AlertTriangle className="h-3 w-3" /> FDA violation</span>
                         Restricted claims rule triggered: 'cures acne'.
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Speech-to-text analyzer flags structural liability.
                   </span>
                 </div>
@@ -301,11 +301,11 @@ export function WhyTruthLayer() {
                 {/* Card 3: Safety Concentric Rings (Apple Activity Rings Style) */}
                 <div 
                   style={{ animationDelay: "120ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Safety Indicators</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Safety Indicators</span>
                   </div>
 
                   <div className="flex items-center gap-4 my-2">
@@ -313,21 +313,21 @@ export function WhyTruthLayer() {
                       {/* Apple Activity-style rings: one SVG, uniform stroke, even gaps */}
                       <svg className="h-full w-full -rotate-90" viewBox="0 0 72 72">
                         {/* Ring 1 (outer): FTC Safety — 85% */}
-                        <circle cx="36" cy="36" r="31" fill="none" stroke="#162e24" strokeWidth="6" />
-                        <circle cx="36" cy="36" r="31" fill="none" stroke="#0f7b6c" strokeWidth="6" strokeLinecap="round"
+                        <circle cx="36" cy="36" r="31" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="6" />
+                        <circle cx="36" cy="36" r="31" fill="none" stroke="rgb(var(--good))" strokeWidth="6" strokeLinecap="round"
                           strokeDasharray={`${2 * Math.PI * 31 * 0.85} ${2 * Math.PI * 31}`} />
                         {/* Ring 2 (middle): RAG Alignment — 92% */}
-                        <circle cx="36" cy="36" r="23.5" fill="none" stroke="#0c253d" strokeWidth="6" />
-                        <circle cx="36" cy="36" r="23.5" fill="none" stroke="#2383e2" strokeWidth="6" strokeLinecap="round"
+                        <circle cx="36" cy="36" r="23.5" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="6" />
+                        <circle cx="36" cy="36" r="23.5" fill="none" stroke="rgb(var(--accent))" strokeWidth="6" strokeLinecap="round"
                           strokeDasharray={`${2 * Math.PI * 23.5 * 0.92} ${2 * Math.PI * 23.5}`} />
                         {/* Ring 3 (inner): Low Hype Risk — 70% */}
-                        <circle cx="36" cy="36" r="16" fill="none" stroke="#37260e" strokeWidth="6" />
-                        <circle cx="36" cy="36" r="16" fill="none" stroke="#cb912f" strokeWidth="6" strokeLinecap="round"
+                        <circle cx="36" cy="36" r="16" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="6" />
+                        <circle cx="36" cy="36" r="16" fill="none" stroke="rgb(var(--warn))" strokeWidth="6" strokeLinecap="round"
                           strokeDasharray={`${2 * Math.PI * 16 * 0.70} ${2 * Math.PI * 16}`} />
                       </svg>
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center leading-none">
-                        <span className="text-[11px] font-extrabold text-white">94%</span>
-                        <span className="mt-0.5 text-[6.5px] font-extrabold tracking-wider text-white/70">SAFE</span>
+                        <span className="text-[11px] font-extrabold text-ink">94%</span>
+                        <span className="mt-0.5 text-[6.5px] font-extrabold tracking-wider text-ink-light">SAFE</span>
                       </div>
                     </div>
 
@@ -338,7 +338,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Concentric scores visualizes real-time audit logs.
                   </span>
                 </div>
@@ -346,53 +346,53 @@ export function WhyTruthLayer() {
                 {/* Card 4: Narrative Intelligence (Cycling Map / Route Style) */}
                 <div 
                   style={{ animationDelay: "180ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-warn/10 via-transparent to-transparent pointer-events-none opacity-30" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Network className="h-4 w-4 text-warn" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Narrative Intelligence</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Narrative Intelligence</span>
                     </div>
                     <span className="text-[10px] font-extrabold text-warn bg-warn/10 px-2 py-0.5 rounded">3 Active Topic Clusters</span>
                   </div>
 
-                  <div className="my-2 h-14 relative flex items-center justify-center">
-                    <svg className="w-full h-full text-white/70" viewBox="0 0 380 60">
-                      <path d="M 20 30 Q 80 5, 140 35 T 260 25 T 360 40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-                      <path d="M 20 30 Q 80 5, 140 35 T 260 25 T 360 40" fill="none" stroke="url(#line-grad)" strokeWidth="2" strokeDasharray="6 4" />
-                      
+                  <div className="my-3 h-28 relative flex items-center justify-center">
+                    <svg className="w-full h-full" viewBox="0 0 520 100" preserveAspectRatio="xMidYMid meet">
+                      <path d="M 28 50 Q 110 12, 194 58 T 356 42 T 496 66" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="6" />
+                      <path d="M 28 50 Q 110 12, 194 58 T 356 42 T 496 66" fill="none" stroke="url(#line-grad)" strokeWidth="3" strokeDasharray="8 5" />
+
                       <defs>
                         <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#2383e2" />
-                          <stop offset="50%" stopColor="#cb912f" />
-                          <stop offset="100%" stopColor="#e03e3e" />
+                          <stop offset="0%" stopColor="rgb(var(--accent))" />
+                          <stop offset="50%" stopColor="rgb(var(--warn))" />
+                          <stop offset="100%" stopColor="rgb(var(--bad))" />
                         </linearGradient>
                       </defs>
 
-                      <g transform="translate(20,30)">
-                        <circle r="6" fill="#2383e2" className="animate-pulse" />
-                        <circle r="3" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7px] font-extrabold">Health</text>
-                      </g>
-                      <g transform="translate(140,35)">
-                        <circle r="5" fill="#cb912f" />
-                        <circle r="2" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7px] font-extrabold">Pricing</text>
-                      </g>
-                      <g transform="translate(260,25)">
-                        <circle r="7" fill="#e03e3e" className="animate-pulse" />
+                      <g transform="translate(28,50)">
+                        <circle r="8.5" fill="rgb(var(--accent))" className="animate-pulse" />
                         <circle r="3.5" fill="#ffffff" />
-                        <text y="-12" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7px] font-extrabold">Efficacy Risk</text>
+                        <text y="-16" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[11px] font-extrabold">Health</text>
                       </g>
-                      <g transform="translate(360,40)">
-                        <circle r="4" fill="rgba(255,255,255,0.3)" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.4)" className="text-[7px] font-extrabold">Safety</text>
+                      <g transform="translate(194,58)">
+                        <circle r="7" fill="rgb(var(--warn))" />
+                        <circle r="3" fill="#ffffff" />
+                        <text y="-16" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[11px] font-extrabold">Pricing</text>
+                      </g>
+                      <g transform="translate(356,42)">
+                        <circle r="10" fill="rgb(var(--bad))" className="animate-pulse" />
+                        <circle r="4" fill="#ffffff" />
+                        <text y="-18" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[11px] font-extrabold">Efficacy Risk</text>
+                      </g>
+                      <g transform="translate(496,66)">
+                        <circle r="6" fill="rgb(var(--ink) / 0.25)" />
+                        <text y="-16" textAnchor="middle" fill="rgb(var(--ink-faint))" className="text-[11px] font-extrabold">Safety</text>
                       </g>
                     </svg>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Clusters topics across creator videos to flag campaign-wide contradictions.
                   </span>
                 </div>
@@ -400,13 +400,13 @@ export function WhyTruthLayer() {
                 {/* Card 5: pgvector Document Database Stack (Car Keys stacked style) */}
                 <div 
                   style={{ animationDelay: "240ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSearch className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Active RAG Store</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Active RAG Store</span>
                     </div>
                     <span className="text-[9px] font-extrabold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-full">
                       pgvector index active
@@ -414,23 +414,23 @@ export function WhyTruthLayer() {
                   </div>
 
                   <div className="my-2.5 flex items-center justify-center relative h-12">
-                    <div className="absolute w-[80%] h-9 rounded-xl bg-[#1e1e24] border border-white/5 p-2 flex items-center justify-between opacity-40 transform -translate-y-2 scale-[0.92] transition-all duration-300 group-hover:-translate-y-3">
-                      <span className="text-xs font-semibold text-white truncate">Skincare_Regs_FTC.pdf</span>
-                      <span className="text-[8px] font-bold text-white/70">120 chunks</span>
+                    <div className="absolute w-[80%] h-9 rounded-xl bg-surface border border-line p-2 flex items-center justify-between opacity-40 transform -translate-y-2 scale-[0.92] transition-all duration-300 group-hover:-translate-y-3">
+                      <span className="text-xs font-semibold text-ink truncate">Skincare_Regs_FTC.pdf</span>
+                      <span className="text-[8px] font-bold text-ink-light">120 chunks</span>
                     </div>
-                    <div className="absolute w-[86%] h-9 rounded-xl bg-[#1d1d22] border border-white/10 p-2 flex items-center justify-between opacity-70 transform -translate-y-1 scale-[0.96] transition-all duration-300 group-hover:-translate-y-1.5">
-                      <span className="text-xs font-semibold text-white truncate">Marketing_Guidelines_V3.pdf</span>
-                      <span className="text-[8px] font-bold text-white/70">45 chunks</span>
+                    <div className="absolute w-[86%] h-9 rounded-xl bg-surface border border-line p-2 flex items-center justify-between opacity-70 transform -translate-y-1 scale-[0.96] transition-all duration-300 group-hover:-translate-y-1.5">
+                      <span className="text-xs font-semibold text-ink truncate">Marketing_Guidelines_V3.pdf</span>
+                      <span className="text-[8px] font-bold text-ink-light">45 chunks</span>
                     </div>
-                    <div className="absolute w-[92%] h-9 rounded-xl bg-[#26262b] border border-white/15 p-2.5 flex items-center justify-between shadow-lg transform translate-y-0 transition-all duration-300 group-hover:translate-y-1">
-                      <span className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                    <div className="absolute w-[92%] h-9 rounded-xl bg-hover border border-ink/15 p-2.5 flex items-center justify-between shadow-lg transform translate-y-0 transition-all duration-300 group-hover:translate-y-1">
+                      <span className="text-xs font-bold text-ink truncate flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" /> Hydration_Cream_FAQ.docx
                       </span>
                       <span className="text-[9px] font-extrabold text-accent bg-accent/10 px-2 py-0.5 rounded-full">84 chunks</span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Validates script claims against specifications using tenant-scoped retrieval.
                   </span>
                 </div>
@@ -438,22 +438,22 @@ export function WhyTruthLayer() {
                 {/* Card 6: Tone Analyzer Siri Orb (Siri Orb Style) */}
                 <div 
                   style={{ animationDelay: "300ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2 relative z-10">
                     <Sparkle className="h-4 w-4 text-warn" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Perception Orb</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Perception Orb</span>
                   </div>
 
                   <div className="my-1.5 flex items-center justify-center relative h-16 w-full">
                     <div className="absolute h-14 w-14 rounded-full bg-gradient-to-tr from-accent via-warn to-bad blur-md opacity-75 animate-siri" />
                     <div className="absolute h-10 w-10 rounded-full bg-gradient-to-br from-white/20 to-transparent mix-blend-overlay border border-white/20" />
-                    <span className="relative z-10 text-[9px] font-black text-white bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full border border-white/5 uppercase tracking-widest">
+                    <span className="relative z-10 text-[9px] font-black text-ink bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full border border-line uppercase tracking-widest">
                       Low Risk
                     </span>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium relative z-10">
+                  <span className="text-[10px] text-ink-light font-medium relative z-10">
                     Identifies hyperbole or delivery triggers that threaten brand reputation.
                   </span>
                 </div>
@@ -467,33 +467,33 @@ export function WhyTruthLayer() {
                 {/* Card 1: Video Pre-Flight Review */}
                 <div 
                   style={{ animationDelay: "0ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
                   <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
                       <Play className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Video Pre-Flight</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Video Pre-Flight</span>
                     </div>
                     <span className="text-[10px] font-extrabold text-good bg-good/10 px-2 py-0.5 rounded">Audit Ready</span>
                   </div>
 
                   <div className="my-2 flex items-center gap-5 relative z-10">
-                    <div className="h-16 w-24 rounded-xl bg-gradient-to-br from-accent/20 to-warn/10 relative overflow-hidden border border-white/5 flex items-center justify-center shrink-0">
-                      <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center text-white backdrop-blur shadow-sm group-hover:scale-110 transition-transform">
+                    <div className="h-16 w-24 rounded-xl bg-gradient-to-br from-accent/20 to-warn/10 relative overflow-hidden border border-line flex items-center justify-center shrink-0">
+                      <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center text-ink backdrop-blur shadow-sm group-hover:scale-110 transition-transform">
                         <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
                       </div>
-                      <div className="absolute left-0 right-0 h-0.5 bg-accent/80 shadow-[0_0_8px_#2383e2] animate-scanline" />
+                      <div className="absolute left-0 right-0 h-0.5 bg-accent/80 shadow-[0_0_8px_rgba(10,122,255,0.8)] animate-scanline" />
                     </div>
 
-                    <div className="flex-1 space-y-1.5 text-xs text-white/80">
+                    <div className="flex-1 space-y-1.5 text-xs text-ink">
                       <div className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-good" /> Speech Transcribed</div>
                       <div className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-good" /> Tone Vetted (Neutral)</div>
                       <div className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-good" /> Sponsorship Flag Verified</div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium relative z-10">
+                  <span className="text-[10px] text-ink-light font-medium relative z-10">
                     Runs compliance audits on raw video files in under 60 seconds before upload.
                   </span>
                 </div>
@@ -501,16 +501,16 @@ export function WhyTruthLayer() {
                 {/* Card 2: Speech Slip Flag */}
                 <div 
                   style={{ animationDelay: "60ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-warn" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Speech Slip Detector</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Speech Slip Detector</span>
                   </div>
 
                   <div className="space-y-2.5 my-2.5 text-xs">
                     <div className="flex justify-start">
-                      <div className="bg-[#18181c] border border-red-500/20 px-3.5 py-1.5 rounded-2xl rounded-tl-sm text-white font-medium max-w-[85%] relative">
+                      <div className="bg-surface border border-bad/25 px-3.5 py-1.5 rounded-2xl rounded-tl-sm text-ink font-medium max-w-[85%] relative">
                         "cures wrinkles instantly"
                         <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bad opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-bad"></span></span>
                       </div>
@@ -522,7 +522,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Flags absolute claims that could trigger sponsor issues.
                   </span>
                 </div>
@@ -530,45 +530,45 @@ export function WhyTruthLayer() {
                 {/* Card 3: Tone Emojis */}
                 <div 
                   style={{ animationDelay: "120ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Tonal Expression</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Tonal Expression</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 my-2 text-[10px] font-extrabold">
-                    <div className="bg-[#18181c] rounded-xl p-2 flex items-center gap-2 border border-white/5">
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center gap-2 border border-line">
                       <span className="text-sm">😊</span>
                       <div>
-                        <div className="text-white/80">Warmth</div>
+                        <div className="text-ink">Warmth</div>
                         <div className="text-good font-extrabold">High</div>
                       </div>
                     </div>
-                    <div className="bg-[#18181c] rounded-xl p-2 flex items-center gap-2 border border-white/5">
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center gap-2 border border-line">
                       <span className="text-sm">😮</span>
                       <div>
-                        <div className="text-white/80">Excitement</div>
+                        <div className="text-ink">Excitement</div>
                         <div className="text-good font-extrabold">Normal</div>
                       </div>
                     </div>
-                    <div className="bg-[#18181c] rounded-xl p-2 flex items-center gap-2 border border-white/5">
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center gap-2 border border-line">
                       <span className="text-sm">😐</span>
                       <div>
-                        <div className="text-white/80">Neutrality</div>
+                        <div className="text-ink">Neutrality</div>
                         <div className="text-accent font-extrabold">Ideal</div>
                       </div>
                     </div>
-                    <div className="bg-[#18181c] rounded-xl p-2 flex items-center gap-2 border border-white/5">
+                    <div className="bg-surface border border-line rounded-xl p-2 flex items-center gap-2 border border-line">
                       <span className="text-sm">🛡️</span>
                       <div>
-                        <div className="text-white/80">Reputation</div>
+                        <div className="text-ink">Reputation</div>
                         <div className="text-good font-extrabold">Safe</div>
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Measures bias and framing to guard against online backlash.
                   </span>
                 </div>
@@ -576,30 +576,30 @@ export function WhyTruthLayer() {
                 {/* Card 4: Contract Check */}
                 <div 
                   style={{ animationDelay: "180ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Box className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Contract Check</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Contract Check</span>
                   </div>
 
                   <div className="flex items-center gap-4 my-2">
                     <div className="relative h-14 w-14 shrink-0 flex items-center justify-center">
                       <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="#2383e2" strokeWidth="3" strokeDasharray="100" strokeDashoffset="5" strokeLinecap="round" />
+                        <circle cx="18" cy="18" r="16" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="3" />
+                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgb(var(--accent))" strokeWidth="3" strokeDasharray="100" strokeDashoffset="5" strokeLinecap="round" />
                       </svg>
-                      <span className="text-xs font-extrabold text-white">98%</span>
+                      <span className="text-xs font-extrabold text-ink">98%</span>
                     </div>
 
                     <div className="space-y-0.5 text-[9px] font-extrabold">
-                      <div className="text-white">COMPATIBLE</div>
-                      <div className="text-white/70">Competitor exclusions: Clear</div>
-                      <div className="text-white/70">Required hashtag: Present</div>
+                      <div className="text-ink">COMPATIBLE</div>
+                      <div className="text-ink-light">Competitor exclusions: Clear</div>
+                      <div className="text-ink-light">Required hashtag: Present</div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Cross-checks script transcripts with active sponsor guidelines.
                   </span>
                 </div>
@@ -607,20 +607,20 @@ export function WhyTruthLayer() {
                 {/* Card 5: Publisher Checklist */}
                 <div 
                   style={{ animationDelay: "240ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-good" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Publisher Gate</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Publisher Gate</span>
                   </div>
 
-                  <div className="space-y-1.5 my-2.5 text-[10px] font-bold text-white/90">
+                  <div className="space-y-1.5 my-2.5 text-[10px] font-bold text-ink">
                     <div className="flex items-center gap-2"><div className="h-3.5 w-3.5 rounded bg-good/20 flex items-center justify-center text-good"><Check className="h-2.5 w-2.5" /></div> FTC Audit Approved</div>
                     <div className="flex items-center gap-2"><div className="h-3.5 w-3.5 rounded bg-good/20 flex items-center justify-center text-good"><Check className="h-2.5 w-2.5" /></div> Brand Slips Resolved</div>
                     <div className="flex items-center gap-2"><div className="h-3.5 w-3.5 rounded bg-good/20 flex items-center justify-center text-good"><Check className="h-2.5 w-2.5" /></div> Sponsor Requirements met</div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Guarantees draft publication safety before going live.
                   </span>
                 </div>
@@ -628,13 +628,13 @@ export function WhyTruthLayer() {
                 {/* Card 6: Audio Waveform (Full width) */}
                 <div 
                   style={{ animationDelay: "300ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-3 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-3 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Timeline Waveform</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Timeline Waveform</span>
                     </div>
                     <span className="text-[9px] font-extrabold text-bad bg-bad/10 px-2 py-0.5 rounded uppercase">
                       1 Audio slip flagged
@@ -643,9 +643,9 @@ export function WhyTruthLayer() {
 
                   <div className="my-2 h-14 flex items-end gap-1 px-4 relative">
                     <div className="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
-                      <div className="w-full h-0.5 bg-white/10" />
+                      <div className="w-full h-0.5 bg-ink/10" />
                     </div>
-                    <div className="absolute top-0 bottom-0 left-[24%] w-0.5 bg-accent/80 z-10 shadow-[0_0_6px_#2383e2]" />
+                    <div className="absolute top-0 bottom-0 left-[24%] w-0.5 bg-accent/80 z-10 shadow-[0_0_6px_rgba(10,122,255,0.8)]" />
                     <span className="absolute top-1 left-[25%] text-[7px] font-bold text-accent z-10 bg-accent/15 px-1 rounded-sm">0:24</span>
 
                     {Array.from({ length: 48 }).map((_, idx) => {
@@ -657,14 +657,14 @@ export function WhyTruthLayer() {
                           className={`w-1 rounded-t-sm transition-all duration-300 hover:opacity-100 flex-1`}
                           style={{
                             height: `${h}px`,
-                            backgroundColor: isFlagged ? "#e03e3e" : "rgba(255,255,255,0.25)"
+                            backgroundColor: isFlagged ? "rgb(var(--bad))" : "rgb(var(--ink) / 0.2)"
                           }}
                         />
                       );
                     })}
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Waveform map highlighting exact timestamps of compliance alerts.
                   </span>
                 </div>
@@ -678,16 +678,16 @@ export function WhyTruthLayer() {
                 {/* Card 1: Video Search Console */}
                 <div 
                   style={{ animationDelay: "0ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent pointer-events-none opacity-30" />
                   <div className="flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Link Verifier Console</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Link Verifier Console</span>
                   </div>
 
                   <div className="my-2.5 relative">
-                    <div className="w-full bg-[#18181c] border border-white/10 rounded-xl p-3 flex items-center justify-between text-xs text-white/80 select-none shadow-inner">
+                    <div className="w-full bg-surface border border-line rounded-xl p-3 flex items-center justify-between text-xs text-ink select-none shadow-inner">
                       <span className="flex items-center gap-2 truncate font-medium">
                         <span className="text-accent">🔗</span>
                         <span>https://www.youtube.com/watch?v=TL984d72</span>
@@ -696,15 +696,15 @@ export function WhyTruthLayer() {
                       <span className="text-[10px] text-accent font-extrabold bg-accent/10 px-2.5 py-1 rounded-lg">VERIFY</span>
                     </div>
 
-                    <div className="flex items-center gap-3 mt-2 px-1 text-[9px] font-extrabold text-white/70">
+                    <div className="flex items-center gap-3 mt-2 px-1 text-[9px] font-extrabold text-ink-light">
                       <span>Platform feeds:</span>
-                      <span className="flex items-center gap-1 text-white/80"><span className="h-1.5 w-1.5 rounded-full bg-[#ff0000]" /> YouTube</span>
-                      <span className="flex items-center gap-1 text-white/80"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> TikTok</span>
-                      <span className="flex items-center gap-1 text-white/80"><span className="h-1.5 w-1.5 rounded-full bg-bad" /> Instagram</span>
+                      <span className="flex items-center gap-1 text-ink"><span className="h-1.5 w-1.5 rounded-full bg-[#ff0000]" /> YouTube</span>
+                      <span className="flex items-center gap-1 text-ink"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> TikTok</span>
+                      <span className="flex items-center gap-1 text-ink"><span className="h-1.5 w-1.5 rounded-full bg-bad" /> Instagram</span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Paste public video links to instantly trigger our deep extraction pipelines.
                   </span>
                 </div>
@@ -712,11 +712,11 @@ export function WhyTruthLayer() {
                 {/* Card 2: Deepfake Scanner */}
                 <div 
                   style={{ animationDelay: "60ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left row-span-1 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2 relative z-10">
                     <Eye className="h-4 w-4 text-good" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Deepfake Scanner</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Deepfake Scanner</span>
                   </div>
 
                   <div className="my-1.5 flex items-center justify-center relative h-16 w-full">
@@ -727,11 +727,11 @@ export function WhyTruthLayer() {
                     </div>
                     <div className="absolute right-5 space-y-0.5 text-[8.5px] font-extrabold text-right z-10 leading-none">
                       <div className="text-good">VOICE CLONE</div>
-                      <div className="text-white">96% CONFIDENCE</div>
+                      <div className="text-ink">96% CONFIDENCE</div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium relative z-10">
+                  <span className="text-[10px] text-ink-light font-medium relative z-10">
                     Analyzes voice cloning, face swaps, and splicing artifacts.
                   </span>
                 </div>
@@ -739,47 +739,47 @@ export function WhyTruthLayer() {
                 {/* Card 3: Spoken Claims (Tall widget, spans 2 rows) */}
                 <div 
                   style={{ animationDelay: "120ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:row-span-2 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:row-span-2 relative overflow-hidden group"
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Statement Registry</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Statement Registry</span>
                   </div>
 
                   <div className="my-4 space-y-2.5 flex-1 overflow-hidden">
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all">
+                    <div className="bg-surface border border-line rounded-xl p-2.5 flex flex-col gap-1 hover:border-ink/20 transition-all">
                       <div className="flex items-center justify-between text-[10px] font-extrabold">
-                        <span className="text-white/80 truncate max-w-[70%]">"100% natural ingredients"</span>
+                        <span className="text-ink truncate max-w-[70%]">"100% natural ingredients"</span>
                         <span className="text-good bg-good/10 px-1.5 py-0.25 rounded text-[8px]">VERIFIED</span>
                       </div>
-                      <span className="text-[8.5px] text-white/70 font-medium leading-none">Citations present in FDA logs</span>
+                      <span className="text-[8.5px] text-ink-light font-medium leading-none">Citations present in FDA logs</span>
                     </div>
 
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all">
+                    <div className="bg-surface border border-line rounded-xl p-2.5 flex flex-col gap-1 hover:border-ink/20 transition-all">
                       <div className="flex items-center justify-between text-[10px] font-extrabold">
-                        <span className="text-white/80 truncate max-w-[70%]">"Cures wrinkles in 3 days"</span>
-                        <span className="text-[#e03e3e] bg-[#e03e3e]/10 px-1.5 py-0.25 rounded text-[8px]">CONTRADICTED</span>
+                        <span className="text-ink truncate max-w-[70%]">"Cures wrinkles in 3 days"</span>
+                        <span className="text-bad bg-bad/10 px-1.5 py-0.25 rounded text-[8px]">CONTRADICTED</span>
                       </div>
-                      <span className="text-[8.5px] text-[#e03e3e]/65 font-medium leading-none">Clinical trials disprove timeline</span>
+                      <span className="text-[8.5px] text-bad/75 font-medium leading-none">Clinical trials disprove timeline</span>
                     </div>
 
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all">
+                    <div className="bg-surface border border-line rounded-xl p-2.5 flex flex-col gap-1 hover:border-ink/20 transition-all">
                       <div className="flex items-center justify-between text-[10px] font-extrabold">
-                        <span className="text-white/80 truncate max-w-[70%]">"Dermatologist tested"</span>
+                        <span className="text-ink truncate max-w-[70%]">"Dermatologist tested"</span>
                         <span className="text-good bg-good/10 px-1.5 py-0.25 rounded text-[8px]">VERIFIED</span>
                       </div>
-                      <span className="text-[8.5px] text-white/70 font-medium leading-none">Medical approval certificate active</span>
+                      <span className="text-[8.5px] text-ink-light font-medium leading-none">Medical approval certificate active</span>
                     </div>
 
-                    <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all opacity-40">
+                    <div className="bg-surface border border-line rounded-xl p-2.5 flex flex-col gap-1 hover:border-ink/20 transition-all opacity-40">
                       <div className="flex items-center justify-between text-[10px] font-extrabold">
-                        <span className="text-white/80 truncate">"Reduces dark spots"</span>
-                        <span className="text-white/70 bg-white/5 px-1.5 py-0.25 rounded text-[8px]">PENDING</span>
+                        <span className="text-ink truncate">"Reduces dark spots"</span>
+                        <span className="text-ink-light bg-ink/5 px-1.5 py-0.25 rounded text-[8px]">PENDING</span>
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Extracts every spoken assertion and provides evidence-backed verdicts.
                   </span>
                 </div>
@@ -787,35 +787,35 @@ export function WhyTruthLayer() {
                 {/* Card 4: Tavily Citations */}
                 <div 
                   style={{ animationDelay: "180ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSearch className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Tavily Fact Check Engine</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Tavily Fact Check Engine</span>
                     </div>
-                    <span className="text-[9px] font-extrabold text-[#2383e2] bg-[#2383e2]/10 border border-[#2383e2]/25 px-2.5 py-0.5 rounded-full animate-pulse">
+                    <span className="text-[9px] font-extrabold text-accent bg-accent/10 border border-accent/25 px-2.5 py-0.5 rounded-full animate-pulse">
                       Live Web RAG
                     </span>
                   </div>
 
                   <div className="my-2 flex items-center justify-center relative h-12">
-                    <div className="absolute w-[82%] h-8.5 rounded-xl bg-[#1e1e24] border border-white/5 p-2 flex items-center justify-between opacity-30 transform -translate-y-2 scale-[0.93] group-hover:-translate-y-3 transition-all duration-300">
-                      <span className="text-[10px] font-semibold text-white truncate">PubMed Study #PMC32918</span>
+                    <div className="absolute w-[82%] h-8.5 rounded-xl bg-surface border border-line p-2 flex items-center justify-between opacity-30 transform -translate-y-2 scale-[0.93] group-hover:-translate-y-3 transition-all duration-300">
+                      <span className="text-[10px] font-semibold text-ink truncate">PubMed Study #PMC32918</span>
                     </div>
-                    <div className="absolute w-[88%] h-8.5 rounded-xl bg-[#1d1d22] border border-white/10 p-2 flex items-center justify-between opacity-60 transform -translate-y-1.5 scale-[0.96] group-hover:-translate-y-2.5 transition-all duration-300">
-                      <span className="text-[10px] font-semibold text-white truncate">NIH Clinical trials database report</span>
+                    <div className="absolute w-[88%] h-8.5 rounded-xl bg-surface border border-line p-2 flex items-center justify-between opacity-60 transform -translate-y-1.5 scale-[0.96] group-hover:-translate-y-2.5 transition-all duration-300">
+                      <span className="text-[10px] font-semibold text-ink truncate">NIH Clinical trials database report</span>
                     </div>
-                    <div className="absolute w-[94%] h-8.5 rounded-xl bg-[#26262b] border border-white/15 p-2 flex items-center justify-between shadow-lg transform translate-y-0 group-hover:translate-y-1 transition-all duration-300">
-                      <span className="text-[10px] font-bold text-white truncate flex items-center gap-1.5">
+                    <div className="absolute w-[94%] h-8.5 rounded-xl bg-hover border border-ink/15 p-2 flex items-center justify-between shadow-lg transform translate-y-0 group-hover:translate-y-1 transition-all duration-300">
+                      <span className="text-[10px] font-bold text-ink truncate flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> FDA Cosmetics Regs Sec 12
                       </span>
                       <span className="text-[8px] font-extrabold text-accent bg-accent/15 px-2 py-0.5 rounded-full">ACTIVE MATCH</span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Cross-references verbal statements with live clinical and legislative registries.
                   </span>
                 </div>
@@ -823,59 +823,59 @@ export function WhyTruthLayer() {
                 {/* Card 5: Verification Map */}
                 <div 
                   style={{ animationDelay: "240ms" }}
-                  className="card-anim rounded-[24px] bg-[#121215]/85 border border-white/5 p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-300"
+                  className="card-anim glass-tile p-5 flex flex-col justify-between text-left lg:col-span-2 row-span-1 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-good/10 via-transparent to-transparent pointer-events-none opacity-30" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Network className="h-4 w-4 text-good" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Verification Map</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink-light">Verification Map</span>
                     </div>
-                    <span className="text-[10px] font-extrabold text-white/70">Clip Timeline</span>
+                    <span className="text-[10px] font-extrabold text-ink-light">Clip Timeline</span>
                   </div>
 
-                  <div className="my-2 h-14 relative flex items-center justify-center">
-                    <svg className="w-full h-full text-white/70" viewBox="0 0 380 60">
-                      <path d="M 15 30 L 100 30 L 180 30 L 280 30 L 365 30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" strokeLinecap="round" />
-                      <path d="M 15 30 L 100 30 L 180 30 L 280 30 L 365 30" fill="none" stroke="url(#route-grad)" strokeWidth="2" />
-                      
+                  <div className="my-3 h-28 relative flex items-center justify-center">
+                    <svg className="w-full h-full" viewBox="0 0 520 100" preserveAspectRatio="xMidYMid meet">
+                      <path d="M 26 56 L 148 56 L 270 56 L 392 56 L 494 56" fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth="8" strokeLinecap="round" />
+                      <path d="M 26 56 L 148 56 L 270 56 L 392 56 L 494 56" fill="none" stroke="url(#route-grad)" strokeWidth="3" />
+
                       <defs>
                         <linearGradient id="route-grad" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#0f7b6c" />
-                          <stop offset="50%" stopColor="#e03e3e" />
-                          <stop offset="75%" stopColor="#0f7b6c" />
-                          <stop offset="100%" stopColor="rgba(255,255,255,0.15)" />
+                          <stop offset="0%" stopColor="rgb(var(--good))" />
+                          <stop offset="50%" stopColor="rgb(var(--bad))" />
+                          <stop offset="75%" stopColor="rgb(var(--good))" />
+                          <stop offset="100%" stopColor="rgb(var(--ink) / 0.15)" />
                         </linearGradient>
                       </defs>
 
-                      <g transform="translate(15,30)">
-                        <circle r="5.5" fill="#0f7b6c" />
-                        <circle r="2" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7.5px] font-extrabold">0:00</text>
+                      <g transform="translate(26,56)">
+                        <circle r="8" fill="rgb(var(--good))" />
+                        <circle r="3" fill="#ffffff" />
+                        <text y="-18" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[12px] font-extrabold">0:00</text>
                       </g>
-                      <g transform="translate(100,30)">
-                        <circle r="5" fill="#0f7b6c" />
-                        <circle r="2" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7.5px] font-extrabold">0:15</text>
+                      <g transform="translate(148,56)">
+                        <circle r="7.5" fill="rgb(var(--good))" />
+                        <circle r="3" fill="#ffffff" />
+                        <text y="-18" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[12px] font-extrabold">0:15</text>
                       </g>
-                      <g transform="translate(180,30)">
-                        <circle r="6.5" fill="#e03e3e" className="animate-pulse" />
-                        <circle r="2.5" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="#e03e3e" className="text-[7.5px] font-extrabold">0:32 Alert</text>
+                      <g transform="translate(270,56)">
+                        <circle r="10" fill="rgb(var(--bad))" className="animate-pulse" />
+                        <circle r="4" fill="#ffffff" />
+                        <text y="-20" textAnchor="middle" fill="rgb(var(--bad))" className="text-[12px] font-extrabold">0:32 Alert</text>
                       </g>
-                      <g transform="translate(280,30)">
-                        <circle r="5" fill="#0f7b6c" />
-                        <circle r="2" fill="#ffffff" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.6)" className="text-[7.5px] font-extrabold">0:50</text>
+                      <g transform="translate(392,56)">
+                        <circle r="7.5" fill="rgb(var(--good))" />
+                        <circle r="3" fill="#ffffff" />
+                        <text y="-18" textAnchor="middle" fill="rgb(var(--ink-light))" className="text-[12px] font-extrabold">0:50</text>
                       </g>
-                      <g transform="translate(365,30)">
-                        <circle r="4" fill="rgba(255,255,255,0.2)" />
-                        <text y="-10" textAnchor="middle" fill="rgba(255,255,255,0.3)" className="text-[7.5px] font-extrabold">1:20</text>
+                      <g transform="translate(494,56)">
+                        <circle r="6" fill="rgb(var(--ink) / 0.2)" />
+                        <text y="-18" textAnchor="middle" fill="rgb(var(--ink) / 0.3)" className="text-[12px] font-extrabold">1:20</text>
                       </g>
                     </svg>
                   </div>
 
-                  <span className="text-[10px] text-white/70 font-medium">
+                  <span className="text-[10px] text-ink-light font-medium">
                     Plots factual accuracy timeline and citation checkpoints.
                   </span>
                 </div>

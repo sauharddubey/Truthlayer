@@ -50,9 +50,9 @@ const TABS = [
 ];
 const tabSlug = (t: string) => t.toLowerCase().replace(/\s+/g, "-");
 const C = (t?: number | null, invert = false) => {
-  if (t == null) return "#9b9a97";
+  if (t == null) return "rgb(var(--ink-faint))";
   const v = invert ? 100 - t : t;
-  return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
+  return v >= 70 ? "rgb(var(--good))" : v >= 40 ? "rgb(var(--warn))" : "rgb(var(--bad))";
 };
 
 function GlassStat({
@@ -68,7 +68,7 @@ function GlassStat({
 }) {
   return (
     <div className="glass-tile p-4">
-      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+      <div className="text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
         {label}
       </div>
       <div
@@ -436,7 +436,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       {/* ── Glass hero header ── */}
       <div className="glass-tile mb-5 flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-40" />
-        <label className="group relative z-10 h-28 w-28 shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <label className="group relative z-10 h-28 w-28 shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-line bg-ink/5">
           {product?.image_url ? (
             <img
               src={mediaUrl(product.image_url)!}
@@ -444,11 +444,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-full items-center justify-center text-white/70">
+            <span className="flex h-full items-center justify-center text-ink-light">
               <Box className="h-8 w-8" />
             </span>
           )}
-          <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[11px] font-bold text-transparent transition group-hover:bg-black/50 group-hover:text-white">
+          <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[11px] font-bold text-transparent transition group-hover:bg-black/50 group-hover:text-ink">
             {busy ? "…" : "Change"}
           </span>
           <input
@@ -465,12 +465,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               {editing ? (
                 <form onSubmit={saveDetails} className="space-y-3">
                   <div>
-                    <label htmlFor="product-edit-name" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+                    <label htmlFor="product-edit-name" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
                       Product name
                     </label>
                     <input
                       id="product-edit-name"
-                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      className="input w-full border-line bg-ink/5 text-ink placeholder-ink-faint"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       required
@@ -478,12 +478,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     />
                   </div>
                   <div>
-                    <label htmlFor="product-edit-description" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+                    <label htmlFor="product-edit-description" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
                       Description
                     </label>
                     <textarea
                       id="product-edit-description"
-                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      className="input w-full border-line bg-ink/5 text-ink placeholder-ink-faint"
                       rows={3}
                       placeholder="What it is, key specs, approved claims, restrictions…"
                       value={editDescription}
@@ -491,12 +491,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     />
                   </div>
                   <div>
-                    <label htmlFor="product-edit-aliases" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
-                      Aliases <span className="font-normal normal-case tracking-normal text-white/40">(comma-separated — other names used in videos)</span>
+                    <label htmlFor="product-edit-aliases" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
+                      Aliases <span className="font-normal normal-case tracking-normal text-ink-faint">(comma-separated — other names used in videos)</span>
                     </label>
                     <input
                       id="product-edit-aliases"
-                      className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
+                      className="input w-full border-line bg-ink/5 text-ink placeholder-ink-faint"
                       placeholder="e.g. Serum XL, HydraMax"
                       value={editAliases}
                       onChange={(e) => setEditAliases(e.target.value)}
@@ -523,7 +523,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               ) : (
                 <>
                   <div className="flex flex-wrap items-start gap-2">
-                    <h1 className="font-heavy text-3xl uppercase tracking-tight text-white">
+                    <h1 className="font-heavy text-3xl text-ink">
                       {product?.name || "Product"}
                     </h1>
                     <button
@@ -537,19 +537,19 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </button>
                   </div>
                   {product?.description ? (
-                    <p className="mt-1 max-w-xl text-sm text-white/70">
+                    <p className="mt-1 max-w-xl text-sm text-ink-light">
                       {product.description}
                     </p>
                   ) : (
-                    <p className="mt-1 max-w-xl text-sm italic text-white/70">
+                    <p className="mt-1 max-w-xl text-sm italic text-ink-light">
                       Add description…
                     </p>
                   )}
                   {(product?.aliases?.length ?? 0) > 0 && (
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">Also known as</span>
+                      <span className="text-[9px] font-extrabold uppercase tracking-widest text-ink-faint">Also known as</span>
                       {product.aliases.map((a: string) => (
-                        <span key={a} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-white/70">{a}</span>
+                        <span key={a} className="rounded-full border border-line bg-ink/5 px-2 py-0.5 text-[11px] font-medium text-ink-light">{a}</span>
                       ))}
                     </div>
                   )}
@@ -572,7 +572,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             className="mt-4 flex flex-wrap gap-2"
           >
             <input
-              className="input flex-1 border-white/10 bg-white/5 text-white placeholder-white/30"
+              className="input flex-1 border-line bg-ink/5 text-ink placeholder-ink-faint"
               aria-label="Video URL to analyze for this product"
               placeholder="Paste a video URL to analyze for this product…"
               value={url}
@@ -628,35 +628,35 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   ? (overview.sentiment_score + 1) * 50
                   : null
               }
-              color="#2383e2"
+              color="rgb(var(--accent))"
             />
             <GlassStat label="Compliance" value={overview?.compliance_score} />
             <GlassStat
               label="Videos"
               value={overview?.video_count ?? 0}
-              color="#cb912f"
+              color="rgb(var(--warn))"
               isCount
             />
           </div>
           {overview?.knowledge_base && (
             <div className="glass-tile p-5">
-              <div className="text-base font-bold text-white">
+              <div className="text-base font-bold text-ink">
                 Knowledge base
               </div>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm text-ink-light">
                 Product details and marketing policies are indexed and used
                 during video analysis for claim verification and compliance
                 checks.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-white/70">
+                <span className="rounded-full border border-line bg-ink/5 px-2.5 py-1 font-bold text-ink-light">
                   {overview.knowledge_base.product_details ?? 0} product details
                   doc
                   {(overview.knowledge_base.product_details ?? 0) === 1
                     ? ""
                     : "s"}
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-white/70">
+                <span className="rounded-full border border-line bg-ink/5 px-2.5 py-1 font-bold text-ink-light">
                   {overview.knowledge_base.marketing_policy ?? 0} marketing
                   polic
                   {(overview.knowledge_base.marketing_policy ?? 0) === 1
@@ -668,7 +668,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           )}
           {overview?.claims_needing_review?.length > 0 && (
             <div className="glass-tile p-5">
-              <div className="flex items-center gap-2 text-base font-bold text-white">
+              <div className="flex items-center gap-2 text-base font-bold text-ink">
                 <AlertTriangle className="h-4 w-4 text-warn" /> Claims needing
                 your review
               </div>
@@ -676,16 +676,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 {overview.claims_needing_review.map((c: any) => (
                   <li
                     key={c.id}
-                    className="rounded-xl border border-white/8 bg-white/5 p-3 text-sm"
+                    className="rounded-xl border border-line bg-ink/5 p-3 text-sm"
                   >
                     <Link
                       href={`/analysis/${c.video_id}`}
-                      className="font-semibold text-white hover:underline"
+                      className="font-semibold text-ink hover:underline"
                     >
                       {c.claim_text}
                     </Link>
                     {c.note && (
-                      <p className="mt-0.5 text-xs text-white/70">{c.note}</p>
+                      <p className="mt-0.5 text-xs text-ink-light">{c.note}</p>
                     )}
                   </li>
                 ))}
@@ -708,10 +708,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       {tab === "Knowledge base" && (
         <div className="grid gap-4 sm:grid-cols-2" role="tabpanel" id="product-panel-knowledge-base" aria-labelledby="product-tab-knowledge-base">
           <div className="glass-tile p-5">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
+            <div className="flex items-center gap-2 text-base font-bold text-ink">
               <FileSearch className="h-4 w-4 text-accent" /> Product details
             </div>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-ink-light">
               Specs and approved facts. Matching claims are auto-verified during
               analysis.
             </p>
@@ -733,10 +733,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </label>
           </div>
           <div className="glass-tile p-5">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
+            <div className="flex items-center gap-2 text-base font-bold text-ink">
               <Scale className="h-4 w-4 text-warn" /> Marketing policies
             </div>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-ink-light">
               Disclosure rules, restricted claims, and brand guidelines. Used by
               the compliance agent.
             </p>
@@ -758,17 +758,17 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </label>
           </div>
           <div className="glass-tile p-5 sm:col-span-2">
-            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
               Indexed documents
             </div>
             {docs.length ? (
               docs.map((d) => (
                 <div
                   key={d.id}
-                  className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 text-sm text-white/80 last:border-0"
+                  className="flex items-center justify-between gap-3 border-b border-line py-2.5 text-sm text-ink last:border-0"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/70" />
+                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-ink-light" />
                     <span className="truncate">{d.filename}</span>
                     {d.status === "failed" && (
                       <span className="shrink-0 rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-bold text-bad">
@@ -777,7 +777,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     )}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/70">
+                    <span className="rounded-full border border-line bg-ink/5 px-2 py-0.5 text-[10px] font-bold text-ink-light">
                       {d.document_type.replace(/_/g, " ")}
                     </span>
                     <button
@@ -793,7 +793,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-ink-light">
                 No documents yet — upload spec sheets and policies above. They
                 are embedded and searched during each video analysis.
               </p>
@@ -804,14 +804,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
       {tab === "Hashtags" && (
         <div className="glass-tile max-w-3xl p-5" role="tabpanel" id="product-panel-hashtags" aria-labelledby="product-tab-hashtags">
-          <div className="text-base font-bold text-white">Product hashtags</div>
-          <p className="mt-1 text-sm text-white/70">
+          <div className="text-base font-bold text-ink">Product hashtags</div>
+          <p className="mt-1 text-sm text-ink-light">
             Required tags are checked against each video&apos;s platform
             description during analysis.
           </p>
           <form onSubmit={addKw} className="mt-3 flex gap-2">
             <input
-              className="input border-white/10 bg-white/5 text-white placeholder-white/30"
+              className="input border-line bg-ink/5 text-ink placeholder-ink-faint"
               aria-label="Add a product hashtag"
               placeholder="#product"
               value={kw}
@@ -826,7 +826,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             {keywords.map((k) => (
               <span
                 key={k.id}
-                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-white/70"
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-ink/5 pl-2.5 pr-1 py-0.5 text-xs font-medium text-ink-light"
               >
                 {k.keyword}
                 <button
@@ -841,30 +841,30 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </span>
             ))}
             {!keywords.length && (
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-ink-light">
                 No hashtags monitored yet.
               </p>
             )}
           </div>
           {videoMatches.length > 0 && (
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-ink-light">
                 Video hashtag status
               </div>
               <div className="space-y-2">
                 {videoMatches.map((v) => (
                   <div
                     key={v.video_id}
-                    className="rounded-xl border border-white/8 bg-white/5 p-3 text-sm"
+                    className="rounded-xl border border-line bg-ink/5 p-3 text-sm"
                   >
                     <Link
                       href={`/analysis/${v.video_id}`}
-                      className="font-semibold text-white hover:underline"
+                      className="font-semibold text-ink hover:underline"
                     >
                       {v.title}
                     </Link>
                     {!v.description_available ? (
-                      <p className="mt-1 text-xs text-white/70">
+                      <p className="mt-1 text-xs text-ink-light">
                         No description available
                       </p>
                     ) : (
@@ -887,7 +887,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         ))}
                         {!v.present_keywords?.length &&
                           !v.missing_keywords?.length && (
-                            <span className="text-xs text-white/70">
+                            <span className="text-xs text-ink-light">
                               Not analyzed yet
                             </span>
                           )}
@@ -926,20 +926,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             {narratives.map((c) => (
               <div key={c.id} className="glass-tile p-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">{c.topic}</span>
+                  <span className="font-bold text-ink">{c.topic}</span>
                   <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">
                     risk {formatMetric(c.risk_score)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm text-white/70">{c.summary}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+                <p className="mt-1.5 text-sm text-ink-light">{c.summary}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-light">
                   {c.video_count != null && (
                     <span>{c.video_count} video{c.video_count === 1 ? "" : "s"} in cluster</span>
                   )}
                   {c.propagation_risk != null && (
                     <span className="flex items-center gap-1">
-                      <span className="text-white/40">Spread risk</span>
-                      <span className="font-bold" style={{ color: c.propagation_risk >= 70 ? "#e03e3e" : c.propagation_risk >= 40 ? "#cb912f" : "#0f7b6c" }}>
+                      <span className="text-ink-faint">Spread risk</span>
+                      <span className="font-bold" style={{ color: c.propagation_risk >= 70 ? "rgb(var(--bad))" : c.propagation_risk >= 40 ? "rgb(var(--warn))" : "rgb(var(--good))" }}>
                         {formatMetric(c.propagation_risk)}
                       </span>
                     </span>
@@ -1009,13 +1009,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     <div className="flex items-center gap-2 text-sm font-bold text-bad">
                       <AlertTriangle className="h-4 w-4" /> Contradiction
                     </div>
-                    <p className="mt-2 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">
+                    <p className="mt-2 rounded-lg bg-ink/5 px-3 py-1.5 text-sm text-ink">
                       &ldquo;{c.claim_a}&rdquo;
                     </p>
-                    <p className="mt-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">
+                    <p className="mt-1.5 rounded-lg bg-ink/5 px-3 py-1.5 text-sm text-ink">
                       &ldquo;{c.claim_b}&rdquo;
                     </p>
-                    <p className="mt-2 text-xs text-white/70">
+                    <p className="mt-2 text-xs text-ink-light">
                       {c.explanation}
                     </p>
                   </div>

@@ -75,7 +75,7 @@ export default function ResetPage() {
         </Link>
 
         <div className="mb-6 text-center">
-          <h1 className="font-heavy text-3xl uppercase tracking-tight text-ink">
+          <h1 className="font-heavy text-3xl text-ink">
             {mode === "update" ? "Set a new password" : "Reset password"}
           </h1>
           <p className="mt-1.5 text-sm text-ink-light">

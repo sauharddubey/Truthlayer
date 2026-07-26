@@ -11,9 +11,9 @@ import { Check, AlertTriangle, FileSearch, Eye, Scale, ShieldCheck, AudioLines, 
 import { formatMetric, formatMetricNa, formatMetricPercent, formatUnitPercent, metricValue } from "@/lib/formatMetric";
 
 const C = (t?: number | null, invert = false) => {
-  if (t == null) return "#9b9a97";
+  if (t == null) return "rgb(var(--ink-faint))";
   const v = invert ? 100 - t : t;
-  return v >= 70 ? "#0f7b6c" : v >= 40 ? "#cb912f" : "#e03e3e";
+  return v >= 70 ? "rgb(var(--good))" : v >= 40 ? "rgb(var(--warn))" : "rgb(var(--bad))";
 };
 
 function fmt(t?: number) {
@@ -32,7 +32,7 @@ function formatMarkdown(text?: string | null) {
         {parts.map((part, index) => {
           if (index % 2 === 1) {
             return (
-              <strong key={index} className="font-extrabold text-white">
+              <strong key={index} className="font-extrabold text-ink">
                 {part}
               </strong>
             );
@@ -50,7 +50,7 @@ function formatMarkdownInline(text?: string | null) {
   return parts.map((part, index) => {
     if (index % 2 === 1) {
       return (
-        <strong key={index} className="font-extrabold text-white">
+        <strong key={index} className="font-extrabold text-ink">
           {part}
         </strong>
       );
@@ -112,14 +112,14 @@ function Block({ label, icon, color, span = "", onClick, children }: {
           : undefined
       }
       aria-label={interactive ? label : undefined}
-      className={`glass-tile group relative flex flex-col p-4 text-left ${span} ${interactive ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"}`}
+      className={`glass-tile group relative flex flex-col p-5 text-left ${span} ${interactive ? "cursor-pointer" : "cursor-default"}`}
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br opacity-40"
-        style={{ backgroundImage: `linear-gradient(135deg, ${color}1f, transparent 60%)` }} />
-      <div className="relative z-10 mb-2 flex items-center gap-1.5">
-        <span style={{ color }}>{icon}</span>
-        <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">{label}</span>
-        {onClick && <ArrowRight className="ml-auto h-3 w-3 text-white/20 transition group-hover:text-white/50" />}
+        style={{ backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent), transparent 60%)` }} />
+      <div className="relative z-10 mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }}>{icon}</span>
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-ink-light">{label}</span>
+        {onClick && <ArrowRight className="ml-auto h-3.5 w-3.5 text-ink-faint transition group-hover:translate-x-0.5 group-hover:text-accent" />}
       </div>
       <div className="relative z-10 flex flex-1 flex-col">{children}</div>
     </div>
@@ -127,19 +127,32 @@ function Block({ label, icon, color, span = "", onClick, children }: {
 }
 
 function Ring({ value, color, size = 92, label }: { value?: number | null; color: string; size?: number; label?: string }) {
-  const r = size / 2 - 7, circ = 2 * Math.PI * r;
+  const gid = useId();
+  const stroke = Math.max(8, Math.round(size / 9));
+  const r = size / 2 - stroke / 2 - 1, circ = 2 * Math.PI * r;
   const pct = metricValue(value) ?? 0;
   const display = value == null ? "N/A" : formatMetricNa(value);
+  const healthy = value != null && pct >= 70;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ width: size, height: size }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" style={{ stopColor: "rgb(var(--good))" }} />
+            <stop offset="100%" style={{ stopColor: "rgb(var(--accent))" }} />
+          </linearGradient>
+        </defs>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: "var(--ring-track)" }} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={healthy ? `url(#${gid})` : color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`font-heavy leading-none text-white ${display === "N/A" ? "text-lg" : "text-2xl"}`}>{display}</span>
-        {label && <span className="text-[7px] font-bold uppercase tracking-widest text-white/70 mt-0.5">{label}</span>}
+        <span className={`font-heavy leading-none text-ink ${
+          display === "N/A"
+            ? (size >= 72 ? "text-lg" : "text-xs")
+            : size >= 100 ? "text-3xl" : size >= 72 ? "text-2xl" : "text-sm"
+        }`}>{display}</span>
+        {label && <span className="text-[9px] font-bold uppercase tracking-widest text-ink-faint mt-0.5">{label}</span>}
       </div>
     </div>
   );
@@ -149,15 +162,25 @@ function MiniBar({ label, value, invert = false }: { label: string; value?: numb
   const n = metricValue(value);
   return (
     <div>
-      <div className="mb-1 flex justify-between text-[9px] font-bold">
-        <span className="uppercase tracking-wider text-white/70">{label}</span>
+      <div className="mb-1 flex justify-between text-[10px] font-bold">
+        <span className="uppercase tracking-wider text-ink-faint">{label}</span>
         <span style={{ color: C(n, invert) }}>{n == null ? "—" : formatMetric(n)}</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-        <div className="h-full rounded-full" style={{ width: `${n ?? 0}%`, background: C(n, invert) }} />
+      <div className="h-1.5 overflow-hidden rounded-full bg-ink/10">
+        <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${n ?? 0}%`, background: C(n, invert) }} />
       </div>
     </div>
   );
+}
+
+/** Small verdict pill for the claims list — mirrors the mockup. */
+function VerdictPill({ tone, children }: { tone: "ok" | "warn" | "bad"; children: ReactNode }) {
+  const map = {
+    ok: "bg-good/15 text-good",
+    warn: "bg-warn/15 text-warn",
+    bad: "bg-bad/15 text-bad",
+  } as const;
+  return <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${map[tone]}`}>{children}</span>;
 }
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -256,7 +279,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       panelClassName="relative z-10 max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-line bg-paper p-5 shadow-pop n-fade"
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 id={titleId} className="font-heavy text-lg uppercase tracking-tight text-ink">{title}</h3>
+        <h3 id={titleId} className="font-heavy text-lg text-ink">{title}</h3>
         <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-light hover:bg-hover">✕</button>
       </div>
       {children}
@@ -270,9 +293,11 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 }) {
   const agents = report?.agent_results || {};
   const content = agents.content || {};
-  const mode = video?.mode || "verifier";
-  const isVerifier = mode === "verifier";
   const scoring = report?.score_reasonings?.scoring_breakdown || {};
+  // The report's own scoring mode wins: video.mode is captured at submission
+  // and can lag behind a re-analysis run under a different workspace role.
+  const mode = scoring?.mode || video?.mode || "verifier";
+  const isVerifier = mode === "verifier";
   const diagnostics = report?.score_reasonings?.diagnostics || {};
   const ocr = agents.ocr || {};
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -415,14 +440,14 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
   return (
     <>
-      <div className="grid auto-rows-[150px] grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid auto-rows-[164px] grid-cols-2 gap-4 lg:grid-cols-4">
 
         {/* TRUST HERO */}
-        <Block label="Trust" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c" span="col-span-2 row-span-2"
+        <Block label="Trust" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="rgb(var(--good))" span="col-span-2 row-span-2"
           onClick={() => setActiveModal("Scores")}>
-          <div className="flex flex-1 items-center gap-5">
-            <Ring value={report?.trust_score ?? null} color={C(report?.trust_score)} label="trust" />
-            <div className="flex-1 space-y-2">
+          <div className="flex flex-1 items-center gap-6">
+            <Ring value={report?.trust_score ?? null} color={C(report?.trust_score)} label="trust" size={124} />
+            <div className="flex-1 space-y-3">
               {!isVerifier && <MiniBar label="Risk" value={report?.risk_score} invert />}
               {!isVerifier && isBusiness && <MiniBar label="Compliance" value={report?.compliance_score} />}
               {!isVerifier && <MiniBar label="Sentiment" value={sentimentPct} />}
@@ -431,69 +456,68 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
               {isVerifier && <MiniBar label="Confidence factor" value={scoring?.confidence_factor} />}
             </div>
           </div>
-          <div className="mt-2 text-[10px] font-medium text-white/70">
+          <div className="mt-3 text-[11px] font-medium text-ink-light">
             {content.is_about_product ? "Product video" : (content.content_type || "video")}
-            {report?.overall_confidence != null && ` · ${formatUnitPercent(report.overall_confidence)} confidence`}
+            {report?.overall_confidence != null && ` · ${formatUnitPercent(report.overall_confidence)} analysis confidence`}
             {(isVerifier || diagnostics?.no_claims_extracted) && diagnostics?.no_claims_extracted && " · insufficient claims"}
           </div>
         </Block>
 
         {/* SUMMARY */}
-        <Block label="Summary" icon={<Sparkle className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
+        <Block label="Summary" icon={<Sparkle className="h-3.5 w-3.5" />} color="rgb(var(--accent))" span="col-span-2 row-span-2"
           onClick={report?.summary ? () => setActiveModal("Summary") : undefined}>
-          <p className="line-clamp-[12] text-xs leading-relaxed text-white/70 whitespace-pre-line">
+          <p className="line-clamp-[11] text-[13px] leading-relaxed text-ink-light whitespace-pre-line">
             {formatMarkdownInline(report?.summary) || "No summary generated."}
           </p>
         </Block>
 
         {/* CLAIMS */}
-        <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="#2383e2" span="col-span-2 row-span-2"
+        <Block label="Fact-check claims" icon={<FileSearch className="h-3.5 w-3.5" />} color="rgb(var(--accent))" span="col-span-2 row-span-2"
           onClick={() => setActiveModal("Fact-check claims")}>
           <div className="mb-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-extrabold text-good">{verified} verified</span>
-            <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-extrabold text-bad">{flagged} flagged</span>
-            <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/70">{claims.length} total</span>
+            <span className="rounded-full bg-good/15 px-2.5 py-1 text-[11px] font-bold text-good">{verified} verified</span>
+            <span className="rounded-full bg-bad/15 px-2.5 py-1 text-[11px] font-bold text-bad">{flagged} flagged</span>
+            <span className="rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink-light">{claims.length} total</span>
             {skippedClaims.length > 0 && (
-              <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-extrabold text-white/70">{skippedClaims.length} filtered</span>
+              <span className="rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink-light">{skippedClaims.length} filtered</span>
             )}
           </div>
-          <div className="space-y-2 flex-1 overflow-hidden">
+          <div className="flex-1 divide-y divide-line overflow-hidden">
             {claims.slice(0, 7).map((c, i) => {
               const isVerified = c.verdict === "supported" || c.verification_status === "auto_verified" || c.verification_status === "approved";
               const isContradicted = c.verdict === "contradicted" || c.verification_status === "contradicted" || c.verification_status === "rejected";
               const isMisleading = c.verdict === "misleading";
+              const tone = isVerified ? "ok" : isContradicted ? "bad" : isMisleading ? "warn" : "warn";
+              const verdict = isVerified ? "Supported" : isContradicted ? "Flagged" : isMisleading ? "Misleading" : "Needs review";
               return (
-                <div key={i} className="flex items-center gap-2 text-[11px] border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                  {isVerified ? (
-                    <Check className="h-3.5 w-3.5 shrink-0 text-good" />
-                  ) : (
-                    <span className="shrink-0" style={{ color: isContradicted ? "#e03e3e" : isMisleading ? "#cb912f" : "#9b9a97" }}>
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                  <span className="truncate text-white/70 flex-1">{c.claim_text}</span>
+                <div key={i} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="line-clamp-1 flex-1 text-[13px] font-medium text-ink">{c.claim_text}</span>
+                  <VerdictPill tone={tone}>{verdict}</VerdictPill>
                 </div>
               );
             })}
-            {!claims.length && <span className="text-[11px] text-white/70">No claims extracted.</span>}
+            {!claims.length && <span className="text-[13px] text-ink-light">No claims extracted.</span>}
           </div>
         </Block>
 
         {/* TRANSCRIPT */}
-        <Block label="Transcript" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f" span="col-span-2 row-span-2"
+        <Block label="Transcript" icon={<AudioLines className="h-3.5 w-3.5" />} color="rgb(var(--warn))" span="col-span-2 row-span-2"
           onClick={() => setActiveModal("Transcript")}>
-          <div className="flex-1 space-y-1.5 overflow-hidden">
+          <div className="flex-1 space-y-2 overflow-hidden">
             {segs.slice(0, 6).map((s: any, i: number) => {
-              const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
+              const flagged = s.label === "risky" || s.label === "verify";
+              const col = s.label === "risky" ? "rgb(var(--bad))" : s.label === "verify" ? "rgb(var(--warn))" : "rgb(var(--ink) / 0.15)";
+              const hasTime = typeof s.start === "number";
               return (
-                <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
-                  <span className="text-[11px] leading-snug text-white/70 line-clamp-1">{s.text}</span>
+                <div key={i} className={`flex items-start gap-2.5 rounded-lg border-l-[3px] py-1 pl-2.5 ${flagged ? "bg-accent/5" : ""}`} style={{ borderColor: col }}>
+                  {hasTime && <span className="shrink-0 pt-px font-mono text-[11px] font-bold tabular-nums text-accent">{fmt(s.start)}</span>}
+                  <span className={`text-[13px] leading-snug line-clamp-1 ${flagged ? "font-medium text-ink" : "text-ink-light"}`}>{s.text}</span>
                 </div>
               );
             })}
-            {!segs.length && <span className="text-[11px] text-white/70">No transcript.</span>}
+            {!segs.length && <span className="text-[13px] text-ink-light">No transcript.</span>}
           </div>
-          <div className="mt-2 text-[10px] font-bold text-white/70">{segs.length} segments · tap to read</div>
+          <div className="mt-3 text-[11px] font-bold text-ink-faint">{segs.length} segments · tap to read</div>
         </Block>
 
         {/* ON-SCREEN TEXT (OCR) */}
@@ -518,20 +542,19 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                 </span>
               </div>
             )}
-            <div className="flex-1 space-y-1.5 overflow-hidden">
+            <div className="flex-1 space-y-2 overflow-hidden">
               {ocr.ocr_segments.slice(0, 6).map((s: any, i: number) => {
-                const col = s.label === "risky" ? "#e03e3e" : s.label === "verify" ? "#cb912f" : "rgba(255,255,255,0.15)";
+                const flagged = s.label === "risky" || s.label === "verify";
+                const col = s.label === "risky" ? "rgb(var(--bad))" : s.label === "verify" ? "rgb(var(--warn))" : "rgb(var(--ink) / 0.15)";
                 return (
-                  <div key={i} className="border-l-2 pl-2" style={{ borderColor: col }}>
-                    <span className="text-[11px] leading-snug text-white/70 line-clamp-1">
-                      <span className="font-mono text-[9px] text-white/70 mr-1">{fmt(s.start)}</span>
-                      {s.text}
-                    </span>
+                  <div key={i} className={`flex items-start gap-2.5 rounded-lg border-l-[3px] py-1 pl-2.5 ${flagged ? "bg-accent/5" : ""}`} style={{ borderColor: col }}>
+                    <span className="shrink-0 pt-px font-mono text-[11px] font-bold tabular-nums text-accent">{fmt(s.start)}</span>
+                    <span className={`text-[13px] leading-snug line-clamp-1 ${flagged ? "font-medium text-ink" : "text-ink-light"}`}>{s.text}</span>
                   </div>
                 );
               })}
             </div>
-            <div className="mt-2 text-[10px] font-bold text-white/70">{ocr.ocr_segments.length} segments · tap to read</div>
+            <div className="mt-2 text-[10px] font-bold text-ink-light">{ocr.ocr_segments.length} segments · tap to read</div>
           </Block>
         )}
 
@@ -542,33 +565,33 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           <Block
             label="Video Segment Analysis"
             icon={<Eye className="h-3.5 w-3.5" />}
-            color="#0f7b6c"
+            color="rgb(var(--good))"
             span="col-span-2 row-span-2"
             onClick={() => setActiveModal("Video Segment Analysis")}
           >
-            <div className="text-[10px] text-white/70 mb-3 leading-relaxed">
+            <div className="text-[10px] text-ink-light mb-3 leading-relaxed">
               Visual action summary for overlay text segments (only music/unrelated speech detected).
             </div>
             <div className="flex-1 space-y-2 overflow-hidden">
               {ocr.ocr_analysis.video_segment_analysis.slice(0, 4).map((item: any, i: number) => (
-                <div key={i} className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                <div key={i} className="flex gap-2.5 items-start text-xs border-b border-line pb-2 last:border-0 last:pb-0">
                   <span className="font-mono text-[9px] text-accent shrink-0 mt-0.5 font-bold bg-accent/15 px-1.5 py-0.5 rounded">
                     {fmt(item.timestamp)}
                   </span>
                   <div className="flex-1 min-w-0">
                     {item.text_appeared && (
-                      <span className="text-[10px] font-bold text-white/70 block truncate mb-0.5">
+                      <span className="text-[10px] font-bold text-ink-light block truncate mb-0.5">
                         "{item.text_appeared}"
                       </span>
                     )}
-                    <span className="text-[11px] leading-snug text-white/70 line-clamp-1 block">
+                    <span className="text-[11px] leading-snug text-ink-light line-clamp-1 block">
                       {item.visual_description}
                     </span>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-2 text-[10px] font-bold text-white/70">
+            <div className="mt-2 text-[10px] font-bold text-ink-light">
               {ocr.ocr_analysis.video_segment_analysis.length} segments analyzed · tap to inspect
             </div>
           </Block>
@@ -580,11 +603,11 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Perception check")}>
             <div className="flex items-center gap-3">
               <Ring value={100 - (perc.sentiment_harm_score ?? 0)} color={C(100 - (perc.sentiment_harm_score ?? 0))} size={56} />
-              <div className="text-[11px] text-white/70">
+              <div className="min-w-0 flex-1 text-[13px]">
                 {(perc.flags?.length || 0) > 0
                   ? <span className="font-bold text-warn">{perc.flags.length} sensitivity flag(s)</span>
                   : <span className="font-bold text-good">Unlikely to offend</span>}
-                <div className="mt-0.5 text-white/70 line-clamp-2">{perc.audience_perception}</div>
+                <div className="mt-1 leading-relaxed text-ink-light line-clamp-3">{perc.audience_perception}</div>
               </div>
             </div>
           </Block>
@@ -592,22 +615,30 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* BIAS */}
         {bias && (
-          <Block label="Bias & sentiment" icon={<AudioLines className="h-3.5 w-3.5" />} color="#cb912f"
+          <Block label="Bias & sentiment" icon={<AudioLines className="h-3.5 w-3.5" />} color="rgb(var(--warn))"
             onClick={() => setActiveModal("Bias analysis")}>
             <div className="flex-1 space-y-2">
               <MiniBar label="Bias" value={report?.bias_score} invert />
-              <div className="text-[10px] text-white/70 line-clamp-2">{bias.reasoning}</div>
+              <div className="text-[12px] leading-relaxed text-ink-light line-clamp-3">{bias.reasoning}</div>
             </div>
           </Block>
         )}
 
-        {/* SENTIMENT TIMELINE */}
+        {/* CREATOR RISK — placed beside Bias & sentiment */}
+        {cr && (
+          <Block label="Creator risk" icon={<AlertTriangle className="h-3.5 w-3.5" />} color="rgb(var(--warn))"
+            onClick={() => setActiveModal("Creator risk")}>
+            <div className="text-[13px] leading-relaxed text-ink-light line-clamp-4">{cr.reasoning || `${cr.risks?.length || 0} risk signal(s)`}</div>
+          </Block>
+        )}
+
+        {/* SENTIMENT TIMELINE — double height so the full curve is visible */}
         {((hasSpeechSenti && sentimentSource === "speech") || (hasVideoSenti && sentimentSource === "video")) && (
           <Block
             label="Sentiment timeline"
             icon={<Network className="h-3.5 w-3.5" />}
-            color="#2383e2"
-            span="col-span-2"
+            color="rgb(var(--accent))"
+            span="col-span-2 row-span-2"
             onClick={() => setActiveModal("Sentiment timeline")}
           >
             <div className="flex flex-col h-full w-full justify-between">
@@ -617,24 +648,24 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
                     Based on Video Visuals (No speech)
                   </span>
                 ) : hasSpeechSenti && hasVideoSenti ? (
-                  <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5 text-[9px] relative z-20" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-1 rounded-md border border-line bg-ink/5 p-0.5 text-[9px] relative z-20" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSentimentSource("speech")}
-                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "speech" ? "bg-surface text-ink shadow-sm" : "text-ink-light hover:text-ink"}`}
                     >
                       Speech
                     </button>
                     <button
                       onClick={() => setSentimentSource("video")}
-                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}
+                      className={`rounded px-1.5 py-0.5 font-bold transition ${sentimentSource === "video" ? "bg-surface text-ink shadow-sm" : "text-ink-light hover:text-ink"}`}
                     >
                       Video
                     </button>
                   </div>
                 ) : null}
               </div>
-              <div className="flex-1 opacity-90 min-h-[90px]">
-                <SentimentTimeline timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
+              <div className="mt-auto min-h-0 flex-1 opacity-90">
+                <SentimentTimeline compact timeline={sentimentSource === "speech" ? (senti.speech_sentiment?.timeline || senti.timeline) : (senti.video_sentiment?.timeline || senti.timeline)} />
               </div>
             </div>
           </Block>
@@ -642,24 +673,24 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
 
         {/* COMPLIANCE (business) */}
         {isBusiness && comp && (
-          <Block label="Compliance" icon={<Scale className="h-3.5 w-3.5" />} color="#2383e2"
+          <Block label="Compliance" icon={<Scale className="h-3.5 w-3.5" />} color="rgb(var(--accent))"
             onClick={() => setActiveModal("Product & compliance")}>
             <div className="flex-1">
               <div className="font-heavy text-3xl" style={{ color: C(report?.compliance_score) }}>{formatMetric(report?.compliance_score)}</div>
-              <div className="mt-1 text-[10px] text-white/70">{(comp.issues?.length || 0)} issue(s) flagged</div>
+              <div className="mt-1 text-[12px] text-ink-light">{(comp.issues?.length || 0)} issue(s) flagged</div>
             </div>
           </Block>
         )}
 
         {/* MEDIA INTEGRITY (business) */}
         {isBusiness && mi && (
-          <Block label="Media integrity" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="#0f7b6c"
+          <Block label="Media integrity" icon={<ShieldCheck className="h-3.5 w-3.5" />} color="rgb(var(--good))"
             onClick={() => setActiveModal("Media integrity")}>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-6 w-6 text-good" />
               <span className="font-heavy text-2xl" style={{ color: C(report?.authenticity_score) }}>{formatMetricPercent(report?.authenticity_score)}</span>
             </div>
-            <div className="mt-1 text-[10px] text-white/70">
+            <div className="mt-1 text-[12px] text-ink-light">
               authenticity
               {mi.dominant_signal && mi.method === "hive" && (
                 <> · {SIGNAL_LABELS[mi.dominant_signal] || mi.dominant_signal}</>
@@ -669,13 +700,6 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           </Block>
         )}
 
-        {/* CREATOR RISK */}
-        {cr && (
-          <Block label="Creator risk" icon={<AlertTriangle className="h-3.5 w-3.5" />} color="#cb912f"
-            onClick={() => setActiveModal("Creator risk")}>
-            <div className="text-[10px] text-white/70 line-clamp-3">{cr.reasoning || `${cr.risks?.length || 0} risk signal(s)`}</div>
-          </Block>
-        )}
       </div>
 
       {renderModal()}
@@ -1016,7 +1040,7 @@ function VisualAnalysisModal({ analysis }: { analysis: any[] }) {
             </div>
             <div className="space-y-1.5 flex-1 min-w-0">
               {item.text_appeared && (
-                <div className="text-[10px] font-bold text-ink bg-white/5 px-2 py-0.5 rounded inline-block truncate max-w-full">
+                <div className="text-[10px] font-bold text-ink bg-ink/5 px-2 py-0.5 rounded inline-block truncate max-w-full">
                   Text: "{item.text_appeared}"
                 </div>
               )}

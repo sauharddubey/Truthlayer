@@ -13,7 +13,7 @@ const ROLES = [
     label: "Business",
     desc: "Compliance, influencer vetting & brand narrative monitoring",
     icon: <Box className="h-5 w-5" />,
-    color: "#2383e2",
+    color: "rgb(var(--accent))",
     bg: "rgba(35,131,226,0.08)",
     border: "rgba(35,131,226,0.25)",
   },
@@ -22,7 +22,7 @@ const ROLES = [
     label: "Creator",
     desc: "Self-check videos pre-publication to prevent cancellation",
     icon: <Eye className="h-5 w-5" />,
-    color: "#0f7b6c",
+    color: "rgb(var(--good))",
     bg: "rgba(15,123,108,0.08)",
     border: "rgba(15,123,108,0.25)",
   },
@@ -31,7 +31,7 @@ const ROLES = [
     label: "Verifier",
     desc: "Fact-check any public video with live evidence citations",
     icon: <Scale className="h-5 w-5" />,
-    color: "#cb912f",
+    color: "rgb(var(--warn))",
     bg: "rgba(203,145,47,0.08)",
     border: "rgba(203,145,47,0.25)",
   },
@@ -97,7 +97,7 @@ export default function RegisterPage() {
         </Link>
 
         <div>
-          <h1 className="font-heavy text-5xl uppercase leading-[0.9] tracking-tight text-paper">
+          <h1 className="font-heavy text-5xl leading-[1.02] text-paper">
             Pick your<br />workspace
           </h1>
           <p className="mt-4 max-w-xs text-sm text-paper/60 leading-relaxed">
@@ -106,7 +106,7 @@ export default function RegisterPage() {
           <div className="mt-8 space-y-3">
             {ROLES.map((r) => (
               <div key={r.value} className="flex items-center gap-3 opacity-70">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10"
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink/5 border border-line"
                   style={{ color: r.color }}>{r.icon}</span>
                 <div>
                   <div className="text-xs font-bold text-paper">{r.label}</div>
@@ -131,7 +131,7 @@ export default function RegisterPage() {
 
         <div className="w-full max-w-md">
           <div className="mb-8">
-            <h2 className="font-heavy text-3xl uppercase tracking-tight text-ink">Create account</h2>
+            <h2 className="font-heavy text-3xl text-ink">Create account</h2>
             <p className="mt-1.5 text-sm text-ink-light">Choose how you'll use TruthLayer.</p>
           </div>
 
@@ -147,15 +147,15 @@ export default function RegisterPage() {
                   onClick={() => setForm({ ...form, role: r.value })}
                   className="flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-200"
                   style={{
-                    borderColor: active ? r.border : "#e9e9e7",
+                    borderColor: active ? r.border : "rgb(var(--line))",
                     background: active ? r.bg : "transparent",
                   }}
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all"
                     style={{
-                      background: active ? r.color + "15" : "#f7f7f5",
-                      borderColor: active ? r.border : "#e9e9e7",
-                      color: active ? r.color : "#9b9a97",
+                      background: active ? r.color + "15" : "rgb(var(--surface))",
+                      borderColor: active ? r.border : "rgb(var(--line))",
+                      color: active ? r.color : "rgb(var(--ink-faint))",
                     }}>
                     {r.icon}
                   </span>
@@ -166,7 +166,7 @@ export default function RegisterPage() {
                   {active && (
                     <span className="flex h-5 w-5 items-center justify-center rounded-full shrink-0"
                       style={{ background: r.color }}>
-                      <Check className="h-2.5 w-2.5 text-white" />
+                      <Check className="h-2.5 w-2.5 text-ink" />
                     </span>
                   )}
                 </button>
