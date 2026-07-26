@@ -292,7 +292,11 @@ export default function SettingsPage() {
   async function changeWorkspace(role: string) {
     if (role === user?.role || switching) return;
     const label = WORKSPACES.find((w) => w.value === role)?.label ?? role;
-    if (!window.confirm(`Switch your workspace to ${label}? Your data is kept — this changes which tools and dashboards you see.`)) return;
+    const confirmMessage =
+      role === "business"
+        ? "Switch your workspace to Business? This immediately unlocks Business-tier tools (deepfake detection, compliance workflows, product knowledge base) and creates a company workspace — no approval needed. Your data is kept."
+        : `Switch your workspace to ${label}? Your data is kept — this changes which tools and dashboards you see.`;
+    if (!window.confirm(confirmMessage)) return;
     setSwitching(role);
     setRoleError("");
     try {
