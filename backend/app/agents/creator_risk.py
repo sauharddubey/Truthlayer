@@ -8,7 +8,7 @@ recommendations.
 
 from __future__ import annotations
 
-from app.agents.base import AgentContext
+from app.agents.base import AgentContext, wrap_untrusted
 from app.llm import chat_json
 
 NAME = "creator_risk"
@@ -40,7 +40,7 @@ def run(ctx: AgentContext) -> dict:
             "- 76-100: Critical risk of account ban, demonetization, severe toxic language/harassment, or dangerous misinformation.\n"
             "Provide concrete, actionable recommendations to reduce risk before publishing."
         ),
-        user=ctx.transcript_text[:5000],
+        user=wrap_untrusted("video transcript", ctx.transcript_text[:5000]),
         schema_hint=_SCHEMA,
     )
     if not result:

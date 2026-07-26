@@ -120,7 +120,8 @@ Health: `GET http://localhost:8000/health`.
 ---
 
 ## ⚠️ Gotchas (we hit these — don't repeat)
-- **Encryption Key Sharing**: When working on the same shared Supabase database, all developers MUST share the exact same `ENCRYPTION_KEY` in their local `.env`. If keys differ, decrypting stored user API keys will fail with a cryptography `InvalidToken` error.
+- **Encryption Key Sharing**: When working on the same shared Supabase database, all developers MUST share the exact same `ENCRYPTION_KEY` in their local `.env` (else decrypting stored user API keys fails with a cryptography `InvalidToken` error).
+  - **Security note (do before launch):** a single symmetric key shared across everyone means anyone holding it can decrypt *every* user's stored third-party keys. Use **separate keys per environment** (dev / staging / prod), keep the prod key in a secrets manager with tight access — **not** in a shared `*.env.local` file passed around — and plan a key-rotation + re-encryption procedure. The prod `ENCRYPTION_KEY` must never be shared with dev.
 - **Multi-env split**: The frontend reads `frontend/.env.local` for local development. Never put server secrets (like `ENCRYPTION_KEY`) in frontend files since `NEXT_PUBLIC_` variables are bundled client-side and visible to users.
 - **Never run `npm run build` while the dev server is running.** `next build`
   overwrites the shared `.next/` dir and the running dev server starts serving

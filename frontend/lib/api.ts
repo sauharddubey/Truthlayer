@@ -2,8 +2,22 @@
 
 import { supabase } from "@/lib/supabase";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+function normalizeApiUrl(raw: string): string {
+  // In production, never call the API over plaintext http (localhost excepted):
+  // upgrade to https so the bearer token is never sent in the clear.
+  if (typeof window !== "undefined" && raw.startsWith("http://")) {
+    const host = raw.slice(7).split("/")[0].split(":")[0];
+    const isLocal = host === "localhost" || host === "127.0.0.1";
+    if (!isLocal && window.location.protocol === "https:") {
+      return "https://" + raw.slice(7);
+    }
+  }
+  return raw;
+}
+
+export const API_URL = normalizeApiUrl(
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+);
 
 const ROLE_KEY = "truthlayer_role";
 const PENDING_KEY = "truthlayer_pending_signup";
@@ -45,7 +59,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ── Auth (delegated to Supabase) ────────────────────────────────────────────
 
-type SignupMeta = { role: string; full_name?: string; organization_name?: string };
+type SignupMeta = {
+  role: string;
+  full_name?: string;
+  organization_name?: string;
+  consent_version?: string;
+};
+
+/** Version of the Privacy Policy / Terms the user accepts at sign-up. Bump when
+ *  the policies materially change so re-consent can be required. */
+export const CONSENT_VERSION = "2026-07-17";
 
 /**
  * Apply the role/org chosen at sign-up to the backend profile (which is
@@ -96,6 +119,7 @@ export async function register(payload: {
     role: payload.role,
     full_name: payload.full_name,
     organization_name: payload.organization_name,
+    consent_version: CONSENT_VERSION,
   });
   localStorage.setItem(ROLE_KEY, me.role);
   return { role: me.role as string };
@@ -277,18 +301,23 @@ export function deleteBrandKeyword(keywordId: string) {
 
 // ── Videos / analysis ───────────────────────────────────────────────────────
 
-export function submitUrl(url: string, productId?: string) {
+export function submitUrl(url: string, productId?: string, rightsAttested?: boolean) {
   return request<any>("/videos/url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, product_id: productId || null }),
+    body: JSON.stringify({
+      url,
+      product_id: productId || null,
+      rights_attested: !!rightsAttested,
+    }),
   });
 }
 
-export async function uploadVideo(file: File, productId?: string) {
+export async function uploadVideo(file: File, productId?: string, rightsAttested?: boolean) {
   const fd = new FormData();
   fd.append("file", file);
   if (productId) fd.append("product_id", productId);
+  fd.append("rights_attested", rightsAttested ? "true" : "false");
   return request<any>("/videos/upload", { method: "POST", body: fd });
 }
 
@@ -306,6 +335,13 @@ export function startAnalysis(videoId: string) {
 
 export function deleteVideo(videoId: string) {
   return request<any>(`/videos/${videoId}`, { method: "DELETE" });
+}
+
+/** Right to erasure: delete the account and all associated data, then sign out. */
+export async function deleteAccount() {
+  const res = await request<any>("/auth/me", { method: "DELETE" });
+  await clearAuth();
+  return res;
 }
 
 // ── Dashboards ──────────────────────────────────────────────────────────────

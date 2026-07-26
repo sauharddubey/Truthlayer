@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import List
 
-from app.agents.base import AgentContext
+from app.agents.base import AgentContext, wrap_untrusted
 from app.llm import chat_json
 
 NAME = "verification"
@@ -68,7 +68,11 @@ def verify_claims(ctx: AgentContext, claims: List[dict]) -> List[dict]:
             "- not_applicable: not a verifiable product claim (small talk, opinion).\n"
             "Be strict: only auto_verify when the documents actually say it."
         ),
-        user=f"PRODUCT KNOWLEDGE:\n{knowledge[:4000]}\n\nCLAIMS:\n{indexed}",
+        user=(
+            wrap_untrusted("brand product knowledge", knowledge[:4000])
+            + "\n\n"
+            + wrap_untrusted("video claims", indexed)
+        ),
         schema_hint=_SCHEMA,
     )
 

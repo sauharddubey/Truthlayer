@@ -32,7 +32,7 @@ function BusinessInfographic() {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{l.score}</div>
               </div>
-              <span className="text-[7.5px] font-bold text-white/40 uppercase tracking-wide text-center leading-tight">{l.label}</span>
+              <span className="text-[7.5px] font-bold text-white/70 uppercase tracking-wide text-center leading-tight">{l.label}</span>
             </div>
           );
         })}
@@ -70,20 +70,20 @@ function CreatorInfographic() {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-sm font-black text-good leading-none">{100 - risk}</span>
-            <span className="text-[7px] font-bold text-white/30 uppercase">Safe</span>
+            <span className="text-[7px] font-bold text-white/70 uppercase">Safe</span>
           </div>
         </div>
         <div>
-          <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/30 mb-1">Creator Risk Score</div>
+          <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/70 mb-1">Creator Risk Score</div>
           <div className="text-xs font-extrabold text-good">Low Risk</div>
-          <div className="text-[10px] text-white/40 font-medium">Safe to publish after minor edits</div>
+          <div className="text-[10px] text-white/70 font-medium">Safe to publish after minor edits</div>
         </div>
       </div>
       {/* 2×2 status grid */}
       <div className="grid grid-cols-2 gap-2">
         {checks.map((c) => (
           <div key={c.label} className="bg-[#18181c] border border-white/5 rounded-xl px-2.5 py-2 flex items-center justify-between gap-2 hover:border-white/10 transition-all">
-            <span className="text-[9px] font-semibold text-white/50 leading-tight">{c.label}</span>
+            <span className="text-[9px] font-semibold text-white/70 leading-tight">{c.label}</span>
             <span className="text-[8px] font-extrabold shrink-0 px-1.5 py-0.5 rounded-md"
               style={{ color: colText[c.status], background: colBg[c.status] }}>
               {c.value}
@@ -111,7 +111,7 @@ function VerifierInfographic() {
           <ShieldCheck className="h-4 w-4 text-good shrink-0" />
           <div className="flex-1">
             <div className="flex justify-between mb-1.5">
-              <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/30">Media Authenticity</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">Media Authenticity</span>
               <span className="text-[9px] font-extrabold text-good">96%</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -124,7 +124,7 @@ function VerifierInfographic() {
       <div className="space-y-1.5">
         {claims.map((c) => (
           <div key={c.text} className="bg-[#18181c] border border-white/5 rounded-xl px-3 py-1.5 flex items-center justify-between gap-2 hover:border-white/10 transition-all">
-            <span className="text-[10px] font-medium text-white/60 truncate">{c.text}</span>
+            <span className="text-[10px] font-medium text-white/70 truncate">{c.text}</span>
             <span className="text-[8px] font-extrabold shrink-0 px-2 py-0.5 rounded-full"
               style={{ color: c.color, background: c.bg }}>
               {c.verdict}
@@ -198,6 +198,7 @@ export default function Home() {
   return (
     <div className="overflow-x-clip bg-paper text-ink selection:bg-accent-soft">
       <Navbar />
+      <main>
       <HeroScroll />
 
       <div id="why-truthlayer" className="relative z-30">
@@ -240,7 +241,7 @@ export default function Home() {
                         style={{ background: tier.accentHex + "22", color: tier.accentHex }}>
                         {tier.icon}
                       </div>
-                      <span className="text-[8.5px] font-extrabold uppercase tracking-widest text-white/40 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
+                      <span className="text-[8.5px] font-extrabold uppercase tracking-widest text-white/70 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
                         {tier.badge}
                       </span>
                     </div>
@@ -262,7 +263,7 @@ export default function Home() {
                       {tier.bullets.map((b) => (
                         <li key={b} className="flex items-start gap-2">
                           <span style={{ color: tier.accentHex }} className="mt-0.5 shrink-0"><Check className="h-3 w-3" /></span>
-                          <span className="text-[11px] text-white/50 leading-snug">{b}</span>
+                          <span className="text-[11px] text-white/70 leading-snug">{b}</span>
                         </li>
                       ))}
                     </ul>
@@ -271,13 +272,13 @@ export default function Home() {
                   {/* ── I/O footer ── */}
                   <div className="px-5 py-3 bg-white/3 border-t border-white/5 flex items-center justify-between gap-3 relative z-10">
                     <div className="flex items-center gap-1.5">
-                      <AudioLines className="h-3 w-3 text-white/25" />
-                      <span className="text-[8.5px] font-bold text-white/30 uppercase tracking-wide">{tier.inputBadge}</span>
+                      <AudioLines className="h-3 w-3 text-white/70" />
+                      <span className="text-[8.5px] font-bold text-white/70 uppercase tracking-wide">{tier.inputBadge}</span>
                     </div>
                     <div className="h-3 w-px bg-white/10" />
                     <div className="flex items-center gap-1.5">
-                      <Sparkle className="h-3 w-3 text-white/25" />
-                      <span className="text-[8.5px] font-bold text-white/30 uppercase tracking-wide">{tier.outputBadge}</span>
+                      <Sparkle className="h-3 w-3 text-white/70" />
+                      <span className="text-[8.5px] font-bold text-white/70 uppercase tracking-wide">{tier.outputBadge}</span>
                     </div>
                   </div>
 
@@ -336,6 +337,7 @@ export default function Home() {
           </div>
         </Reveal>
       </section>
+      </main>
 
       <footer className="border-t border-line/60 bg-sidebar/50">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-8 text-xs text-ink-faint">
@@ -345,6 +347,10 @@ export default function Home() {
             </span>
             <span className="font-bold text-ink">TruthLayer</span>
           </div>
+          <nav aria-label="Legal" className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-ink hover:underline">Privacy</Link>
+            <Link href="/terms" className="hover:text-ink hover:underline">Terms</Link>
+          </nav>
           <span>© {new Date().getFullYear()} — explainable trust & media intelligence.</span>
         </div>
       </footer>

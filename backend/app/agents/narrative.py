@@ -13,6 +13,7 @@ from typing import List
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.base import clamp_score, wrap_untrusted
 from app.llm import chat_json, embed_texts
 from app.models import NarrativeCluster, Transcript, Video
 
@@ -79,7 +80,7 @@ def cluster_narratives(
                 "a short topic label, a 1-2 sentence summary, a risk_score (0-100) for "
                 "misinformation/reputational harm, and propagation_risk (0-100)."
             ),
-            user="\n---\n".join(c["texts"][:6])[:4000],
+            user=wrap_untrusted("video transcripts", "\n---\n".join(c["texts"][:6])[:4000]),
             schema_hint='{"topic": "string", "summary": "string", "risk_score": 0, "propagation_risk": 0}',
         )
         cluster = NarrativeCluster(
@@ -87,8 +88,8 @@ def cluster_narratives(
             product_id=product_id,
             topic=summary.get("topic", "Unlabeled narrative"),
             summary=summary.get("summary", ""),
-            risk_score=float(summary.get("risk_score", 0)),
-            propagation_risk=float(summary.get("propagation_risk", 0)),
+            risk_score=clamp_score(summary.get("risk_score", 0), 0, 100, default=0.0),
+            propagation_risk=clamp_score(summary.get("propagation_risk", 0), 0, 100, default=0.0),
             video_ids=c["video_ids"],
         )
         db.add(cluster)

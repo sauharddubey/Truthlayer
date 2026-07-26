@@ -14,6 +14,7 @@ import contextvars
 import json
 import logging
 import uuid
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -124,18 +125,30 @@ _DEFAULT_HEADERS = {
 }
 
 # Cache OpenAI clients by (api_key, base_url) so we don't rebuild per call.
-_client_cache: dict = {}
+# Bounded LRU so a busy multi-user process can't accumulate unbounded clients
+# (each holds a plaintext key in memory for the process lifetime).
+_client_cache: "OrderedDict[tuple, OpenAI]" = OrderedDict()
+_CLIENT_CACHE_MAX = 128
 
 
 def _client(api_key: str, base_url: str) -> Optional[OpenAI]:
     if not api_key:
         return None
     cache_key = (api_key, base_url)
-    if cache_key not in _client_cache:
-        _client_cache[cache_key] = OpenAI(
-            api_key=api_key, base_url=base_url, default_headers=_DEFAULT_HEADERS
+    client = _client_cache.get(cache_key)
+    if client is None:
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            default_headers=_DEFAULT_HEADERS,
+            timeout=settings.LLM_REQUEST_TIMEOUT_SECONDS,
         )
-    return _client_cache[cache_key]
+        _client_cache[cache_key] = client
+        if len(_client_cache) > _CLIENT_CACHE_MAX:
+            _client_cache.popitem(last=False)  # evict least-recently-used
+    else:
+        _client_cache.move_to_end(cache_key)
+    return client
 
 
 # ── OpenRouter published pricing (USD per 1M tokens) ────────────────────────
@@ -199,7 +212,7 @@ def record_usage(call_type: str, model: str, prompt_tokens: int, completion_toke
 # ── Chat completions ──────────────────────────────────────────────────────────
 
 
-def chat_json(system: str, user: str, *, schema_hint: str = "") -> dict:
+def chat_json(system: str, user: str, *, schema_hint: str = "", max_tokens: Optional[int] = None) -> dict:
     client = _client(effective_chat_key(), settings.LLM_BASE_URL)
     if client is None:
         return {}
@@ -215,6 +228,7 @@ def chat_json(system: str, user: str, *, schema_hint: str = "") -> dict:
         resp = client.chat.completions.create(
             model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
+            max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user},
@@ -232,7 +246,7 @@ def chat_json(system: str, user: str, *, schema_hint: str = "") -> dict:
         return {}
 
 
-def chat_text(system: str, user: str) -> str:
+def chat_text(system: str, user: str, *, max_tokens: Optional[int] = None) -> str:
     client = _client(effective_chat_key(), settings.LLM_BASE_URL)
     if client is None:
         return ""
@@ -241,6 +255,7 @@ def chat_text(system: str, user: str) -> str:
         resp = client.chat.completions.create(
             model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
+            max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -262,16 +277,28 @@ def _extract_json(text: str) -> dict:
     if text.startswith("```"):
         text = text.split("```", 2)[1] if "```" in text else text
         text = text.replace("json", "", 1).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start, end = text.find("{"), text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(text[start : end + 1])
-            except json.JSONDecodeError:
-                return {}
-        return {}
+
+    def _as_dict(candidate: str):
+        """Parse `candidate`; return the dict, {} if it parsed to a non-dict
+        (array/scalar), or None if it didn't parse at all."""
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+        return value if isinstance(value, dict) else {}
+
+    # A model reply that is valid JSON but not an object (e.g. a top-level array)
+    # would otherwise crash callers doing `.get()/.setdefault()` — guard here so
+    # every caller receives a dict.
+    result = _as_dict(text)
+    if result is not None:
+        return result
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        result = _as_dict(text[start : end + 1])
+        if result is not None:
+            return result
+    return {}
 
 
 # ── Embeddings ────────────────────────────────────────────────────────────────

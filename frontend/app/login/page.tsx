@@ -84,16 +84,18 @@ export default function LoginPage() {
 
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label className="label">Email</label>
-                <input className="input" type="email" placeholder="you@example.com"
+                <label className="label" htmlFor="login-email">Email</label>
+                <input id="login-email" className="input" type="email" placeholder="you@example.com"
+                  autoComplete="email"
                   value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="label">Password</label>
-                <input className="input" type="password" placeholder="••••••••"
+                <label className="label" htmlFor="login-password">Password</label>
+                <input id="login-password" className="input" type="password" placeholder="••••••••"
+                  autoComplete="current-password"
                   value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              {error && <p className="text-sm text-bad">{error}</p>}
+              {error && <p className="text-sm text-bad" role="alert">{error}</p>}
               <button className="btn-accent w-full py-2.5 text-sm" disabled={loading}>
                 {loading ? "Signing in…" : "Sign in"} <ArrowRight className="h-3.5 w-3.5" />
               </button>

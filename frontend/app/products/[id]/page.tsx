@@ -47,6 +47,7 @@ const TABS = [
   "Narratives",
   "Contradictions",
 ];
+const tabSlug = (t: string) => t.toLowerCase().replace(/\s+/g, "-");
 const C = (t?: number | null, invert = false) => {
   if (t == null) return "#9b9a97";
   const v = invert ? 100 - t : t;
@@ -66,7 +67,7 @@ function GlassStat({
 }) {
   return (
     <div className="glass-tile p-4">
-      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+      <div className="text-[9px] font-extrabold uppercase tracking-widest text-white/70">
         {label}
       </div>
       <div
@@ -365,6 +366,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     }
   }
 
+  function onTabsKeyDown(e: React.KeyboardEvent) {
+    const idx = TABS.indexOf(tab);
+    if (idx < 0) return;
+    let next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % TABS.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = TABS.length - 1;
+    else return;
+    e.preventDefault();
+    const nextTab = TABS[next];
+    setTab(nextTab);
+    document.getElementById(`product-tab-${tabSlug(nextTab)}`)?.focus();
+  }
+
   return (
     <AppShell wide>
       <div className="mb-3 text-sm text-ink-light">
@@ -386,7 +402,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-full items-center justify-center text-white/30">
+            <span className="flex h-full items-center justify-center text-white/70">
               <Box className="h-8 w-8" />
             </span>
           )}
@@ -397,6 +413,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             type="file"
             accept="image/*"
             className="hidden"
+            aria-label="Upload product image"
             onChange={onImage}
           />
         </label>
@@ -406,10 +423,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               {editing ? (
                 <form onSubmit={saveDetails} className="space-y-3">
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+                    <label htmlFor="product-edit-name" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                       Product name
                     </label>
                     <input
+                      id="product-edit-name"
                       className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
@@ -418,10 +436,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+                    <label htmlFor="product-edit-description" className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                       Description
                     </label>
                     <textarea
+                      id="product-edit-description"
                       className="input w-full border-white/10 bg-white/5 text-white placeholder-white/30"
                       rows={3}
                       placeholder="What it is, key specs, approved claims, restrictions…"
@@ -464,11 +483,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </button>
                   </div>
                   {product?.description ? (
-                    <p className="mt-1 max-w-xl text-sm text-white/50">
+                    <p className="mt-1 max-w-xl text-sm text-white/70">
                       {product.description}
                     </p>
                   ) : (
-                    <p className="mt-1 max-w-xl text-sm italic text-white/30">
+                    <p className="mt-1 max-w-xl text-sm italic text-white/70">
                       Add description…
                     </p>
                   )}
@@ -492,6 +511,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           >
             <input
               className="input flex-1 border-white/10 bg-white/5 text-white placeholder-white/30"
+              aria-label="Video URL to analyze for this product"
               placeholder="Paste a video URL to analyze for this product…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -501,15 +521,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               Analyze <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </form>
-          {msg && <p className="mt-2 text-sm text-accent">{msg}</p>}
+          {msg && <p className="mt-2 text-sm text-accent" role="status">{msg}</p>}
         </div>
       </div>
 
       {/* ── Pill tabs ── */}
-      <div className="mb-5 flex flex-wrap gap-1 rounded-full border border-line bg-sidebar p-1">
+      <div role="tablist" aria-label="Product sections" onKeyDown={onTabsKeyDown} className="mb-5 flex flex-wrap gap-1 rounded-full border border-line bg-sidebar p-1">
         {TABS.map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            id={`product-tab-${tabSlug(t)}`}
+            aria-selected={tab === t}
+            aria-controls={`product-panel-${tabSlug(t)}`}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               tab === t
@@ -523,7 +549,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       </div>
 
       {tab === "Overview" && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" id="product-panel-overview" aria-labelledby="product-tab-overview">
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
             <GlassStat label="Trust" value={overview?.trust_score} />
             <GlassStat
@@ -548,7 +574,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               <div className="text-base font-bold text-white">
                 Knowledge base
               </div>
-              <p className="mt-1 text-sm text-white/50">
+              <p className="mt-1 text-sm text-white/70">
                 Product details and marketing policies are indexed and used
                 during video analysis for claim verification and compliance
                 checks.
@@ -590,7 +616,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       {c.claim_text}
                     </Link>
                     {c.note && (
-                      <p className="mt-0.5 text-xs text-white/50">{c.note}</p>
+                      <p className="mt-0.5 text-xs text-white/70">{c.note}</p>
                     )}
                   </li>
                 ))}
@@ -600,15 +626,19 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {tab === "Videos" && <VideoBoard videos={vids} emptyHref="#" />}
+      {tab === "Videos" && (
+        <div role="tabpanel" id="product-panel-videos" aria-labelledby="product-tab-videos">
+          <VideoBoard videos={vids} emptyHref="#" />
+        </div>
+      )}
 
       {tab === "Knowledge base" && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2" role="tabpanel" id="product-panel-knowledge-base" aria-labelledby="product-tab-knowledge-base">
           <div className="glass-tile p-5">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <FileSearch className="h-4 w-4 text-accent" /> Product details
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Specs and approved facts. Matching claims are auto-verified during
               analysis.
             </p>
@@ -633,7 +663,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <Scale className="h-4 w-4 text-warn" /> Marketing policies
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Disclosure rules, restricted claims, and brand guidelines. Used by
               the compliance agent.
             </p>
@@ -655,7 +685,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </label>
           </div>
           <div className="glass-tile p-5 sm:col-span-2">
-            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+            <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
               Indexed documents
             </div>
             {docs.length ? (
@@ -665,7 +695,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 text-sm text-white/80 last:border-0"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                    <FileSearch className="h-3.5 w-3.5 shrink-0 text-white/70" />
                     <span className="truncate">{d.filename}</span>
                     {d.status === "failed" && (
                       <span className="shrink-0 rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-bold text-bad">
@@ -674,7 +704,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     )}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/60">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/70">
                       {d.document_type.replace(/_/g, " ")}
                     </span>
                     <button
@@ -690,7 +720,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-white/30">
+              <p className="text-sm text-white/70">
                 No documents yet — upload spec sheets and policies above. They
                 are embedded and searched during each video analysis.
               </p>
@@ -700,21 +730,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Hashtags" && (
-        <div className="glass-tile max-w-3xl p-5">
+        <div className="glass-tile max-w-3xl p-5" role="tabpanel" id="product-panel-hashtags" aria-labelledby="product-tab-hashtags">
           <div className="text-base font-bold text-white">Product hashtags</div>
-          <p className="mt-1 text-sm text-white/50">
+          <p className="mt-1 text-sm text-white/70">
             Required tags are checked against each video&apos;s platform
             description during analysis.
           </p>
           <form onSubmit={addKw} className="mt-3 flex gap-2">
             <input
               className="input border-white/10 bg-white/5 text-white placeholder-white/30"
+              aria-label="Add a product hashtag"
               placeholder="#product"
               value={kw}
               onChange={(e) => setKw(e.target.value)}
               required
             />
-            <button className="btn-accent shrink-0">
+            <button className="btn-accent shrink-0" aria-label="Add hashtag">
               <Plus className="h-4 w-4" />
             </button>
           </form>
@@ -737,14 +768,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </span>
             ))}
             {!keywords.length && (
-              <p className="text-sm text-white/30">
+              <p className="text-sm text-white/70">
                 No hashtags monitored yet.
               </p>
             )}
           </div>
           {videoMatches.length > 0 && (
             <div className="mt-5 border-t border-white/10 pt-4">
-              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/40">
+              <div className="mb-2 text-[9px] font-extrabold uppercase tracking-widest text-white/70">
                 Video hashtag status
               </div>
               <div className="space-y-2">
@@ -760,7 +791,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       {v.title}
                     </Link>
                     {!v.description_available ? (
-                      <p className="mt-1 text-xs text-white/40">
+                      <p className="mt-1 text-xs text-white/70">
                         No description available
                       </p>
                     ) : (
@@ -783,7 +814,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         ))}
                         {!v.present_keywords?.length &&
                           !v.missing_keywords?.length && (
-                            <span className="text-xs text-white/40">
+                            <span className="text-xs text-white/70">
                               Not analyzed yet
                             </span>
                           )}
@@ -798,7 +829,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Narratives" && (
-        <div>
+        <div role="tabpanel" id="product-panel-narratives" aria-labelledby="product-tab-narratives">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-light">
               Cluster this product&apos;s analyzed videos into shared narrative
@@ -827,9 +858,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     risk {formatMetric(c.risk_score)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm text-white/50">{c.summary}</p>
+                <p className="mt-1.5 text-sm text-white/70">{c.summary}</p>
                 {c.video_count != null && (
-                  <p className="mt-2 text-xs text-white/40">
+                  <p className="mt-2 text-xs text-white/70">
                     {c.video_count} video{c.video_count === 1 ? "" : "s"} in
                     cluster
                   </p>
@@ -853,7 +884,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       )}
 
       {tab === "Contradictions" && (
-        <div>
+        <div role="tabpanel" id="product-panel-contradictions" aria-labelledby="product-tab-contradictions">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-light">
               Compare claims across all videos for this product and flag
@@ -904,7 +935,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     <p className="mt-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-white/80">
                       &ldquo;{c.claim_b}&rdquo;
                     </p>
-                    <p className="mt-2 text-xs text-white/40">
+                    <p className="mt-2 text-xs text-white/70">
                       {c.explanation}
                     </p>
                   </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteVideo, downloadReportPdf, getAnalysis, getRole, reviewClaim, routeForRole, startAnalysis } from "@/lib/api";
+import { safeExternalUrl } from "@/lib/safeUrl";
 import { AppShell } from "@/components/AppShell";
 import { AnalysisBento } from "@/components/AnalysisBento";
 import { Check, Sparkle, Link2, AudioLines, FileSearch, Network, ArrowRight, ArrowUpRight, AlertTriangle } from "@/components/icons";
@@ -116,6 +117,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     const stages = ["pending", "ingesting", "transcribing", "structuring", "analyzing"];
     const currentIdx = stages.indexOf(status);
     const pct = currentIdx >= 0 ? Math.round(((currentIdx + 1) / stages.length) * 100) : 10;
+    const currentStageLabel = currentIdx >= 0 ? STAGES[currentIdx]?.label ?? "Preparing" : "Preparing";
     return (
       <AppShell>
         <div className="mx-auto max-w-lg">
@@ -131,21 +133,33 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                   <Sparkle className="h-5 w-5 text-accent" />
                 </div>
                 <h2 className="text-lg font-heavy uppercase tracking-tight text-white">Auditing Video Content</h2>
-                <p className="mt-1 text-xs text-white/40">Our multi-agent AI fleet is scanning your media...</p>
+                <p className="mt-1 text-xs text-white/70">Our multi-agent AI fleet is scanning your media...</p>
               </div>
 
               {/* Progress bar */}
-              <div className="rounded-xl bg-white/5 border border-white/[0.03] p-4">
-                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <div
+                role="status"
+                aria-live="polite"
+                className="rounded-xl bg-white/5 border border-white/[0.03] p-4"
+              >
+                <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/70">
                   <span>Audit Progress</span>
                   <span className="text-accent">{pct}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Audit progress"
+                >
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-accent to-good transition-all duration-700 ease-out"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+                <span className="sr-only">{currentStageLabel} — {pct}% complete</span>
               </div>
 
               {/* Stage Checklist */}
@@ -157,7 +171,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
                   let borderCol = "border-white/5";
                   let bgCol = "bg-white/[0.02]";
-                  let textCol = "text-white/30";
+                  let textCol = "text-white/70";
                   
                   if (isActive) {
                     borderCol = "border-accent/30 bg-accent/5";
@@ -182,7 +196,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                               ? "border-good/30 bg-good/10 text-good"
                               : isActive
                               ? "border-accent/40 bg-accent/20 text-accent animate-pulse"
-                              : "border-white/10 bg-white/5 text-white/30"
+                              : "border-white/10 bg-white/5 text-white/70"
                           }`}
                         >
                           {isCompleted ? (
@@ -206,10 +220,10 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                         <p
                           className={`mt-1 text-[11px] leading-relaxed transition-colors duration-300 ${
                             isActive
-                              ? "text-white/60 font-medium"
+                              ? "text-white/70 font-medium"
                               : isCompleted
-                              ? "text-white/45"
-                              : "text-white/20"
+                              ? "text-white/70"
+                              : "text-white/70"
                           }`}
                         >
                           {s.desc}
@@ -255,9 +269,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
             {isProduct && products.length > 0 && <span className="chip">{products.slice(0, 2).join(", ")}</span>}
           </div>
           <h1 className="font-heavy text-2xl uppercase leading-tight tracking-tight text-ink">{video.title || "Analysis"}</h1>
-          {video.source_url && (
+          {safeExternalUrl(video.source_url) && (
             <a
-              href={video.source_url}
+              href={safeExternalUrl(video.source_url) as string}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-light transition hover:text-ink hover:underline"

@@ -7,7 +7,7 @@ transcript segment timestamps.
 
 from __future__ import annotations
 
-from app.agents.base import AgentContext
+from app.agents.base import AgentContext, wrap_untrusted
 from app.llm import chat_json
 
 NAME = "sentiment"
@@ -69,7 +69,7 @@ def run(ctx: AgentContext) -> dict:
             "CRITICAL TIMELINE REQUIREMENT: The timelines (overall timeline, speech_sentiment.timeline, and video_sentiment.timeline) must NOT be flat or repeat a single static sentiment or intensity value. "
             "Evaluate each timestamped segment's local text, visual cue, or spoken phrase carefully to capture fluctuations, highs, and lows in emotional tone and intensity over the course of the video."
         ),
-        user=user_content,
+        user=wrap_untrusted("video speech and visual segments", user_content),
         schema_hint=_SCHEMA,
     )
     if not result:

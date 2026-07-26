@@ -87,6 +87,22 @@ export function WhyTruthLayer() {
     };
   }, []);
 
+  const tabIds = tabData.map((t) => t.id);
+  function onTabsKeyDown(e: React.KeyboardEvent) {
+    const idx = tabIds.indexOf(activeTab);
+    if (idx < 0) return;
+    let next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % tabIds.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + tabIds.length) % tabIds.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = tabIds.length - 1;
+    else return;
+    e.preventDefault();
+    const nextId = tabIds[next];
+    setActiveTab(nextId);
+    document.getElementById(`why-tab-${nextId}`)?.focus();
+  }
+
   return (
     // Outer scroll wrapper (tall space on lg, natural on mobile). 220vh keeps
     // the pinned tab cycle brisk (~40vh per tab) without a long empty tail.
@@ -160,12 +176,18 @@ export function WhyTruthLayer() {
 
           {/* Pill Tab Selector */}
           <div className="flex justify-center mb-4 shrink-0">
-            <div className="flex bg-sidebar border border-line p-1 rounded-full gap-1 shadow-sm">
+            <div role="tablist" aria-label="Who TruthLayer is for" onKeyDown={onTabsKeyDown} className="flex bg-sidebar border border-line p-1 rounded-full gap-1 shadow-sm">
               {tabData.map((tab) => {
                 const active = tab.id === activeTab;
                 return (
                   <button
                     key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`why-tab-${tab.id}`}
+                    aria-selected={active}
+                    aria-controls={`why-panel-${tab.id}`}
+                    tabIndex={active ? 0 : -1}
                     onClick={() => {
                       setActiveTab(tab.id);
                       // On click on desktop, scroll window to target percentage to match behavior
@@ -205,7 +227,7 @@ export function WhyTruthLayer() {
           {/* Apple Style Bento Grid Layout — no scroll, fits viewport */}
           <div key={activeTab}>
             {activeTab === "brands" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
+              <div role="tabpanel" id="why-panel-brands" aria-labelledby="why-tab-brands" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Compliance Registry Status (App Library Style) */}
                 <div 
@@ -216,7 +238,7 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
                       <Box className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Compliance Registry</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Compliance Registry</span>
                     </div>
                     <span className="flex items-center gap-1.5 text-[9px] font-extrabold text-good uppercase bg-good/15 px-2 py-0.5 rounded-full">
                       <span className="h-1.5 w-1.5 rounded-full bg-good animate-pulse" /> Live Audit Engine
@@ -225,24 +247,24 @@ export function WhyTruthLayer() {
 
                   <div className="grid grid-cols-2 gap-3 my-2.5 relative z-10">
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/60 font-medium truncate">FTC Disclosure</span>
+                      <span className="text-white/70 font-medium truncate">FTC Disclosure</span>
                       <span className="text-[10px] text-good font-extrabold bg-good/10 px-2 py-0.5 rounded">PASSED</span>
                     </div>
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/60 font-medium truncate">FDA Restrictions</span>
+                      <span className="text-white/70 font-medium truncate">FDA Restrictions</span>
                       <span className="text-[10px] text-good font-extrabold bg-good/10 px-2 py-0.5 rounded">0 FLAGS</span>
                     </div>
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/60 font-medium truncate">Medical Claims</span>
+                      <span className="text-white/70 font-medium truncate">Medical Claims</span>
                       <span className="text-[10px] text-warn font-extrabold bg-warn/10 px-2 py-0.5 rounded">1 ALERT</span>
                     </div>
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2 flex items-center justify-between text-xs hover:border-white/10 transition-all">
-                      <span className="text-white/60 font-medium truncate">Competitor mentions</span>
-                      <span className="text-[10px] text-white/40 font-extrabold bg-white/5 px-2 py-0.5 rounded">CLEARED</span>
+                      <span className="text-white/70 font-medium truncate">Competitor mentions</span>
+                      <span className="text-[10px] text-white/70 font-extrabold bg-white/5 px-2 py-0.5 rounded">CLEARED</span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium relative z-10">
+                  <span className="text-[10px] text-white/70 font-medium relative z-10">
                     Reviews influencer uploads in parallel, flags legal risks and omissions.
                   </span>
                 </div>
@@ -254,7 +276,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">FTC Speech Audit</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">FTC Speech Audit</span>
                   </div>
                   
                   <div className="space-y-2.5 my-2 text-xs">
@@ -271,7 +293,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Speech-to-text analyzer flags structural liability.
                   </span>
                 </div>
@@ -283,7 +305,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Safety Indicators</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Safety Indicators</span>
                   </div>
 
                   <div className="flex items-center gap-4 my-2">
@@ -305,7 +327,7 @@ export function WhyTruthLayer() {
                       </svg>
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center leading-none">
                         <span className="text-[11px] font-extrabold text-white">94%</span>
-                        <span className="mt-0.5 text-[6.5px] font-extrabold tracking-wider text-white/40">SAFE</span>
+                        <span className="mt-0.5 text-[6.5px] font-extrabold tracking-wider text-white/70">SAFE</span>
                       </div>
                     </div>
 
@@ -316,7 +338,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Concentric scores visualizes real-time audit logs.
                   </span>
                 </div>
@@ -330,13 +352,13 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Network className="h-4 w-4 text-warn" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Narrative Intelligence</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Narrative Intelligence</span>
                     </div>
                     <span className="text-[10px] font-extrabold text-warn bg-warn/10 px-2 py-0.5 rounded">3 Active Topic Clusters</span>
                   </div>
 
                   <div className="my-2 h-14 relative flex items-center justify-center">
-                    <svg className="w-full h-full text-white/20" viewBox="0 0 380 60">
+                    <svg className="w-full h-full text-white/70" viewBox="0 0 380 60">
                       <path d="M 20 30 Q 80 5, 140 35 T 260 25 T 360 40" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
                       <path d="M 20 30 Q 80 5, 140 35 T 260 25 T 360 40" fill="none" stroke="url(#line-grad)" strokeWidth="2" strokeDasharray="6 4" />
                       
@@ -370,7 +392,7 @@ export function WhyTruthLayer() {
                     </svg>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Clusters topics across creator videos to flag campaign-wide contradictions.
                   </span>
                 </div>
@@ -384,7 +406,7 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSearch className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Active RAG Store</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Active RAG Store</span>
                     </div>
                     <span className="text-[9px] font-extrabold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-full">
                       pgvector index active
@@ -394,11 +416,11 @@ export function WhyTruthLayer() {
                   <div className="my-2.5 flex items-center justify-center relative h-12">
                     <div className="absolute w-[80%] h-9 rounded-xl bg-[#1e1e24] border border-white/5 p-2 flex items-center justify-between opacity-40 transform -translate-y-2 scale-[0.92] transition-all duration-300 group-hover:-translate-y-3">
                       <span className="text-xs font-semibold text-white truncate">Skincare_Regs_FTC.pdf</span>
-                      <span className="text-[8px] font-bold text-white/30">120 chunks</span>
+                      <span className="text-[8px] font-bold text-white/70">120 chunks</span>
                     </div>
                     <div className="absolute w-[86%] h-9 rounded-xl bg-[#1d1d22] border border-white/10 p-2 flex items-center justify-between opacity-70 transform -translate-y-1 scale-[0.96] transition-all duration-300 group-hover:-translate-y-1.5">
                       <span className="text-xs font-semibold text-white truncate">Marketing_Guidelines_V3.pdf</span>
-                      <span className="text-[8px] font-bold text-white/50">45 chunks</span>
+                      <span className="text-[8px] font-bold text-white/70">45 chunks</span>
                     </div>
                     <div className="absolute w-[92%] h-9 rounded-xl bg-[#26262b] border border-white/15 p-2.5 flex items-center justify-between shadow-lg transform translate-y-0 transition-all duration-300 group-hover:translate-y-1">
                       <span className="text-xs font-bold text-white truncate flex items-center gap-1.5">
@@ -408,7 +430,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Validates script claims against specifications using tenant-scoped retrieval.
                   </span>
                 </div>
@@ -420,7 +442,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2 relative z-10">
                     <Sparkle className="h-4 w-4 text-warn" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Perception Orb</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Perception Orb</span>
                   </div>
 
                   <div className="my-1.5 flex items-center justify-center relative h-16 w-full">
@@ -431,7 +453,7 @@ export function WhyTruthLayer() {
                     </span>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium relative z-10">
+                  <span className="text-[10px] text-white/70 font-medium relative z-10">
                     Identifies hyperbole or delivery triggers that threaten brand reputation.
                   </span>
                 </div>
@@ -440,7 +462,7 @@ export function WhyTruthLayer() {
             )}
 
             {activeTab === "creators" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
+              <div role="tabpanel" id="why-panel-creators" aria-labelledby="why-tab-creators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Video Pre-Flight Review */}
                 <div 
@@ -451,7 +473,7 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-2">
                       <Play className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Video Pre-Flight</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Video Pre-Flight</span>
                     </div>
                     <span className="text-[10px] font-extrabold text-good bg-good/10 px-2 py-0.5 rounded">Audit Ready</span>
                   </div>
@@ -471,7 +493,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium relative z-10">
+                  <span className="text-[10px] text-white/70 font-medium relative z-10">
                     Runs compliance audits on raw video files in under 60 seconds before upload.
                   </span>
                 </div>
@@ -483,7 +505,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-warn" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Speech Slip Detector</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Speech Slip Detector</span>
                   </div>
 
                   <div className="space-y-2.5 my-2.5 text-xs">
@@ -500,7 +522,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Flags absolute claims that could trigger sponsor issues.
                   </span>
                 </div>
@@ -512,7 +534,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Tonal Expression</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Tonal Expression</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 my-2 text-[10px] font-extrabold">
@@ -546,7 +568,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Measures bias and framing to guard against online backlash.
                   </span>
                 </div>
@@ -558,7 +580,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Box className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Contract Check</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Contract Check</span>
                   </div>
 
                   <div className="flex items-center gap-4 my-2">
@@ -572,12 +594,12 @@ export function WhyTruthLayer() {
 
                     <div className="space-y-0.5 text-[9px] font-extrabold">
                       <div className="text-white">COMPATIBLE</div>
-                      <div className="text-white/50">Competitor exclusions: Clear</div>
-                      <div className="text-white/50">Required hashtag: Present</div>
+                      <div className="text-white/70">Competitor exclusions: Clear</div>
+                      <div className="text-white/70">Required hashtag: Present</div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Cross-checks script transcripts with active sponsor guidelines.
                   </span>
                 </div>
@@ -589,7 +611,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-good" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Publisher Gate</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Publisher Gate</span>
                   </div>
 
                   <div className="space-y-1.5 my-2.5 text-[10px] font-bold text-white/90">
@@ -598,7 +620,7 @@ export function WhyTruthLayer() {
                     <div className="flex items-center gap-2"><div className="h-3.5 w-3.5 rounded bg-good/20 flex items-center justify-center text-good"><Check className="h-2.5 w-2.5" /></div> Sponsor Requirements met</div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Guarantees draft publication safety before going live.
                   </span>
                 </div>
@@ -612,7 +634,7 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Timeline Waveform</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Timeline Waveform</span>
                     </div>
                     <span className="text-[9px] font-extrabold text-bad bg-bad/10 px-2 py-0.5 rounded uppercase">
                       1 Audio slip flagged
@@ -642,7 +664,7 @@ export function WhyTruthLayer() {
                     })}
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Waveform map highlighting exact timestamps of compliance alerts.
                   </span>
                 </div>
@@ -651,7 +673,7 @@ export function WhyTruthLayer() {
             )}
 
             {activeTab === "viewers" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
+              <div role="tabpanel" id="why-panel-viewers" aria-labelledby="why-tab-viewers" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-[minmax(155px,auto)]">
                 
                 {/* Card 1: Video Search Console */}
                 <div 
@@ -661,7 +683,7 @@ export function WhyTruthLayer() {
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent pointer-events-none opacity-30" />
                   <div className="flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Link Verifier Console</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Link Verifier Console</span>
                   </div>
 
                   <div className="my-2.5 relative">
@@ -674,7 +696,7 @@ export function WhyTruthLayer() {
                       <span className="text-[10px] text-accent font-extrabold bg-accent/10 px-2.5 py-1 rounded-lg">VERIFY</span>
                     </div>
 
-                    <div className="flex items-center gap-3 mt-2 px-1 text-[9px] font-extrabold text-white/40">
+                    <div className="flex items-center gap-3 mt-2 px-1 text-[9px] font-extrabold text-white/70">
                       <span>Platform feeds:</span>
                       <span className="flex items-center gap-1 text-white/80"><span className="h-1.5 w-1.5 rounded-full bg-[#ff0000]" /> YouTube</span>
                       <span className="flex items-center gap-1 text-white/80"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> TikTok</span>
@@ -682,7 +704,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Paste public video links to instantly trigger our deep extraction pipelines.
                   </span>
                 </div>
@@ -694,7 +716,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2 relative z-10">
                     <Eye className="h-4 w-4 text-good" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Deepfake Scanner</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Deepfake Scanner</span>
                   </div>
 
                   <div className="my-1.5 flex items-center justify-center relative h-16 w-full">
@@ -709,7 +731,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium relative z-10">
+                  <span className="text-[10px] text-white/70 font-medium relative z-10">
                     Analyzes voice cloning, face swaps, and splicing artifacts.
                   </span>
                 </div>
@@ -721,7 +743,7 @@ export function WhyTruthLayer() {
                 >
                   <div className="flex items-center gap-2">
                     <Scale className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/50">Statement Registry</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/70">Statement Registry</span>
                   </div>
 
                   <div className="my-4 space-y-2.5 flex-1 overflow-hidden">
@@ -730,7 +752,7 @@ export function WhyTruthLayer() {
                         <span className="text-white/80 truncate max-w-[70%]">"100% natural ingredients"</span>
                         <span className="text-good bg-good/10 px-1.5 py-0.25 rounded text-[8px]">VERIFIED</span>
                       </div>
-                      <span className="text-[8.5px] text-white/40 font-medium leading-none">Citations present in FDA logs</span>
+                      <span className="text-[8.5px] text-white/70 font-medium leading-none">Citations present in FDA logs</span>
                     </div>
 
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all">
@@ -746,18 +768,18 @@ export function WhyTruthLayer() {
                         <span className="text-white/80 truncate max-w-[70%]">"Dermatologist tested"</span>
                         <span className="text-good bg-good/10 px-1.5 py-0.25 rounded text-[8px]">VERIFIED</span>
                       </div>
-                      <span className="text-[8.5px] text-white/40 font-medium leading-none">Medical approval certificate active</span>
+                      <span className="text-[8.5px] text-white/70 font-medium leading-none">Medical approval certificate active</span>
                     </div>
 
                     <div className="bg-[#18181c] border border-white/5 rounded-xl p-2.5 flex flex-col gap-1 hover:border-white/10 transition-all opacity-40">
                       <div className="flex items-center justify-between text-[10px] font-extrabold">
                         <span className="text-white/80 truncate">"Reduces dark spots"</span>
-                        <span className="text-white/30 bg-white/5 px-1.5 py-0.25 rounded text-[8px]">PENDING</span>
+                        <span className="text-white/70 bg-white/5 px-1.5 py-0.25 rounded text-[8px]">PENDING</span>
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Extracts every spoken assertion and provides evidence-backed verdicts.
                   </span>
                 </div>
@@ -771,7 +793,7 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSearch className="h-4 w-4 text-accent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Tavily Fact Check Engine</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Tavily Fact Check Engine</span>
                     </div>
                     <span className="text-[9px] font-extrabold text-[#2383e2] bg-[#2383e2]/10 border border-[#2383e2]/25 px-2.5 py-0.5 rounded-full animate-pulse">
                       Live Web RAG
@@ -793,7 +815,7 @@ export function WhyTruthLayer() {
                     </div>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Cross-references verbal statements with live clinical and legislative registries.
                   </span>
                 </div>
@@ -807,13 +829,13 @@ export function WhyTruthLayer() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Network className="h-4 w-4 text-good" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">Verification Map</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/70">Verification Map</span>
                     </div>
-                    <span className="text-[10px] font-extrabold text-white/50">Clip Timeline</span>
+                    <span className="text-[10px] font-extrabold text-white/70">Clip Timeline</span>
                   </div>
 
                   <div className="my-2 h-14 relative flex items-center justify-center">
-                    <svg className="w-full h-full text-white/20" viewBox="0 0 380 60">
+                    <svg className="w-full h-full text-white/70" viewBox="0 0 380 60">
                       <path d="M 15 30 L 100 30 L 180 30 L 280 30 L 365 30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" strokeLinecap="round" />
                       <path d="M 15 30 L 100 30 L 180 30 L 280 30 L 365 30" fill="none" stroke="url(#route-grad)" strokeWidth="2" />
                       
@@ -853,7 +875,7 @@ export function WhyTruthLayer() {
                     </svg>
                   </div>
 
-                  <span className="text-[10px] text-white/40 font-medium">
+                  <span className="text-[10px] text-white/70 font-medium">
                     Plots factual accuracy timeline and citation checkpoints.
                   </span>
                 </div>

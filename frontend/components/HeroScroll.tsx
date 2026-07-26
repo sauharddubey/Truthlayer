@@ -14,7 +14,7 @@ import {
  */
 export function HeroScroll() {
   const section = useRef<HTMLElement>(null);
-  const headline = useRef<HTMLDivElement>(null);
+  const headline = useRef<HTMLHeadingElement>(null);
   const phone = useRef<HTMLDivElement>(null);
   const left = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
@@ -90,11 +90,11 @@ export function HeroScroll() {
             style={{ background: "radial-gradient(circle,#e7f3fb,transparent 70%)" }} />
 
           <div className="relative mx-auto h-[640px] w-full max-w-6xl px-6">
-            {/* giant headline (behind) */}
-            <div ref={headline} className="pointer-events-none absolute inset-x-0 top-[45px] z-0 text-center font-heavy uppercase leading-[0.8] tracking-tight text-ink will-change-transform">
+            {/* giant headline (behind) — the page h1 on desktop */}
+            <h1 ref={headline} className="pointer-events-none absolute inset-x-0 top-[45px] z-0 text-center font-heavy uppercase leading-[0.8] tracking-tight text-ink will-change-transform">
               <span className="block text-[7rem] lg:text-[9rem]">Truth in</span>
               <span className="block text-[7rem] lg:text-[9rem]">every video</span>
-            </div>
+            </h1>
 
             {/* phone (front) — starts below the fold - Slimmed w-[260px] wrapper */}
             <div ref={phone} className="absolute left-1/2 top-[25px] z-20 w-[260px] will-change-transform" style={{ transform: "translate(-50%,520px) scale(0.8)" }}>

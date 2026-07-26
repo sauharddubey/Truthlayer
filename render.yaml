@@ -20,15 +20,16 @@ services:
         value: production
       - key: USE_CELERY
         value: "false"
-      - key: SECRET_KEY
-        generateValue: true
+      # Fernet key for encrypting per-user secrets + signing media URLs.
       - key: ENCRYPTION_KEY
         sync: false
       - key: SUPABASE_URL
         sync: false
       - key: DATABASE_URL
         sync: false
-      - key: LLM_API_KEY
+      # OPTIONAL: only needed so account erasure can also remove the Supabase auth
+      # identity. Leave unset to erase local data only.
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: LLM_BASE_URL
         value: https://openrouter.ai/api/v1
@@ -38,7 +39,8 @@ services:
         value: openai
       - key: EMBEDDINGS_DIM
         value: "1536"
-      - key: TAVILY_API_KEY
-        sync: false
       - key: BACKEND_CORS_ORIGINS
         sync: false
+    # NOTE: LLM / Tavily / media-integrity API keys are per-user (entered in the
+    # app's Settings, stored encrypted) — they are intentionally NOT deploy env
+    # vars. SECRET_KEY was unused and has been removed.

@@ -11,6 +11,11 @@ const base = {
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
   viewBox: "0 0 24 24",
+  // Icons are decorative by default: they sit next to visible text or inside a
+  // labelled control, so hide them from assistive tech (the accessible name
+  // comes from that text / the control's aria-label).
+  "aria-hidden": true,
+  focusable: false,
 };
 
 export const ArrowRight = ({ className }: P) => (

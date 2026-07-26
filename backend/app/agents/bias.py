@@ -7,7 +7,7 @@ reasoning and a 0-100 bias score (higher = more biased/manipulative).
 
 from __future__ import annotations
 
-from app.agents.base import AgentContext
+from app.agents.base import AgentContext, wrap_untrusted
 from app.llm import chat_json
 
 NAME = "bias"
@@ -42,7 +42,7 @@ def run(ctx: AgentContext) -> dict:
             "- 41-70: Significant bias, emotional appeals, sensational headlines, one-sided product hype, or partisan framing.\n"
             "- 71-100: Extreme manipulation, fear-mongering, active disinformation, or highly deceptive/hostile persuasive tactics."
         ),
-        user=ctx.transcript_text[:5000],
+        user=wrap_untrusted("video transcript", ctx.transcript_text[:5000]),
         schema_hint=_SCHEMA,
     )
     if not result:

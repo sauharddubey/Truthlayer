@@ -5,8 +5,10 @@
 :root {
   color-scheme: light;
   --ink: 55 53 47;
-  --ink-light: 120 119 116;
-  --ink-faint: 155 154 151;
+  /* Darkened to meet WCAG AA (4.5:1) on white while keeping the ink/light/faint
+     visual hierarchy: ink-light ≈ 6.4:1, ink-faint ≈ 4.5:1. */
+  --ink-light: 95 95 92;
+  --ink-faint: 118 117 113;
   --paper: 255 255 255;
   --sidebar: 251 251 250;
   --surface: 247 247 245;
@@ -23,7 +25,8 @@ html.dark {
   color-scheme: dark;
   --ink: 241 241 239;
   --ink-light: 151 150 147;
-  --ink-faint: 120 119 116;
+  /* Raised so faint body text clears WCAG AA (~5.2:1) on the dark paper. */
+  --ink-faint: 138 137 134;
   --paper: 25 25 25;
   --sidebar: 32 32 32;
   --surface: 37 37 37;
@@ -34,6 +37,26 @@ html.dark {
   --good: 46 168 153;
   --warn: 223 158 56;
   --bad: 226 88 88;
+}
+
+/* Skip-to-content link: visually hidden until it receives keyboard focus. */
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transform: translateY(-120%);
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 0.5rem 0;
+  background: rgb(var(--accent));
+  color: #fff;
+  font-weight: 600;
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 body {
@@ -257,6 +280,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Comprehensive reset: neutralize all animation / transition / auto-scroll so
+     nothing auto-moves for users who prefer reduced motion (WCAG 2.3.3, 2.2.2).
+     Covers Tailwind animate-* and every custom keyframe (radar, scanline, siri,
+     cursor, float-a/float-b, card-anim, …) without enumerating them. */
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
   .reveal, .word, .marquee-track, .aurora, .float-y, .spin-slow { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
 
