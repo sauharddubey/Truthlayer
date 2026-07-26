@@ -1,18 +1,20 @@
 """Tests for the safety / guardrails / compliance hardening pass."""
 
+import io
 import socket
+import zipfile
 
 import pytest
 
 from app.agents.base import clamp_score, sanitize_transcript, wrap_untrusted
 from app.llm import _extract_json
+from app.models import UserRole
 from app.schemas import ReportOut
 from app.security import _authoritative_role, role_is_locked
-from app.models import UserRole
 from app.services.ingestion import _safety_ydl_opts
 from app.services.video_cleanup import collect_media_paths
 from app.uploads import DOCUMENT_KINDS, IMAGE_KINDS, enforce_content_type
-from app.urlguard import UrlValidationError, validate_ingest_url
+from app.urlguard import UrlValidationError, guarded_resolution, validate_ingest_url
 
 
 # ── SSRF guard (urlguard) ─────────────────────────────────────────────────────
@@ -54,6 +56,36 @@ def test_ssrf_guard_blocks_allowlisted_host_resolving_private(monkeypatch):
     )
     with pytest.raises(UrlValidationError):
         validate_ingest_url("https://youtube.com/watch?v=abc")
+
+
+def test_guarded_resolution_allows_public_resolution(monkeypatch):
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("142.250.72.14", 443))],
+    )
+    with guarded_resolution():
+        socket.getaddrinfo("example.com", 443)
+
+
+def test_guarded_resolution_rejects_rebind_mid_context(monkeypatch):
+    # Simulates DNS rebinding: the URL passed the initial validate_ingest_url
+    # check, but a later resolution (e.g. yt-dlp's own, inside the guarded
+    # block) answers with a private address.
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("10.0.0.5", 443))],
+    )
+    with pytest.raises(UrlValidationError):
+        with guarded_resolution():
+            socket.getaddrinfo("evil.example.com", 443)
+
+
+def test_guarded_resolution_restores_getaddrinfo_on_exit():
+    original = socket.getaddrinfo
+    with pytest.raises(UrlValidationError):
+        with guarded_resolution():
+            socket.getaddrinfo("127.0.0.1", 80)
+    assert socket.getaddrinfo is original
 
 
 # ── Score clamping ────────────────────────────────────────────────────────────
@@ -126,6 +158,25 @@ def test_enforce_content_type_rejects_mismatch_allows_unknown():
     enforce_content_type(_PDF, DOCUMENT_KINDS, label="document")
     # Unidentifiable content (plain text, no signature) is allowed through.
     enforce_content_type(b"just some plain text", IMAGE_KINDS, label="image")
+
+
+def _zip_bytes(*names: str) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name in names:
+            zf.writestr(name, "content")
+    return buf.getvalue()
+
+
+def test_enforce_content_type_rejects_non_docx_zip_renamed_as_document():
+    # A bare zip (not an OOXML/docx package) must not pass as a document even
+    # though "zip" is in DOCUMENT_KINDS (needed for real DOCX detection).
+    with pytest.raises(Exception):
+        enforce_content_type(_zip_bytes("readme.txt"), DOCUMENT_KINDS, label="document")
+
+
+def test_enforce_content_type_allows_real_docx_zip():
+    enforce_content_type(_zip_bytes("word/document.xml"), DOCUMENT_KINDS, label="document")
 
 
 # ── Trusted-role sourcing ─────────────────────────────────────────────────────
