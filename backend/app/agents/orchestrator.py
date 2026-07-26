@@ -647,7 +647,7 @@ def _generate_summary_and_reasonings(
 
 
 def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
-    from app.llm import effective_media_integrity_key, effective_tavily_key
+    from app.llm import effective_media_integrity_key, effective_tavily_key, has_chat_key
 
     claims = fact.get("claims", []) or []
     claim_evidence_count = sum(1 for c in claims if c.get("evidence"))
@@ -667,6 +667,9 @@ def _diagnostics(video: Video, fact: dict, results: dict) -> dict:
         "retrieved_evidence_count": len(fact_retrieved),
         "no_retrieved_evidence": len(fact_retrieved) == 0,
         "tavily_configured": bool(effective_tavily_key()),
+        # Without a chat key every agent falls back to neutral defaults, which
+        # render as real 0/50 scores — the UI needs to be able to say so.
+        "llm_configured": has_chat_key(),
         "transcription_provider": metadata.get("transcription_provider"),
         "used_transcription_stub": bool(metadata.get("transcription_stub")),
         "agent_keys": sorted(k for k in results.keys() if k != "diagnostics"),

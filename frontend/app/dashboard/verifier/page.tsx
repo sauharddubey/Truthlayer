@@ -1,16 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getDashboard } from "@/lib/api";
+import { useRefetchOnVisible } from "@/lib/useRefetchOnVisible";
+import { useRoleGuard } from "@/lib/useRoleGuard";
 import { AppShell } from "@/components/AppShell";
 import { VideoBoard } from "@/components/VideoBoard";
 import { Scale } from "@/components/icons";
 
 export default function VerifierDashboard() {
+  const guardOk = useRoleGuard(["verifier"]);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
-  useEffect(() => { getDashboard("verifier").then(setData).catch((e) => setError(e.message)); }, []);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    getDashboard("verifier")
+      .then((d) => { setData(d); setError(""); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useRefetchOnVisible(load);
 
   const videos = data?.videos || [];
   const removeVideo = (videoId: string) => {
@@ -19,6 +32,14 @@ export default function VerifierDashboard() {
       videos: (current?.videos || []).filter((v: any) => v.video_id !== videoId),
     }));
   };
+
+  if (!guardOk) {
+    return (
+      <AppShell title="My checks" wide>
+        <div className="flex items-center justify-center py-24"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="My checks" wide>
@@ -29,7 +50,7 @@ export default function VerifierDashboard() {
         </Link>
       </div>
       {error && <p className="mb-4 rounded-lg border border-bad/20 bg-bad/5 px-3 py-2 text-sm text-bad">{error}</p>}
-      <VideoBoard videos={videos} variant="verifier" onDeleted={removeVideo} />
+      <VideoBoard videos={videos} variant="verifier" onDeleted={removeVideo} loading={loading} searchable={videos.length > 6} />
     </AppShell>
   );
 }

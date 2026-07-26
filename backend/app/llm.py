@@ -85,6 +85,15 @@ def effective_chat_key() -> str:
     return key
 
 
+def has_chat_key() -> bool:
+    """Non-raising variant of :func:`effective_chat_key`.
+
+    Without a chat key every agent degrades to neutral defaults, so callers
+    (diagnostics, reporting) need to test for the key without blowing up.
+    """
+    return bool(_runtime_api_key.get())
+
+
 def effective_embeddings_key() -> str:
     # OpenRouter serves embeddings with the same per-user OpenRouter key.
     return effective_chat_key()
