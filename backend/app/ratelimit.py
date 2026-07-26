@@ -1,7 +1,7 @@
 """Rate limiting (slowapi) for abuse / cost / DoS protection.
 
 Only the expensive endpoints (video upload, URL submit, analysis start, document
-indexing, narrative/contradiction recompute) are decorated with
+indexing, narrative/contradiction recompute, PDF export) are decorated with
 ``@limiter.limit(settings.RATE_LIMIT_EXPENSIVE)`` — we deliberately do NOT install
 a global default limit so ordinary GET/polling traffic (dashboards, analysis
 progress polling) is never throttled.

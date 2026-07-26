@@ -1,6 +1,6 @@
 """Report export endpoints (§9 Reports, FR-DASH-004)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from app.api.videos import _get_scoped
 from app.audit import record_audit
 from app.database import get_db
 from app.models import User
+from app.ratelimit import EXPENSIVE, limiter
 from app.schemas import AnalysisOut
 from app.security import get_current_user
 from app.services.reports import build_pdf
@@ -23,7 +24,8 @@ def report_json(video_id: str, db: Session = Depends(get_db), user: User = Depen
 
 
 @router.get("/{video_id}/pdf")
-def report_pdf(video_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+@limiter.limit(EXPENSIVE)
+def report_pdf(request: Request, video_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     video = _get_scoped(db, video_id, user)
     if not video.report:
         raise HTTPException(status_code=409, detail="Analysis not completed yet")
