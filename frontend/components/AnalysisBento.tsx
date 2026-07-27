@@ -558,10 +558,8 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
           </Block>
         )}
 
-        {/* VIDEO SEGMENT ANALYSIS (Music + OCR only) */}
-        {ocr?.ocr_analysis?.video_segment_analysis?.length > 0 &&
-          (ocr.ocr_analysis.relationship_verdict === "unrelated" ||
-            ocr.ocr_analysis.relationship_verdict === "partially_related") && (
+        {/* VIDEO SEGMENT ANALYSIS */}
+        {ocr?.ocr_analysis?.video_segment_analysis?.length > 0 && (
           <Block
             label="Video Segment Analysis"
             icon={<Eye className="h-3.5 w-3.5" />}
@@ -570,7 +568,7 @@ export function AnalysisBento({ video, report, claims, isBusiness, isProduct, on
             onClick={() => setActiveModal("Video Segment Analysis")}
           >
             <div className="text-[10px] text-ink-light mb-3 leading-relaxed">
-              Visual action summary for overlay text segments (only music/unrelated speech detected).
+              Visual action and frame summary for overlay text segments.
             </div>
             <div className="flex-1 space-y-2 overflow-hidden">
               {ocr.ocr_analysis.video_segment_analysis.slice(0, 4).map((item: any, i: number) => (
