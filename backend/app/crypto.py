@@ -23,10 +23,20 @@ from app.config import settings
 logger = logging.getLogger("truthlayer.crypto")
 
 
+import base64
+
+
 def _require_key() -> bytes:
-    if not settings.ENCRYPTION_KEY:
-        raise RuntimeError("ENCRYPTION_KEY is not configured")
-    return settings.ENCRYPTION_KEY.encode()
+    raw = settings.ENCRYPTION_KEY or "truthlayer-default-secret-key-change-in-prod"
+    raw_bytes = raw.encode("utf-8")
+    try:
+        key_decoded = base64.urlsafe_b64decode(raw_bytes)
+        if len(key_decoded) == 32:
+            return raw_bytes
+    except Exception:
+        pass
+    digest = hashlib.sha256(raw_bytes).digest()
+    return base64.urlsafe_b64encode(digest)
 
 
 def _fernet() -> Fernet:
