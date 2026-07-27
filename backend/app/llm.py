@@ -107,8 +107,14 @@ def effective_media_integrity_key() -> Optional[str]:
     return _runtime_media_integrity_key.get()
 
 
+FALLBACK_LLM_MODEL = "google/gemini-2.5-flash-lite"
+
+
 def effective_llm_model() -> str:
-    return _runtime_llm_model.get() or settings.LLM_MODEL
+    model = _runtime_llm_model.get() or settings.LLM_MODEL
+    if not model or "gpt-oss-120b" in model:
+        return FALLBACK_LLM_MODEL
+    return model
 
 
 def effective_embeddings_model() -> str:
@@ -140,40 +146,32 @@ _client_cache: "OrderedDict[tuple, OpenAI]" = OrderedDict()
 _CLIENT_CACHE_MAX = 128
 
 
-def _client(api_key: str, base_url: str) -> Optional[OpenAI]:
+def _client(api_key: Optional[str], base_url: str) -> Optional[OpenAI]:
     if not api_key:
         return None
     cache_key = (api_key, base_url)
-    client = _client_cache.get(cache_key)
-    if client is None:
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            default_headers=_DEFAULT_HEADERS,
-            timeout=settings.LLM_REQUEST_TIMEOUT_SECONDS,
-        )
-        _client_cache[cache_key] = client
-        if len(_client_cache) > _CLIENT_CACHE_MAX:
-            _client_cache.popitem(last=False)  # evict least-recently-used
-    else:
+    if cache_key in _client_cache:
         _client_cache.move_to_end(cache_key)
-    return client
+        return _client_cache[cache_key]
+
+    c = OpenAI(api_key=api_key, base_url=base_url, default_headers=_DEFAULT_HEADERS)
+    _client_cache[cache_key] = c
+    if len(_client_cache) > _CLIENT_CACHE_MAX:
+        _client_cache.popitem(last=False)
+    return c
 
 
 # ── OpenRouter published pricing (USD per 1M tokens) ────────────────────────
 # Only models explicitly used by TruthLayer are listed; everything else falls
 # back to the free-model rate (0.0). Values from openrouter.ai/models.
 _MODEL_PRICE: dict[str, tuple[float, float]] = {
-    # model_id: (prompt_per_1M, completion_per_1M)
-    "openai/gpt-4o":                    (5.00,   15.00),
+    "openai/gpt-4o":                    (2.50,   10.00),
     "openai/gpt-4o-mini":               (0.15,    0.60),
     "openai/gpt-4-turbo":               (10.00,  30.00),
     "openai/gpt-3.5-turbo":             (0.50,   1.50),
     "google/gemini-2.5-flash-lite":     (0.075,  0.30),
     "anthropic/claude-3.5-sonnet":      (3.00,   15.00),
     "anthropic/claude-3-haiku":         (0.25,   1.25),
-    "google/gemini-2.5-flash-lite":     (0.075,  0.30),
-    "google/gemini-2.0-flash-001":      (0.10,   0.40),
     "meta-llama/llama-3.1-8b-instruct:free": (0.0, 0.0),
     "openai/text-embedding-3-small":    (0.02,   0.0),
 }
@@ -232,8 +230,8 @@ def chat_json(system: str, user: str, *, schema_hint: str = "", max_tokens: Opti
             "\n\nRespond with ONLY a valid JSON object matching this shape:\n"
             f"{schema_hint}\nDo not include markdown fences or commentary."
         )
+    llm_model = effective_llm_model()
     try:
-        llm_model = effective_llm_model()
         resp = client.chat.completions.create(
             model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
@@ -243,7 +241,6 @@ def chat_json(system: str, user: str, *, schema_hint: str = "", max_tokens: Opti
                 {"role": "user", "content": user},
             ],
         )
-        # Record usage
         if resp.usage:
             _record_usage(
                 "chat", llm_model,
@@ -251,7 +248,26 @@ def chat_json(system: str, user: str, *, schema_hint: str = "", max_tokens: Opti
             )
         return _extract_json(resp.choices[0].message.content or "")
     except Exception as exc:  # pragma: no cover
-        logger.exception("LLM chat_json failed: %s", exc)
+        logger.warning("LLM chat_json failed for model %s: %s. Attempting fallback.", llm_model, exc)
+        if llm_model != FALLBACK_LLM_MODEL:
+            try:
+                resp = client.chat.completions.create(
+                    model=FALLBACK_LLM_MODEL,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user},
+                    ],
+                )
+                if resp.usage:
+                    _record_usage(
+                        "chat", FALLBACK_LLM_MODEL,
+                        resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                    )
+                return _extract_json(resp.choices[0].message.content or "")
+            except Exception as fb_exc:
+                logger.exception("LLM chat_json fallback failed: %s", fb_exc)
         return {}
 
 
@@ -259,8 +275,8 @@ def chat_text(system: str, user: str, *, max_tokens: Optional[int] = None) -> st
     client = _client(effective_chat_key(), settings.LLM_BASE_URL)
     if client is None:
         return ""
+    llm_model = effective_llm_model()
     try:
-        llm_model = effective_llm_model()
         resp = client.chat.completions.create(
             model=llm_model,
             temperature=settings.LLM_TEMPERATURE,
@@ -277,7 +293,26 @@ def chat_text(system: str, user: str, *, max_tokens: Optional[int] = None) -> st
             )
         return resp.choices[0].message.content or ""
     except Exception as exc:  # pragma: no cover
-        logger.exception("LLM chat_text failed: %s", exc)
+        logger.warning("LLM chat_text failed for model %s: %s. Attempting fallback.", llm_model, exc)
+        if llm_model != FALLBACK_LLM_MODEL:
+            try:
+                resp = client.chat.completions.create(
+                    model=FALLBACK_LLM_MODEL,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                )
+                if resp.usage:
+                    _record_usage(
+                        "chat", FALLBACK_LLM_MODEL,
+                        resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                    )
+                return resp.choices[0].message.content or ""
+            except Exception as fb_exc:
+                logger.exception("LLM chat_text fallback failed: %s", fb_exc)
         return ""
 
 
