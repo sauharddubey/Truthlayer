@@ -91,6 +91,25 @@ In an era dominated by rapid synthetic media generation and high-velocity social
 
 ---
 
+## Production Deployment & Deployed Service Endpoints
+
+TruthLayer is engineered for zero-maintenance serverless/cloud deployment across free and low-cost enterprise tiers.
+
+### Production Service Endpoint Mapping
+
+| Service Layer | Provider Platform | Environment Variable Reference | Production Endpoint Mapping |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App** | Vercel | `NEXT_PUBLIC_API_URL` | Deployed Next.js App Router domain |
+| **Backend REST API** | Render / Railway | `BACKEND_CORS_ORIGINS` | Deployed FastAPI OpenAPI domain (`/docs`) |
+| **PostgreSQL & Vector Store**| Supabase / Neon | `DATABASE_URL` | PostgreSQL pooler endpoint (`sslmode=require`) |
+| **Authentication Service** | Supabase Auth | `NEXT_PUBLIC_SUPABASE_URL` | Supabase GoTrue JWKS endpoint |
+| **Cache & Task Broker** | Upstash Redis | `REDIS_URL` | Serverless Redis broker |
+| **LLM & Audio Engine** | OpenRouter | `LLM_BASE_URL` | Unified OpenRouter OpenAI-compatible API |
+
+For detailed step-by-step instructions on deploying the backend on Render and the frontend on Vercel, consult [`documentation/deployment_docs/DEPLOYMENT.md`](documentation/deployment_docs/DEPLOYMENT.md).
+
+---
+
 ## System User Categories & Capabilities
 
 TruthLayer strictly segments user permissions and analytical tools across three primary user roles:
