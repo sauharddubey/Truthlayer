@@ -29,8 +29,7 @@ This guide deploys TruthLayer entirely on free tiers.
 
    Use this as `DATABASE_URL`.
 
-> Neon works identically — copy its connection string and prefix with
-> `postgresql+psycopg://`.
+> For access to shared production database connection strings, Supabase credentials, or deployment keys, please contact the development team / group maintainers directly.
 
 ## 2. LLM + transcription keys (OpenRouter)
 

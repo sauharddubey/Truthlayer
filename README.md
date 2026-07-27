@@ -18,6 +18,8 @@ In an era dominated by rapid synthetic media generation and high-velocity social
 6. **Live Evidence Retrieval**: Validates external claims against current Web data using Tavily Search API.
 7. **Explainable Report Generation**: Aggregates agent findings, confidence metrics, and evidence citations into downloadable PDF reports and interactive web dashboards.
 
+> **Database Credentials & Shared Access**: For database connection credentials (`DATABASE_URL`), Supabase keys, or shared production deployment configuration, please contact the development team / group maintainers directly.
+
 ---
 
 ## Architecture Overview

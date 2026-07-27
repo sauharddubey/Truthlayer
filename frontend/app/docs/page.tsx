@@ -244,6 +244,13 @@ export default function DocsPage() {
                 Your files never leak to external tenants.
               </p>
             </div>
+
+            <div className="card border-accent/30 bg-accent/5">
+              <h3 className="font-bold text-ink text-sm mb-2">Database Credentials</h3>
+              <p className="text-xs text-ink-light leading-relaxed">
+                For shared database connection strings, Supabase environment credentials, or production deployment keys, please contact the development team directly.
+              </p>
+            </div>
           </div>
         </div>
       ) : (
