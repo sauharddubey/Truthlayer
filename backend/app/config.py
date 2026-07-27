@@ -118,6 +118,19 @@ class Settings(BaseSettings):
     # Hang guard for the OCR keyframe-extraction ffmpeg call.
     FFMPEG_TIMEOUT_SECONDS: int = 600
 
+    # ── yt-dlp anti-bot (datacenter-IP evasion) ───────────────────────────
+    # YouTube (and increasingly TikTok/Instagram) block downloads from cloud /
+    # datacenter IPs with bot-detection — so ingestion works locally (residential
+    # IP) but fails on Render/Fly/etc. Client spoofing alone does NOT defeat this;
+    # a trusted identity is required. Set one (or both) of the following:
+    #   YTDLP_COOKIES_FILE — path to a Netscape-format cookies.txt exported from a
+    #     logged-in browser (on Render: add as a Secret File and point here).
+    #   YTDLP_PROXY — http(s)/socks proxy URL (ideally residential) that yt-dlp
+    #     routes ALL requests through, e.g. http://user:pass@host:port.
+    # Both are empty by default (no behavior change until configured).
+    YTDLP_COOKIES_FILE: str = ""
+    YTDLP_PROXY: str = ""
+
     # ── LLM guardrails (cost / DoS / latency) ─────────────────────────────
     # Generous default so normal structured outputs (claim lists, contradiction
     # reports, summaries) are never truncated, while still bounding a runaway

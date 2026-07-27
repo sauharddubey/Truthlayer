@@ -298,7 +298,9 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
         compliance_score = None
         authenticity_pct = None
     else:
-        trust = compute_tier_trust_score(fact, bias_r, mi, tier=tier)
+        trust, scoring_breakdown = compute_tier_trust_score(
+            fact, bias_r, mi, comp=comp, perc=perc, risk=cr, tier=tier
+        )
         authenticity_val = authenticity if authenticity is not None else 1.0
         authenticity_pct = authenticity_val * 100
         # Overall risk: blend creator-risk, bias, (100 - compliance), perception harm
@@ -310,15 +312,6 @@ def _fuse_and_score(db: Session, video: Video, results: Dict[str, dict]) -> Anal
             perception_harm,
             risky_ratio,
         )
-        scoring_breakdown = {
-            "mode": tier,
-            "insufficient_claims": trust is None,
-            "trust_components": {
-                "claim_verdict_weighted": trust,
-                "bias_penalty_pct": round(((bias_score or 0.0) / 100) * 30, 2),
-                "authenticity_multiplier": round(authenticity_val, 3),
-            },
-        }
 
     confidences = [
         _as_float(r.get("confidence")) for r in results.values() if r.get("confidence") is not None
