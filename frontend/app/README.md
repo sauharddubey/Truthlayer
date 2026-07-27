@@ -22,6 +22,15 @@ This directory contains the route components, page layouts, global styling rules
 | `/terms` | `terms/page.tsx` | Terms of service and platform acceptable use policy. |
 | `/docs` | `docs/page.tsx` | Interactive platform user manual and API usage documentation. |
 
+## Business Scoring Breakdown Display (`/analysis/[id]`)
+
+The interactive analysis workspace (`/analysis/[id]`) consumes the backend `AnalysisReport` response and renders sub-scores across the Bento board:
+* **Product Knowledge Base Compliance (35% Weight)**: Displayed on claim badges and verification status pills.
+* **Factual Accuracy (25% Weight)**: Displayed on the Fact-Check claims card.
+* **Regulatory Compliance (25% Weight)**: Displayed on the Marketing & Disclaimer Compliance card.
+* **Brand Safety & Bias (15% Weight)**: Rendered on Perception and Bias analysis cards.
+* **Media Authenticity Multiplier**: Displayed on the Authenticity & Deepfake card.
+
 ## Layouts & Global Styles
 
 * **`layout.tsx`**: Root HTML layout embedding primary fonts (`Inter`, `Anton`, `Fraunces`), setting metadata, and wrapping the app in global context providers.
