@@ -131,6 +131,32 @@ TruthLayer strictly segments user permissions and analytical tools across three 
 
 ---
 
+## Multi-Tier Mathematical Scoring Engine
+
+TruthLayer evaluates content using role-tailored mathematical scoring formulas:
+
+### A. Business Tier Trust Score (5-Dimensional Composite)
+Evaluates marketing assets across product knowledge base compliance, web factual accuracy, regulatory marketing compliance, brand safety/bias, and deepfake media authenticity:
+
+$$\text{Business Trust Score} = \left(0.35 \cdot S_{\text{kb}} + 0.25 \cdot S_{\text{fact}} + 0.25 \cdot S_{\text{comp}} + 0.15 \cdot S_{\text{brand}}\right) \cdot S_{\text{authenticity}}$$
+
+* **Product KB Compliance ($S_{\text{kb}}$, 35%)**: Claim alignment against uploaded spec sheets and brand policies (`auto_verified`: 100%, `approved`: 100%, `needs_review`: 55%, `contradicted`/`rejected`: 0%).
+* **Factual Accuracy ($S_{\text{fact}}$, 25%)**: Fact-checks claims against external web evidence via Tavily search.
+* **Regulatory Compliance ($S_{\text{comp}}$, 25%)**: FTC disclosures, disclaimers, and prohibited claim checks.
+* **Brand Safety ($S_{\text{brand}}$, 15%)**: Penalizes bias and perception harm index.
+* **Authenticity Multiplier ($S_{\text{authenticity}}$)**: Scales by visual/audio deepfake manipulation score (0.0 to 1.0).
+
+### B. Creator Tier Trust Score (Pre-Publication Audit)
+$$\text{Creator Trust Score} = \left(0.40 \cdot S_{\text{fact}} + 0.30 \cdot S_{\text{brand}} + 0.30 \cdot S_{\text{risk}}\right) \cdot S_{\text{authenticity}}$$
+
+### C. Verifier Tier Trust Score (Fact-Checking Core)
+$$\text{Verifier Trust Score} = \text{Verdict Base} \times \text{Coverage Multiplier} \times \text{URL Quality} \times \text{Rerank Quality} \times \text{Confidence Factor}$$
+
+### D. Scientific Honesty: 0 Claims Rule
+If a video contains 0 verifiable factual claims (e.g., ambient music, scenery), the Trust Score returns `None` (`·` / insufficient claims) to avoid returning misleading scores for unverified content.
+
+---
+
 ## The 11 AI Agents Fleet
 
 The core analytical pipeline relies on 11 specialized agent modules residing under `backend/app/agents/`:

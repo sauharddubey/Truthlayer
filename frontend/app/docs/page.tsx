@@ -145,27 +145,74 @@ export default function DocsPage() {
 
             {/* Section 3: Metric Formulas */}
             <section className="glass-tile p-6">
-              <h2 className="font-display text-xl font-bold text-ink mb-4">How Scores are Calculated</h2>
+              <h2 className="font-display text-xl font-bold text-ink mb-4">Multi-Tier Scoring Mechanisms</h2>
               
-              <div className="space-y-4 text-sm text-ink">
-                <div>
-                  <h3 className="font-bold text-ink text-base">🛡️ Trust Score (0-100)</h3>
-                  <p className="text-xs text-ink-light mt-1 leading-relaxed">
-                    The overall trust metric is derived from the fact-check claim verdicts. Supported claims score 1.0, unverified 0.5, misleading 0.15, and contradicted 0.0. This base average is penalized by the bias index and multiplied by media authenticity (deepfake probability inverse).
+              <div className="space-y-6 text-sm text-ink">
+                {/* Business Tier */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-ink text-base">🏢 Business Tier Trust Score</h3>
+                    <span className="chip border-accent/25 bg-accent/5 text-accent font-bold">Multi-Dimensional Audit</span>
+                  </div>
+                  <p className="text-xs text-ink-light leading-relaxed">
+                    Evaluates marketing assets across 5 distinct dimensions rather than relying solely on uploaded knowledge base documents:
                   </p>
+                  <ul className="text-xs text-ink-light space-y-1 pl-4 list-disc">
+                    <li><strong>Product Knowledge Base Compliance (35% Weight)</strong>: Verification of claims against company specs, manuals, and marketing guidelines (<code className="text-accent font-mono">auto_verified</code>: 100%, <code className="text-accent font-mono">approved</code>: 100%, <code className="text-warn font-mono">needs_review</code>: 55%, <code className="text-bad font-mono">contradicted</code>: 0%).</li>
+                    <li><strong>Factual Accuracy (25% Weight)</strong>: Verification of factual statements against external web evidence gathered via Tavily search (<code className="text-good font-mono">supported</code>: 100%, <code className="text-ink-light font-mono">unverified</code>: 50%, <code className="text-warn font-mono">misleading</code>: 15%, <code className="text-bad font-mono">contradicted</code>: 0%).</li>
+                    <li><strong>Regulatory &amp; Marketing Compliance (25% Weight)</strong>: Evaluates FTC disclosure requirements, legal disclaimers, and prohibited claims via the <code className="font-mono">compliance</code> agent.</li>
+                    <li><strong>Brand Safety &amp; Bias (15% Weight)</strong>: Penalizes bias index and perception harm index to safeguard corporate reputation.</li>
+                    <li><strong>Media Authenticity Multiplier</strong>: Multiplies the composite base by deepfake and visual manipulation analysis (<code className="font-mono text-good">authenticity_score</code> from 0.0 to 1.0).</li>
+                  </ul>
+                  <div className="mt-2 rounded-lg bg-ink/5 p-2 font-mono text-[11px] text-ink">
+                    Business Trust Score = (0.35 * S_kb + 0.25 * S_fact + 0.25 * S_comp + 0.15 * S_brand) * S_authenticity
+                  </div>
                 </div>
                 
-                <div>
-                  <h3 className="font-bold text-ink text-base">⚠️ Risk Score (0-100)</h3>
-                  <p className="text-xs text-ink-light mt-1 leading-relaxed">
-                    Calculated by averaging Creator Risk, Bias severity, Perception sensitivity harm, the ratio of segments labeled "risky" by the content classifier, and the compliance penalty (100 - compliance score).
+                {/* Creator Tier */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-ink text-base">🎨 Creator Tier Trust Score</h3>
+                    <span className="chip border-good/25 bg-good/5 text-good font-bold">Pre-Publication Check</span>
+                  </div>
+                  <p className="text-xs text-ink-light leading-relaxed">
+                    Designed for content creators to pre-check videos before publishing:
                   </p>
+                  <ul className="text-xs text-ink-light space-y-1 pl-4 list-disc">
+                    <li><strong>Factual Statement Integrity (40% Weight)</strong>: Core fact-check accuracy across extracted claims.</li>
+                    <li><strong>Brand Safety &amp; Perception (30% Weight)</strong>: Audience perception check, toxic phrasing avoidance, and emotional bias.</li>
+                    <li><strong>Platform Risk Index (30% Weight)</strong>: Adherence to YouTube / TikTok community guidelines and terms-of-service safety.</li>
+                  </ul>
+                  <div className="mt-2 rounded-lg bg-ink/5 p-2 font-mono text-[11px] text-ink">
+                    Creator Trust Score = (0.40 * S_fact + 0.30 * S_brand + 0.30 * S_risk) * S_authenticity
+                  </div>
                 </div>
 
-                <div>
-                  <h3 className="font-bold text-ink text-base">🔒 Compliance Score (0-100)</h3>
-                  <p className="text-xs text-ink-light mt-1 leading-relaxed">
-                    Grades adherence to advertising guidelines. Severe alerts (unsubstantiated medical claims or missing #ad disclosures) heavily lower this score.
+                {/* Verifier Tier */}
+                <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-ink text-base">🔍 Verifier Tier Trust Score</h3>
+                    <span className="chip border-warn/25 bg-warn/5 text-warn font-bold">Fact-Checking Core</span>
+                  </div>
+                  <p className="text-xs text-ink-light leading-relaxed">
+                    Deep factual verification weighted by evidence coverage and citation quality:
+                  </p>
+                  <ul className="text-xs text-ink-light space-y-1 pl-4 list-disc">
+                    <li><strong>Verdict Base Score</strong>: Weighted average of claim verdicts (<code className="text-good font-mono">supported</code>: 1.0, <code className="text-ink-light font-mono">unverified</code>: 0.5, <code className="text-warn font-mono">misleading</code>: 0.15, <code className="text-bad font-mono">contradicted</code>: 0.0).</li>
+                    <li><strong>Evidence Coverage Multiplier</strong>: (0.55 + 0.45 * Coverage %) based on Tavily web snippet retrieval.</li>
+                    <li><strong>Citation Quality Multiplier</strong>: (0.7 + 0.3 * URL Ratio) rewarding claims backed by live external sources.</li>
+                    <li><strong>Confidence Factor</strong>: Average model extraction confidence across claim statements.</li>
+                  </ul>
+                  <div className="mt-2 rounded-lg bg-ink/5 p-2 font-mono text-[11px] text-ink">
+                    Verifier Trust Score = Verdict Base * Coverage * Quality * Rerank Quality * Confidence
+                  </div>
+                </div>
+
+                {/* Insufficient Claims Rule */}
+                <div className="rounded-xl border border-line bg-sidebar p-4 space-y-1.5">
+                  <h4 className="font-bold text-ink text-xs uppercase tracking-wider">Scientific Honesty: 0 Claims Rule</h4>
+                  <p className="text-xs text-ink-light leading-relaxed">
+                    If a video contains 0 verifiable factual claims (e.g. ambient music, visual footage, or purely subjective commentary), the Trust Score returns <code className="font-mono text-ink">None</code> (rendered as <code className="font-mono text-ink font-bold">·</code> with an <code className="font-mono text-warn font-bold">insufficient claims</code> badge). Falsely returning 100% or 50% for unchecked content is avoided to maintain scientific rigor.
                   </p>
                 </div>
               </div>
