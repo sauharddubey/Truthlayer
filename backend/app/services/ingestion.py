@@ -211,9 +211,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
     try:
         import yt_dlp  # imported lazily so the module loads without the binary
 
-        ydl_opts = {
-            # Download low-res video (max 360p height) to keep it fast & deployable on free tiers
-            "format": "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/worst",
+        base_opts = {
             "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
             "quiet": True,
             "no_warnings": True,
@@ -229,41 +227,57 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
                     "nopostoverwrites": False,
                 }
             ],
-            "keepvideo": True,
             **_safety_ydl_opts(),
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl, guarded_resolution():
-            info = ydl.extract_info(url, download=True)
-            vid_id = info.get("id")
-            audio_path = str(out_dir / f"{vid_id}.mp3")
-            
-            # Find the preserved video file among candidate video extensions
-            for ext in [".mp4", ".webm", ".mkv", ".avi", ".mov", ".m4v"]:
-                candidate = str(out_dir / f"{vid_id}{ext}")
-                if os.path.exists(candidate):
-                    video_path = candidate
-                    break
 
-            meta = {
-                "title": info.get("title"),
-                "creator_handle": info.get("uploader") or info.get("channel"),
-                "duration_seconds": info.get("duration"),
-                "view_count": info.get("view_count"),
-                "like_count": info.get("like_count"),
-                "upload_date": info.get("upload_date"),
-                "description": info.get("description"),
+        # Primary attempt: try audio/video bundle first
+        ydl_opts = {
+            **base_opts,
+            "format": "bestaudio/best/bestvideo[height<=360]+bestaudio/worst",
+            "keepvideo": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl, guarded_resolution():
+                info = ydl.extract_info(url, download=True)
+        except Exception as primary_exc:
+            logger.warning("Primary yt-dlp download failed for %s: %s. Attempting audio-only fallback.", url, primary_exc)
+            fallback_opts = {
+                **base_opts,
+                "format": "bestaudio/best",
+                "keepvideo": False,
             }
-            # Record the actual on-disk files so cleanup_video_media can remove
-            # them on delete / retention purge (previously the mp3 + 360p mp4
-            # were orphaned because they were never referenced in extra_metadata).
-            media_paths = [
-                p for p in (audio_path, video_path)
-                if p and os.path.exists(p)
-            ]
-            if audio_path and os.path.exists(audio_path):
-                meta["audio_path"] = audio_path
-            if video_path and os.path.exists(video_path):
-                meta["video_path"] = video_path
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl, guarded_resolution():
+                info = ydl.extract_info(url, download=True)
+
+        vid_id = info.get("id")
+        audio_path = str(out_dir / f"{vid_id}.mp3")
+        
+        # Find the preserved video file among candidate video extensions
+        for ext in [".mp4", ".webm", ".mkv", ".avi", ".mov", ".m4v"]:
+            candidate = str(out_dir / f"{vid_id}{ext}")
+            if os.path.exists(candidate):
+                video_path = candidate
+                break
+
+        meta = {
+            "title": info.get("title"),
+            "creator_handle": info.get("uploader") or info.get("channel"),
+            "duration_seconds": info.get("duration"),
+            "view_count": info.get("view_count"),
+            "like_count": info.get("like_count"),
+            "upload_date": info.get("upload_date"),
+            "description": info.get("description"),
+        }
+        media_paths = [
+            p for p in (audio_path, video_path)
+            if p and os.path.exists(p)
+        ]
+        if audio_path and os.path.exists(audio_path):
+            meta["audio_path"] = audio_path
+        if video_path and os.path.exists(video_path):
+            meta["video_path"] = video_path
+
         if include_video and vid_id:
             hive_video_path = _download_url_video(url, out_dir, vid_id)
             if hive_video_path:
@@ -272,10 +286,9 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
                 if hive_video_path not in media_paths:
                     media_paths.append(hive_video_path)
         if media_paths:
-            # De-duplicate while preserving order; consumed by video_cleanup.
             meta["media_paths"] = list(dict.fromkeys(media_paths))
     except Exception as exc:
-        logger.warning("yt-dlp ingestion failed for %s: %s", url, exc)
+        logger.warning("yt-dlp ingestion failed completely for %s: %s", url, exc)
         meta = {"title": f"Video from {platform}", "ingest_error": str(exc)}
 
     return IngestResult(
