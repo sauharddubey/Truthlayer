@@ -44,22 +44,33 @@ instead, set `EMBEDDINGS_PROVIDER=openai`, the key/base, and `EMBEDDINGS_DIM=153
 
 ## 3. Backend (Render)
 
-1. Push this repo to GitHub.
-2. Render → **New → Blueprint** → pick the repo (uses [`render.yaml`](../render.yaml)).
-3. Fill the `sync:false` env vars: `DATABASE_URL`, `LLM_API_KEY`,
-   `TAVILY_API_KEY` (optional), and `BACKEND_CORS_ORIGINS` (your Vercel URL).
-4. Deploy. Health check: `GET /health`.
+Production URL: `https://truthlayer-backend-spcp.onrender.com`
 
-> Free Render web services sleep after inactivity and cold-start in ~30s. The
-> first analysis after a sleep includes that wake time. The local-embeddings model
-> also downloads (~90MB) on first boot — keep the instance warm or switch to OpenAI
-> embeddings to avoid the download on a memory-constrained free dyno.
+1. Push this repo to GitHub.
+2. Render → **New → Blueprint** → select this repo (uses [`render.yaml`](../../render.yaml)).
+3. Verify environment variables in the Render Dashboard:
+   * `ENVIRONMENT`: `production`
+   * `DATABASE_URL`: `<your-supabase-postgres-connection-string>`
+   * `ENCRYPTION_KEY`: `<32-byte-fernet-secret-key>`
+   * `SUPABASE_URL`: `https://<your-project-ref>.supabase.co`
+   * `BACKEND_CORS_ORIGINS`: `https://truthlayer-ashen.vercel.app,http://localhost:3000`
+   * `BACKEND_PUBLIC_URL`: `https://truthlayer-backend-spcp.onrender.com`
+   * `LLM_MODEL`: `google/gemini-2.5-flash-lite`
+   * `EMBEDDINGS_PROVIDER`: `openai`
+   * `EMBEDDINGS_DIM`: `1536`
+   * `YTDLP_COOKIES_FILE`: `/etc/secrets/cookies.txt` (optional: secret file upload)
+4. Deploy. Health check: `GET https://truthlayer-backend-spcp.onrender.com/health` -> `{"status":"ok"}`.
 
 ## 4. Frontend (Vercel)
 
-1. Vercel → **Add New Project** → import the repo, set **Root Directory** = `frontend`.
-2. Add env var `NEXT_PUBLIC_API_URL` = your Render backend URL.
-3. Deploy. Update the backend's `BACKEND_CORS_ORIGINS` to include the Vercel URL.
+Production URL: `https://truthlayer-ashen.vercel.app`
+
+1. Vercel → **Add New Project** → import repo, set **Root Directory** = `frontend`.
+2. Configure Environment Variables in Vercel Project Settings:
+   * `NEXT_PUBLIC_API_URL`: `https://truthlayer-backend-spcp.onrender.com`
+   * `NEXT_PUBLIC_SUPABASE_URL`: `https://<your-project-ref>.supabase.co`
+   * `NEXT_PUBLIC_SUPABASE_ANON_KEY`: `<your-supabase-anon-public-key>`
+3. Deploy. Verify login, registration, and analysis dashboard pages.
 
 ## 5. (Optional) Distributed processing with Celery
 

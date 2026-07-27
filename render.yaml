@@ -40,10 +40,10 @@ services:
       - key: EMBEDDINGS_DIM
         value: "1536"
       - key: BACKEND_CORS_ORIGINS
-        sync: false
+        value: "https://truthlayer-ashen.vercel.app,http://localhost:3000"
       # Public URL of THIS service (needed for business-tier Hive media links).
       - key: BACKEND_PUBLIC_URL
-        sync: false
+        value: "https://truthlayer-backend-spcp.onrender.com"
       # yt-dlp anti-bot: REQUIRED for ingestion to work from Render's datacenter
       # IPs (YouTube/TikTok/IG block cloud IPs). Set at least one:
       #   YTDLP_COOKIES_FILE — path to a Netscape cookies.txt added as a Render

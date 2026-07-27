@@ -151,7 +151,7 @@ export default function DocsPage() {
                 {/* Business Tier */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-ink text-base">🏢 Business Tier Trust Score</h3>
+                    <h3 className="font-bold text-ink text-base">Business Tier Trust Score</h3>
                     <span className="chip border-accent/25 bg-accent/5 text-accent font-bold">Multi-Dimensional Audit</span>
                   </div>
                   <p className="text-xs text-ink-light leading-relaxed">
@@ -172,7 +172,7 @@ export default function DocsPage() {
                 {/* Creator Tier */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-ink text-base">🎨 Creator Tier Trust Score</h3>
+                    <h3 className="font-bold text-ink text-base">Creator Tier Trust Score</h3>
                     <span className="chip border-good/25 bg-good/5 text-good font-bold">Pre-Publication Check</span>
                   </div>
                   <p className="text-xs text-ink-light leading-relaxed">
@@ -191,7 +191,7 @@ export default function DocsPage() {
                 {/* Verifier Tier */}
                 <div className="rounded-xl border border-line bg-surface p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-ink text-base">🔍 Verifier Tier Trust Score</h3>
+                    <h3 className="font-bold text-ink text-base">Verifier Tier Trust Score</h3>
                     <span className="chip border-warn/25 bg-warn/5 text-warn font-bold">Fact-Checking Core</span>
                   </div>
                   <p className="text-xs text-ink-light leading-relaxed">
