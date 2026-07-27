@@ -188,18 +188,33 @@ attributed to them.
 Located in `app/agents/`, coordinated by `orchestrator.py` (runs selected agents
 concurrently in a thread pool, each with its own context copy).
 
-| Agent | Role |
-| ----- | ---- |
-| `content` | Classifies the video/topic (runs first) |
-| `fact_check` | Extracts claims, retrieves evidence (Tavily), assigns verdicts + confidence |
-| `verification` | Cross-checks/normalizes verification status |
-| `perception` | How the content will be perceived by an audience |
-| `sentiment` | Sentiment / tone scoring |
-| `bias` | Bias and narrative-leaning detection |
-| `compliance` | Checks claims against the product's compliance KB (business) |
-| `creator_risk` | Reputational/"cancellation" risk for creators |
 | `media_integrity` | Deepfake / celebrity-detection (heuristic stub by default; pluggable GPU backend) |
 | `narrative` | Clusters claims into narrative themes across videos |
+
+### Multi-Tier Scoring Mechanism
+
+1. **Business Tier Trust Score (5-Dimensional Composite)**:
+   $$\text{Business Trust Score} = \left(0.35 \cdot S_{\text{kb}} + 0.25 \cdot S_{\text{fact}} + 0.25 \cdot S_{\text{comp}} + 0.15 \cdot S_{\text{brand}}\right) \cdot S_{\text{authenticity}}$$
+   * **Product KB Compliance ($S_{\text{kb}}$, 35%)**: Verification against uploaded spec sheets and brand policies (`auto_verified`: 100%, `approved`: 100%, `needs_review`: 55%, `contradicted`/`rejected`: 0%).
+   * **Factual Accuracy ($S_{\text{fact}}$, 25%)**: Fact-checks claims against external web evidence via Tavily search.
+   * **Regulatory Compliance ($S_{\text{comp}}$, 25%)**: FTC disclosures, disclaimers, and prohibited claim checks.
+   * **Brand Safety ($S_{\text{brand}}$, 15%)**: Penalizes bias and perception harm index.
+   * **Authenticity Multiplier ($S_{\text{authenticity}}$)**: Scales by visual/audio deepfake manipulation score (0.0 to 1.0).
+
+2. **Creator Tier Trust Score**:
+   $$\text{Creator Trust Score} = \left(0.40 \cdot S_{\text{fact}} + 0.30 \cdot S_{\text{brand}} + 0.30 \cdot S_{\text{risk}}\right) \cdot S_{\text{authenticity}}$$
+
+3. **Verifier Tier Trust Score**:
+   $$\text{Verifier Trust Score} = \text{Verdict Base} \times \text{Coverage Multiplier} \times \text{URL Quality} \times \text{Rerank Quality} \times \text{Confidence Factor}$$
+
+4. **Scientific Honesty: 0 Claims Rule**:
+   If a video contains 0 verifiable factual claims, the Trust Score returns `None` (`·` / insufficient claims) to avoid returning misleading scores for unverified content.
+
+### Cloud Ingestion Anti-Bot Strategy (`services/ingestion.py`)
+
+* **Client Spoofing**: `player_client` configured with `["tv_embedded", "ios", "android", "mweb", "web"]`.
+* **Automatic Cookie Discovery**: Auto-detects `cookies.txt` from `/tmp/truthlayer/cookies.txt`, `/app/cookies.txt`, or `YTDLP_COOKIES_FILE`.
+* **3-Stage Fallback**: Primary audio/video download -> `bestaudio/best` fallback -> Captions & metadata extraction mode (`skip_download=True`) when media stream downloads are blocked on cloud datacenter IPs.
 
 ---
 
