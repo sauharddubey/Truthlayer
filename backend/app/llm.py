@@ -79,7 +79,7 @@ def set_runtime_transcription_model(model: Optional[str]) -> None:
 
 
 def effective_chat_key() -> str:
-    key = _runtime_api_key.get()
+    key = _runtime_api_key.get() or settings.LLM_API_KEY
     if not key:
         raise RuntimeError("No OpenRouter API key set for this request")
     return key
@@ -91,7 +91,7 @@ def has_chat_key() -> bool:
     Without a chat key every agent degrades to neutral defaults, so callers
     (diagnostics, reporting) need to test for the key without blowing up.
     """
-    return bool(_runtime_api_key.get())
+    return bool(_runtime_api_key.get() or settings.LLM_API_KEY)
 
 
 def effective_embeddings_key() -> str:
