@@ -86,6 +86,14 @@ export default function DocsPage() {
                   <p className="text-xs text-ink-light">Deep analysis, citation lookup, and factual trust verdicts on every statement.</p>
                 </div>
               </div>
+
+              {/* Cloud Ingestion Limitation Notice */}
+              <div className="mt-5 rounded-xl border border-warn/25 bg-warn/5 p-4 text-xs text-ink space-y-1">
+                <div className="font-bold text-warn uppercase tracking-wider text-[11px]">Cloud Deployment Notice: YouTube Datacenter IP Restrictions</div>
+                <p className="text-ink-light leading-relaxed">
+                  In cloud-hosted deployments (e.g. Render, Railway, AWS datacenter IPs), YouTube blocks automated bot access and requires authentication (<code className="font-mono">Sign in to confirm you&apos;re not a bot</code>). Online URL ingestion requires mounting a logged-in <code className="font-mono">cookies.txt</code> Secret File or routing requests through a residential proxy (<code className="font-mono">YTDLP_PROXY</code>). Direct video file uploads and local development runs operate without restriction.
+                </p>
+              </div>
             </section>
 
             {/* Section 2: AI Agents */}

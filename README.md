@@ -108,6 +108,9 @@ TruthLayer is engineered for zero-maintenance serverless/cloud deployment across
 
 For detailed step-by-step instructions on deploying the backend on Render and the frontend on Vercel, consult [`documentation/deployment_docs/DEPLOYMENT.md`](documentation/deployment_docs/DEPLOYMENT.md).
 
+> **Cloud Deployment Notice (YouTube Datacenter IP Restrictions)**:
+> In cloud-hosted deployments (e.g. Render, Railway, AWS datacenter IPs), YouTube blocks automated bot access and requires authentication (`Sign in to confirm you're not a bot`). Online URL ingestion on cloud deployments requires mounting a logged-in `cookies.txt` Secret File or routing requests through a residential proxy (`YTDLP_PROXY`). Direct video file uploads (`.mp4`, `.mov`) and local development runs operate without restriction.
+
 ---
 
 ## System User Categories & Capabilities
