@@ -24,6 +24,43 @@ logger = logging.getLogger("truthlayer.ingestion")
 # Hive V3 URL/base64 video inputs are limited to 180 seconds.
 HIVE_MAX_VIDEO_SECONDS = 180
 
+# Signatures that mean the platform blocked us for looking like a bot / a
+# datacenter IP — as opposed to a genuinely bad or private video. When we see
+# one, we log an unmistakable, actionable hint (set cookies or a proxy) so the
+# cause is obvious in the Render logs instead of a generic "download failed".
+_BOT_BLOCK_SIGNATURES = (
+    "sign in to confirm",
+    "confirm you're not a bot",
+    "confirm you are not a bot",
+    "not a bot",
+    "http error 403",
+    "403 forbidden",
+    "unable to download webpage",
+    "failed to extract any player response",
+    "this content isn't available",
+    "login required",
+    "requires authentication",
+    "rate-limit",
+    "too many requests",
+)
+
+
+def _log_ingest_failure(url: str, exc: Exception) -> None:
+    """Log a yt-dlp failure, upgrading likely bot-blocks to a clear, fix-oriented
+    message so the root cause is obvious in production logs."""
+    msg = str(exc).lower()
+    if any(sig in msg for sig in _BOT_BLOCK_SIGNATURES):
+        logger.error(
+            "yt-dlp appears BLOCKED as a bot/datacenter IP for %s (%s). "
+            "This is expected on cloud hosts like Render. FIX: set YTDLP_COOKIES_FILE "
+            "(a logged-in cookies.txt) and/or YTDLP_PROXY (a residential proxy). "
+            "See .env.example.",
+            url,
+            exc,
+        )
+    else:
+        logger.warning("yt-dlp ingestion failed completely for %s: %s", url, exc)
+
 SUPPORTED_PLATFORMS = {
     "youtube.com": "youtube",
     "youtu.be": "youtube",
@@ -87,6 +124,23 @@ def _safety_ydl_opts() -> dict:
             return None
 
         opts["match_filter"] = _reject_too_long
+
+    # Anti-bot identity for datacenter IPs (YouTube/TikTok/IG bot-detection).
+    # Client spoofing above is not enough on cloud hosts; a real cookies file
+    # and/or a (residential) proxy is what actually gets past the block. Both
+    # are opt-in via env — absent config leaves behavior unchanged.
+    cookies_file = (settings.YTDLP_COOKIES_FILE or "").strip()
+    if cookies_file:
+        if os.path.exists(cookies_file):
+            opts["cookiefile"] = cookies_file
+        else:
+            logger.warning(
+                "YTDLP_COOKIES_FILE is set but the file does not exist: %s",
+                cookies_file,
+            )
+    proxy = (settings.YTDLP_PROXY or "").strip()
+    if proxy:
+        opts["proxy"] = proxy
     return opts
 
 
@@ -99,6 +153,34 @@ def _hash_file(path: str) -> Optional[str]:
         return h.hexdigest()
     except OSError:
         return None
+
+
+def _has_video_stream(path: str) -> bool:
+    """True only if ``path`` contains a real (frame-bearing) video stream.
+
+    The primary download prioritizes ``bestaudio`` and keeps the file, so the
+    "video" candidate is usually an audio-only container (e.g. an Opus .webm).
+    Handing that to OCR just burns an ffmpeg call that extracts zero frames and
+    produces an empty OCR result. We probe with ffmpeg (always available via
+    ffmpeg_utils) and ignore cover-art / "attached pic" streams, which are not
+    real video. Fail-open only on probe error so genuine videos are never lost.
+    """
+    try:
+        result = subprocess.run(
+            [ffmpeg_exe(), "-hide_banner", "-i", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        # ffmpeg prints stream info to stderr (and exits non-zero with only -i).
+        for line in (result.stderr or "").splitlines():
+            if "Video:" in line and "attached pic" not in line:
+                return True
+        return False
+    except Exception as exc:
+        logger.warning("Could not probe %s for a video stream: %s", path, exc)
+        return False
 
 
 def _normalize_video_for_hive(input_path: str, out_dir: Path, vid_id: str) -> Optional[str]:
@@ -245,7 +327,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
             fallback_opts = {
                 **base_opts,
                 "format": "bestaudio/best",
-                "keepvideo": False,
+                "keepvideo": True,
             }
             with yt_dlp.YoutubeDL(fallback_opts) as ydl, guarded_resolution():
                 info = ydl.extract_info(url, download=True)
@@ -253,11 +335,22 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
         vid_id = info.get("id")
         audio_path = str(out_dir / f"{vid_id}.mp3")
         
-        # Find the preserved video file among candidate video extensions
+        # Find the preserved video file among candidate video extensions. The
+        # primary format prioritizes bestaudio, so the kept file is often an
+        # audio-only container (e.g. Opus .webm) with NO frames — only accept it
+        # as a video (for OCR) if it actually has a video stream. Business-tier
+        # runs get a proper video via _download_url_video below regardless.
         for ext in [".mp4", ".webm", ".mkv", ".avi", ".mov", ".m4v"]:
             candidate = str(out_dir / f"{vid_id}{ext}")
             if os.path.exists(candidate):
-                video_path = candidate
+                if _has_video_stream(candidate):
+                    video_path = candidate
+                else:
+                    logger.info(
+                        "Ingest kept an audio-only file (%s); OCR/image analysis "
+                        "skipped for this run (expected on non-business tiers).",
+                        os.path.basename(candidate),
+                    )
                 break
 
         meta = {
@@ -288,7 +381,7 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
         if media_paths:
             meta["media_paths"] = list(dict.fromkeys(media_paths))
     except Exception as exc:
-        logger.warning("yt-dlp ingestion failed completely for %s: %s", url, exc)
+        _log_ingest_failure(url, exc)
         meta = {"title": f"Video from {platform}", "ingest_error": str(exc)}
 
     return IngestResult(
