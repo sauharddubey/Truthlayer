@@ -1,56 +1,99 @@
-# TruthLayer Backend
+# TruthLayer Backend Subsystem
 
-FastAPI service implementing ingestion, transcription, transcript structuring, the
-multi-agent analysis pipeline, RAG, and reporting.
+FastAPI backend service implementing video ingestion, audio extraction, multimodal transcription, transcript structuring, the parallel multi-agent analysis fleet, pgvector RAG retrieval, security controls, and PDF report generation.
 
-## Run locally (without Docker)
+---
+
+## Directory Architecture
+
+```
+backend/
+├── Dockerfile              Container build configuration for FastAPI service
+├── README.md               Backend subsystem architecture and execution guide
+├── requirements.txt        Pinned Python dependencies
+├── app/                    Core FastAPI backend package
+│   ├── main.py             FastAPI entrypoint, middleware, CORS, static mounts
+│   ├── config.py           Single source of truth environment settings
+│   ├── database.py         SQLAlchemy engine, session factory, and schema migrations
+│   ├── models.py           SQLAlchemy ORM data models and enumerations
+│   ├── schemas.py          Pydantic v2 schemas for API requests and responses
+│   ├── security.py         Supabase JWT authentication and RBAC dependencies
+│   ├── crypto.py           Fernet symmetric key encryption and signed URL helpers
+│   ├── audit.py            Structured audit logging engine
+│   ├── ratelimit.py        Token-bucket rate limiting middleware and memory stores
+│   ├── urlguard.py         SSRF prevention and video URL domain validation
+│   ├── uploads.py          Video file upload validation and disk storage
+│   ├── rights.py           Role capabilities, tier permissions, and agent mapping
+│   ├── llm.py              OpenRouter LLM chat, embeddings, and contextvar key handling
+│   ├── monitoring.py       Continuous keyword and hashtag monitoring engine
+│   ├── agents/             Fleet of 11 specialized AI analysis agents
+│   ├── api/                FastAPI REST router modules
+│   ├── compliance/         Subprocessor registry and compliance assets
+│   ├── rag/                PostgreSQL pgvector storage and similarity search
+│   ├── services/           Background processing services (ingest, transcribe, struct, PDF)
+│   └── tasks/              Celery worker configuration and pipeline task flows
+└── tests/                  Automated unit, integration, and hardening test suite
+```
+
+---
+
+## Technical Specifications
+
+### 1. In-Process & Asynchronous Pipeline Execution
+* **Default Mode (`USE_CELERY=false`)**: Pipeline execution runs asynchronously within the FastAPI process using `BackgroundTasks`. No external Redis broker is required for single-node deployments.
+* **Distributed Mode (`USE_CELERY=true`)**: Pipeline execution is dispatched to Celery workers backed by a Redis message broker for horizontal scaling.
+
+### 2. Multi-Agent Threading & Per-User API Keys
+* AI calls are executed in parallel using `concurrent.futures.ThreadPoolExecutor`.
+* Python `contextvars` (`set_runtime_api_key`) ensure that the submitting user's decrypted OpenRouter API key is safely propagated to worker threads without cross-request leakages.
+
+### 3. Security & Access Control
+* **JWKS Verification**: Supabase JWT access tokens are validated against Supabase Published JWKS endpoint using ES256 signature verification.
+* **Data Encryption**: Per-user API keys stored in `users.openrouter_api_key` are encrypted at rest via Fernet symmetric encryption.
+* **URL Guard**: Prevents SSRF attacks by enforcing strict domain allow-lists (YouTube, TikTok, Instagram) and resolving IP addresses before making HTTP requests.
+
+---
+
+## Local Execution & Development Setup
+
+### Virtual Environment Execution
 
 ```bash
+# Navigate to backend directory
 cd backend
-python -m venv .venv && source .venv/bin/activate
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-cp ../.env.example ../.env        # then edit ../.env
-uvicorn app.main:app --reload     # http://localhost:8000/docs
+
+# Initialize environment variables
+cp ../.env.example ../.env
+
+# Launch FastAPI development server
+uvicorn app.main:app --reload --port 8000
 ```
 
-By default (`USE_CELERY=false`) analysis runs in-process via FastAPI
-`BackgroundTasks` — no Redis/worker needed. This is the free-tier path.
-
-## With Celery (distributed processing)
+### Docker Execution
 
 ```bash
-# set USE_CELERY=true and REDIS_URL in .env, then:
-celery -A app.tasks.celery_app.celery worker --loglevel=info
-# optional periodic keyword monitoring:
-celery -A app.tasks.celery_app.celery beat --loglevel=info
+# Build backend container from root directory
+docker compose build backend
+
+# Run backend container
+docker compose up backend
 ```
 
-## Layout
+---
 
+## Executing the Test Suite
+
+```bash
+# Run all tests using pytest
+pytest -q
+
+# Run specific security hardening tests
+pytest tests/test_hardening.py -v
 ```
-app/
-├── main.py            FastAPI app + router wiring
-├── config.py          env-driven settings (provider-agnostic)
-├── database.py        SQLAlchemy engine/session + pgvector bootstrap
-├── models.py          ORM models (full SRS schema)
-├── schemas.py         Pydantic request/response models
-├── security.py        JWT, password hashing, RBAC
-├── llm.py             OpenAI-compatible chat + embeddings (local fallback)
-├── monitoring.py      continuous keyword monitoring
-├── api/               auth, videos, business, dashboard, reports routers
-├── agents/            fact_check, bias, sentiment, compliance, creator_risk,
-│                      media_integrity, narrative, orchestrator
-├── rag/store.py       document parse/chunk/embed + tenant-scoped retrieval
-├── services/          ingestion (yt-dlp), transcription (OpenRouter audio), structuring,
-│                      evidence (tavily), reports (pdf)
-└── tasks/             pipeline + celery app
-```
-
-## Notes
-
-- **No keys?** The system still runs end-to-end: transcription, LLM agents, and
-  evidence retrieval fall back to deterministic stubs, and embeddings use a local
-  MiniLM model. Add keys in `.env` to unlock real analysis.
-- `EMBEDDINGS_DIM` must match the embedding model. If you switch from the local
-  MiniLM (384) to OpenAI `text-embedding-3-small` (1536), update `EMBEDDINGS_DIM`
-  **before** first run (it defines the pgvector column width).
