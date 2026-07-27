@@ -233,10 +233,13 @@ TruthLayer/
 ### Automated Setup via Docker Compose
 
 ```bash
-# 1. Clone repository and initialize environment settings
+# 1. Clone repository and initialize root/backend environment settings
 cp .env.example .env
 
-# 2. Launch PostgreSQL (pgvector), Redis, FastAPI backend, Celery worker, and Next.js frontend
+# 2. Initialize frontend environment settings
+cp frontend/.env.local.example frontend/.env.local
+
+# 3. Launch PostgreSQL (pgvector), Redis, FastAPI backend, Celery worker, and Next.js frontend
 docker compose up --build -d
 
 # Access services:
@@ -249,6 +252,7 @@ docker compose up --build -d
 ```bash
 # Backend setup
 cd backend
+cp ../.env.example ../.env
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -256,6 +260,7 @@ uvicorn app.main:app --reload --port 8000
 
 # Frontend setup
 cd frontend
+cp .env.local.example .env.local
 npm install
 npm run dev
 ```
