@@ -105,9 +105,11 @@ def _safety_ydl_opts() -> dict:
     opts: dict = {
         "enable_file_urls": False,
         "max_filesize": settings.MAX_DOWNLOAD_MB * 1024 * 1024,
+        "nocheckcertificate": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "android", "mweb", "tv_embedded"]
+                "player_client": ["tv_embedded", "ios", "android", "mweb", "web"],
+                "player_skip": ["configs", "webpage"],
             }
         },
         "http_headers": {
@@ -125,19 +127,21 @@ def _safety_ydl_opts() -> dict:
 
         opts["match_filter"] = _reject_too_long
 
-    # Anti-bot identity for datacenter IPs (YouTube/TikTok/IG bot-detection).
-    # Client spoofing above is not enough on cloud hosts; a real cookies file
-    # and/or a (residential) proxy is what actually gets past the block. Both
-    # are opt-in via env — absent config leaves behavior unchanged.
-    cookies_file = (settings.YTDLP_COOKIES_FILE or "").strip()
-    if cookies_file:
-        if os.path.exists(cookies_file):
-            opts["cookiefile"] = cookies_file
-        else:
-            logger.warning(
-                "YTDLP_COOKIES_FILE is set but the file does not exist: %s",
-                cookies_file,
-            )
+    # Auto-discover Netscape cookies.txt file from env or common storage paths
+    cookie_candidates = [
+        (settings.YTDLP_COOKIES_FILE or "").strip(),
+        os.path.join(settings.MEDIA_STORAGE_DIR, "cookies.txt"),
+        "/tmp/cookies.txt",
+        "/tmp/truthlayer/cookies.txt",
+        "/app/cookies.txt",
+        os.path.abspath("cookies.txt"),
+    ]
+    for candidate in cookie_candidates:
+        if candidate and os.path.isfile(candidate):
+            opts["cookiefile"] = candidate
+            logger.info("yt-dlp using verified cookies file: %s", candidate)
+            break
+
     proxy = (settings.YTDLP_PROXY or "").strip()
     if proxy:
         opts["proxy"] = proxy
@@ -329,8 +333,19 @@ def ingest_url(url: str, *, include_video: bool = False) -> IngestResult:
                 "format": "bestaudio/best",
                 "keepvideo": True,
             }
-            with yt_dlp.YoutubeDL(fallback_opts) as ydl, guarded_resolution():
-                info = ydl.extract_info(url, download=True)
+            try:
+                with yt_dlp.YoutubeDL(fallback_opts) as ydl, guarded_resolution():
+                    info = ydl.extract_info(url, download=True)
+            except Exception as fallback_exc:
+                logger.warning("Audio-only yt-dlp download failed for %s: %s. Attempting metadata/captions-only fallback.", url, fallback_exc)
+                meta_opts = {
+                    **base_opts,
+                    "skip_download": True,
+                    "writesubtitles": True,
+                    "writeautomaticsub": True,
+                }
+                with yt_dlp.YoutubeDL(meta_opts) as ydl, guarded_resolution():
+                    info = ydl.extract_info(url, download=False)
 
         vid_id = info.get("id")
         audio_path = str(out_dir / f"{vid_id}.mp3")
