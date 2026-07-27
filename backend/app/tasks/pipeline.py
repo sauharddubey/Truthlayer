@@ -208,6 +208,7 @@ def process_video(video_id: str) -> None:
             run_pipeline(db, video)
 
             video.processing_status = ProcessingStatus.COMPLETED
+            video.error = None
             logger.info("Pipeline completed for video %s", video_id)
             if video.organization_id:
                 try:
