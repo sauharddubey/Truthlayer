@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     MEDIA_STORAGE_DIR: str = "/tmp/truthlayer/media"
     MAX_UPLOAD_MB: int = 200          # streamed video-upload cap
     MAX_DOCUMENT_MB: int = 25         # RAG document / product-image upload cap
+    MAX_DOCUMENTS_PER_PRODUCT: int = 25 # Max RAG documents allowed per product
 
     # ── Ingestion safety (SSRF + resource limits) ─────────────────────────
     # yt-dlp fetches user-supplied URLs server-side. Only the platforms the

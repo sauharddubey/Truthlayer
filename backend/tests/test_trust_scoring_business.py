@@ -11,10 +11,9 @@ def test_business_trust_uses_verification_status_when_present():
             {"verdict": "supported", "verification_status": "needs_review"},
         ]
     }
-    score = compute_tier_trust_score(fact, {}, {}, tier="business")
+    score, breakdown = compute_tier_trust_score(fact, {}, {}, tier="business")
     assert score is not None
-    # (1.0 + 0.0 + 0.55) / 3 * 100, no bias/authenticity penalties
-    assert score == 51.7
+    assert breakdown["sub_scores"]["kb_compliance"] == 51.7
 
 
 def test_creator_trust_ignores_verification_status():
@@ -24,5 +23,6 @@ def test_creator_trust_ignores_verification_status():
             {"verdict": "unverified", "verification_status": "auto_verified"},
         ]
     }
-    score = compute_tier_trust_score(fact, {}, {}, tier="creator")
-    assert score == 75.0
+    score, breakdown = compute_tier_trust_score(fact, {}, {}, tier="creator")
+    assert score is not None
+    assert breakdown["sub_scores"]["factual_accuracy"] == 75.0

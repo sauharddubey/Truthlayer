@@ -230,6 +230,12 @@ async def upload_document(
     user: User = Depends(business_only),
 ):
     _get_product(db, pid, user)
+    existing_count = db.query(Document).filter(Document.product_id == pid).count()
+    if existing_count >= settings.MAX_DOCUMENTS_PER_PRODUCT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum limit of {settings.MAX_DOCUMENTS_PER_PRODUCT} documents reached for this product.",
+        )
     if document_type not in ALLOWED_DOCUMENT_TYPES:
         raise HTTPException(
             status_code=400,
