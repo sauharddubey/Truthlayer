@@ -5,20 +5,14 @@ changes. Keep it up to date when architecture or conventions change.
 
 ---
 
-## What this is
+## System Overview
 
-**TruthLayer** is an AI trust, compliance & media-intelligence platform for video.
-It transcribes a video, structures the transcript, runs a fleet of AI agents
-(fact-check, perception, bias, sentiment, compliance, creator-risk, media-integrity,
-narrative), and produces an explainable, evidence-backed report.
+**TruthLayer** is an AI trust, compliance, and media-intelligence platform for video.
+It transcribes video content, structures the transcript into claim statements, executes a parallel fleet of specialized AI agents (fact-check, perception, bias, sentiment, compliance, creator-risk, media-integrity, narrative), and produces an explainable, evidence-backed report.
 
-### Three user categories (this is the core model — keep it to exactly three)
-- **business** — Products workspace. Each product has its own videos, compliance
-  knowledge base (product details + marketing policies), hashtag monitoring,
-  narrative intelligence, and a brand overview. Claims are verified against the
-  product's uploaded docs (auto-verify / needs-review / contradicted).
-- **creator** — Pre-publication self-check of their own uploads: facts, perception
-  ("could this offend / is it wrong / how will it land"), tone, bias.
+### Three User Categories
+- **business** — Products workspace. Each product has its own videos, compliance knowledge base (product details + marketing policies), hashtag monitoring, narrative intelligence, and a brand overview. Claims are verified against the product's uploaded docs (auto-verify / needs-review / contradicted).
+- **creator** — Pre-publication self-check of their own uploads: facts, perception ("could this offend / is it wrong / how will it land"), tone, bias.
 - **verifier** — AI fact-checker: every claim evaluated with evidence + a trust verdict.
 
 ---
@@ -27,14 +21,14 @@ narrative), and produces an explainable, evidence-backed report.
 
 | Layer        | Tech |
 | ------------ | ---- |
-| Frontend     | Next.js 14 (App Router), TypeScript, Tailwind |
+| Frontend     | Next.js 14 (App Router), TypeScript, Tailwind CSS |
 | Backend      | FastAPI + SQLAlchemy + Pydantic v2 |
 | DB           | PostgreSQL + `pgvector` |
 | Async        | Celery + Redis (optional; default runs inline via FastAPI BackgroundTasks) |
-| All AI       | **OpenRouter** (OpenAI-compatible) — chat, embeddings, and audio transcription |
+| All AI       | OpenRouter (OpenAI-compatible) — chat, embeddings, and audio transcription |
 | Ingestion    | `yt-dlp` (YouTube / TikTok / Instagram) |
 
-### Repo layout
+### Repo Layout
 ```
 backend/app/
   main.py            FastAPI app, router wiring, /media static mount, startup init_db
@@ -51,7 +45,7 @@ backend/app/
   services/          ingestion (yt-dlp), transcription (OpenRouter audio), structuring,
                      evidence (tavily), reports (pdf), google_oauth
   rag/store.py       parse/chunk/embed docs + tenant+product-scoped pgvector retrieval
-  tasks/             pipeline (ingest→transcribe→structure→agents→fuse→report) + celery
+  tasks/             pipeline (ingest->transcribe->structure->agents->fuse->report) + celery
 
 frontend/
   app/               App Router pages: / (editorial landing), login, register, settings,
@@ -64,10 +58,10 @@ frontend/
 
 ---
 
-## The analysis pipeline (`backend/app/tasks/pipeline.py` → `agents/orchestrator.py`)
+## The Analysis Pipeline (`backend/app/tasks/pipeline.py` -> `agents/orchestrator.py`)
 1. Set the submitting user's OpenRouter key for the run (falls back to default).
 2. Clear prior results for the video (re-processing is idempotent).
-3. Ingest (yt-dlp) → Transcribe (OpenRouter audio, timestamped segments) → Structure.
+3. Ingest (yt-dlp) -> Transcribe (OpenRouter audio, timestamped segments) -> Structure.
 4. Business: auto-identify the product from title/captions/transcript.
 5. `content` agent runs first (classifies product vs not, labels each segment safe/verify/risky).
 6. `rights.agents_for_tier(tier)` selects the parallel agents; they run in a
@@ -91,16 +85,14 @@ frontend/
   is unavailable — a single agent failure must never crash the pipeline.
 - **No emojis in the UI** — use the SVG icon set in `components/icons.tsx`.
 - **Frontend fonts**: `Inter` (body/UI), `Anton` (`font-heavy`, big display headings),
-  `Fraunces` (`font-display`, available but the landing uses Anton). Palette is the
-  Notion-style tokens in `tailwind.config.ts` (`ink`, `paper`, `surface`, `line`,
-  `accent`, `good`/`warn`/`bad`). Keep status colors consistent.
+  `Fraunces` (`font-display`). Palette is defined in `tailwind.config.ts`.
 - **Two UIs, on purpose**: the marketing landing (`app/page.tsx`) is an editorial,
-  scroll-animated, Wizz-style showpiece; the authenticated app (`AppShell`) is a clean,
+  scroll-animated showpiece; the authenticated app (`AppShell`) is a clean,
   minimal Notion-style workspace. Don't blur them.
 
 ---
 
-## Running locally
+## Running Locally
 ```bash
 cp .env.example .env          # fill keys (OpenRouter key already wired for dev)
 # Backend + DB (Redis optional):
@@ -108,18 +100,18 @@ docker compose up --build -d db redis backend     # http://localhost:8000/docs
 # Frontend (dev):
 cd frontend && npm install && npm run dev          # http://localhost:3000
 ```
-Health: `GET http://localhost:8000/health`.
+Health check: `GET http://localhost:8000/health`.
 
 ### Environment
-- `LLM_*` → OpenRouter chat (`openai/gpt-oss-120b:free` is the free default).
-- `EMBEDDINGS_*` → OpenRouter `openai/text-embedding-3-small` (1536-dim) or local MiniLM.
+- `LLM_*` -> OpenRouter chat (`openai/gpt-oss-120b:free` is the free default).
+- `EMBEDDINGS_*` -> OpenRouter `openai/text-embedding-3-small` (1536-dim) or local MiniLM.
 - `TRANSCRIPTION_PROVIDER=openrouter` (audio via `google/gemini-2.5-flash-lite`); `stub` is the alternative.
 - **No Whisper API Key**: Whisper key/provider is fully removed. All transcription runs through OpenRouter audio multimodal models or falls back to the stub.
 - Per-user keys: OpenRouter, Tavily, and media-integrity keys are set in the app's Settings page (`PUT /auth/settings`) and stored on `User` encrypted.
 
 ---
 
-## ⚠️ Gotchas (we hit these — don't repeat)
+## Implementation Gotchas
 - **Encryption Key Sharing**: When working on the same shared Supabase database, all developers MUST share the exact same `ENCRYPTION_KEY` in their local `.env` (else decrypting stored user API keys fails with a cryptography `InvalidToken` error).
   - **Security note (do before launch):** a single symmetric key shared across everyone means anyone holding it can decrypt *every* user's stored third-party keys. Use **separate keys per environment** (dev / staging / prod), keep the prod key in a secrets manager with tight access — **not** in a shared `*.env.local` file passed around — and plan a key-rotation + re-encryption procedure. The prod `ENCRYPTION_KEY` must never be shared with dev.
 - **Multi-env split**: The frontend reads `frontend/.env.local` for local development. Never put server secrets (like `ENCRYPTION_KEY`) in frontend files since `NEXT_PUBLIC_` variables are bundled client-side and visible to users.
@@ -146,14 +138,14 @@ Health: `GET http://localhost:8000/health`.
 
 ---
 
-## Verifying changes
+## Verifying Changes
 - Backend: `cd backend && python3 -m compileall -q app` then rebuild the container.
 - Frontend: `cd frontend && npx tsc --noEmit` and view via the preview/dev server.
 - Smoke tests: `cd backend && python -m pytest -q` (offline, no DB/keys needed).
 
 ---
 
-## Docs
-- `docs/REQUIREMENTS_TRACEABILITY.md` — SRS requirement → code mapping.
+## Documentation Index
+- `docs/REQUIREMENTS_TRACEABILITY.md` — SRS requirement -> code mapping.
 - `docs/DEPLOYMENT.md` — free-tier deployment (Supabase/Neon, Render, Vercel, OpenRouter).
 - `README.md`, `backend/README.md`, `frontend/README.md`.

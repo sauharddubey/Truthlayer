@@ -1,37 +1,73 @@
-# TruthLayer Frontend
+# TruthLayer Frontend Subsystem
 
-Next.js 14 (App Router) + Tailwind + Recharts. Three dashboards (business / creator
-/ viewer), a video-submission flow, and an explainable analysis page with live
-polling, score cards, sentiment timeline, claims and per-agent evidence panels.
+Next.js 14 (App Router) web application built with TypeScript, Tailwind CSS, Recharts, and Framer Motion. The frontend features role-tailored dashboards (`business`, `creator`, `verifier`), an interactive video submission page, a real-time live analysis dashboard, and marketing landing pages.
 
-## Run locally
+---
+
+## Technical Architecture
+
+```
+frontend/
+├── Dockerfile                  Container build instructions for Next.js app
+├── README.md                   Frontend subsystem overview and execution guide
+├── package.json                Node.js dependencies and script definitions
+├── tailwind.config.ts          Tailwind CSS design tokens and custom animations
+├── tsconfig.json               TypeScript compiler settings
+├── next.config.js              Next.js runtime configuration and security headers
+├── app/                        Next.js App Router pages, layouts, and global styles
+├── components/                 Reusable React UI components
+├── lib/                        API client, Supabase bindings, and custom hooks
+└── public/                     Static images and brand assets
+```
+
+---
+
+## Technology Stack
+
+| Technology | Specification & Role |
+| :--- | :--- |
+| **Framework** | Next.js 14 (App Router), React 18, TypeScript |
+| **Styling & Design System** | Tailwind CSS with Notion-inspired monochromatic UI design tokens (`ink`, `paper`, `surface`, `line`, `accent`) |
+| **Typography** | Google Fonts: `Inter` (body/UI), `Anton` (display headers), `Fraunces` |
+| **Visualizations** | Recharts (sentiment timelines, confidence radars, claim distribution charts) |
+| **Animations** | Framer Motion (smooth scroll transitions, interactive hero element dynamics) |
+| **Icons** | Custom SVG icon library (`components/icons.tsx`) — strictly zero external emoji reliance |
+
+---
+
+## Subsystem Navigation & Role Workspaces
+
+The application enforces a dual-design philosophy:
+1. **Public Marketing Portal (`/`)**: Editorial, scroll-animated showpiece highlighting core capabilities.
+2. **Authenticated Workspace (`AppShell`)**: Clean, minimal workspace tailored to the user's active role:
+   * **Business (`/dashboard/brand`)**: Product catalogs, RAG document management, hashtag tracking, and narrative trend analytics.
+   * **Creator (`/dashboard/creator`)**: Pre-publication risk audits, audience perception scoring, and sponsorship policy compliance.
+   * **Verifier (`/dashboard/verifier`)**: Fact-checking queue, evidence validation cards, and trust score breakdowns.
+
+---
+
+## Local Development Execution
 
 ```bash
+# Navigate to frontend directory
 cd frontend
+
+# Install Node.js dependencies
 npm install
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL
-npm run dev                         # http://localhost:3000
+
+# Copy environment template
+cp .env.local.example .env.local
+
+# Launch Next.js local dev server
+npm run dev
+# App accessible at http://localhost:3000
 ```
 
-## Deploy (Vercel — free tier)
+---
 
-1. Import the `frontend/` directory as a Vercel project.
-2. Set `NEXT_PUBLIC_API_URL` to your deployed backend URL.
-3. Deploy. Vercel auto-detects Next.js.
+## Verification & Type Checking
 
-## Pages
-
+```bash
+# Execute TypeScript compilation check without emitting files
+npx tsc --noEmit
 ```
-app/
-├── page.tsx                 landing
-├── login / register         auth
-├── analyze                  submit URL or upload
-├── analysis/[id]            live results + evidence dashboard
-└── dashboard/
-    ├── viewer               consumer view
-    ├── creator              creator risk view
-    └── business             brand intelligence + compliance + monitoring
-```
-
-Auth uses a JWT stored in `localStorage`; the API client in `lib/api.ts` attaches
-it to every request.

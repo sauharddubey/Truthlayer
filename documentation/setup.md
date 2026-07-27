@@ -112,7 +112,7 @@ Generate an encryption key:
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> ⚠️ Keep `ENCRYPTION_KEY` stable — if it changes, previously stored user keys
+> IMPORTANT: Keep `ENCRYPTION_KEY` stable — if it changes, previously stored user keys
 > become unreadable and users must re-enter them.
 
 ### Frontend `frontend/.env.local`

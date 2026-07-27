@@ -171,11 +171,11 @@ the `Video` row (`processing_status`):
 | ----- | ------ | ------------ |
 | 0 | — | Idempotent reset: clear prior artifacts for re-processing |
 | 1. Ingestion | `INGESTING` | Resolve URL / read upload; extract audio (`services/ingestion.py`) |
-| 2. Transcription | `TRANSCRIBING` | Speech → text (`services/transcription.py`) |
-| 3. Structuring | `STRUCTURING` | Transcript → semantic claims; embed + index in pgvector |
+| 2. Transcription | `TRANSCRIBING` | Speech -> text (`services/transcription.py`) |
+| 3. Structuring | `STRUCTURING` | Transcript -> semantic claims; embed + index in pgvector |
 | 4. Agents + fusion + scoring | `ANALYZING` | Run tier's agents in parallel, fuse evidence, compute scores |
-| ✓ | `COMPLETED` | Write `AnalysisReport`; invalidate brand-synthesis cache |
-| ✗ | `FAILED` | Store a **generic** error message (full detail to server logs only) |
+| Completed | `COMPLETED` | Write `AnalysisReport`; invalidate brand-synthesis cache |
+| Failed | `FAILED` | Store a **generic** error message (full detail to server logs only) |
 
 The submitting user's OpenRouter key is decrypted and set as the per-request
 runtime key before any LLM calls, so all work bills that user's key and usage is
