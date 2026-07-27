@@ -68,6 +68,15 @@ def _safety_ydl_opts() -> dict:
     opts: dict = {
         "enable_file_urls": False,
         "max_filesize": settings.MAX_DOWNLOAD_MB * 1024 * 1024,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "android", "mweb", "tv_embedded"]
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     }
     max_dur = settings.MAX_VIDEO_DURATION_SECONDS
     if max_dur:
