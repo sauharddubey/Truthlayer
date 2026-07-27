@@ -169,7 +169,7 @@ _MODEL_PRICE: dict[str, tuple[float, float]] = {
     "openai/gpt-4o-mini":               (0.15,    0.60),
     "openai/gpt-4-turbo":               (10.00,  30.00),
     "openai/gpt-3.5-turbo":             (0.50,   1.50),
-    "openai/gpt-oss-120b:free":         (0.0,     0.0),
+    "google/gemini-2.5-flash-lite":     (0.075,  0.30),
     "anthropic/claude-3.5-sonnet":      (3.00,   15.00),
     "anthropic/claude-3-haiku":         (0.25,   1.25),
     "google/gemini-2.5-flash-lite":     (0.075,  0.30),

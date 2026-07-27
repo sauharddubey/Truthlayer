@@ -13,11 +13,12 @@ const WORKSPACES = [
 ];
 
 const DEFAULT_LLM_MODELS = [
-  { id: "openai/gpt-oss-120b:free", name: "GPT-OSS-120B (Free Default)" },
+  { id: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite (Fast Default)" },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini" },
   { id: "openai/gpt-4o", name: "GPT-4o" },
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
-  { id: "meta-llama/llama-3.1-8b-instruct:free", name: "Llama 3.1 8B Instruct (Free)" },
+  { id: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B Instruct (Free)" },
 ];
 
 // Only 1536-dimension models: the pgvector column is fixed at EMBEDDINGS_DIM

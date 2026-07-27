@@ -103,7 +103,7 @@ cd frontend && npm install && npm run dev          # http://localhost:3000
 Health check: `GET http://localhost:8000/health`.
 
 ### Environment
-- `LLM_*` -> OpenRouter chat (`openai/gpt-oss-120b:free` is the free default).
+- `LLM_*` -> OpenRouter chat (`google/gemini-2.5-flash-lite` is the fast default).
 - `EMBEDDINGS_*` -> OpenRouter `openai/text-embedding-3-small` (1536-dim) or local MiniLM.
 - `TRANSCRIPTION_PROVIDER=openrouter` (audio via `google/gemini-2.5-flash-lite`); `stub` is the alternative.
 - **No Whisper API Key**: Whisper key/provider is fully removed. All transcription runs through OpenRouter audio multimodal models or falls back to the stub.

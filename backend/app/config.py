@@ -59,7 +59,7 @@ class Settings(BaseSettings):
 
     # ── LLM (OpenRouter — OpenAI-compatible) ──────────────────────────────
     LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
-    LLM_MODEL: str = "openai/gpt-oss-120b:free"
+    LLM_MODEL: str = "google/gemini-2.5-flash-lite"
     LLM_TEMPERATURE: float = 0.1
     # Optional OpenRouter attribution headers (shown on your OpenRouter dashboard).
     LLM_HTTP_REFERER: str = "https://truthlayer.app"
